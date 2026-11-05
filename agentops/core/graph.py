@@ -19,7 +19,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 
 from agentops.core.state import DemoState, RunContext
-from agentops.observability.events import emit
+from agentops.observability.events import emit, node_key
 
 # Test-only hook: when set, step_two writes a marker file and blocks until a release file
 # exists, so an integration test can kill the worker deterministically inside step_two.
@@ -43,7 +43,12 @@ async def _wait_for_release(task_id: str) -> None:
 async def step_one(state: DemoState, runtime: Runtime[RunContext]) -> dict[str, Any]:
     ctx = runtime.context
     await emit(
-        ctx.engine, ctx.task_id, "node.completed", node="step_one", payload={"pid": os.getpid()}
+        ctx.engine,
+        ctx.task_id,
+        "node.completed",
+        node="step_one",
+        payload={"pid": os.getpid()},
+        dedupe_key=node_key("step_one", "completed"),
     )
     return {"log": [f"step_one:{os.getpid()}"]}
 
@@ -51,11 +56,21 @@ async def step_one(state: DemoState, runtime: Runtime[RunContext]) -> dict[str, 
 async def step_two(state: DemoState, runtime: Runtime[RunContext]) -> dict[str, Any]:
     ctx = runtime.context
     await emit(
-        ctx.engine, ctx.task_id, "node.started", node="step_two", payload={"pid": os.getpid()}
+        ctx.engine,
+        ctx.task_id,
+        "node.started",
+        node="step_two",
+        payload={"pid": os.getpid()},
+        dedupe_key=node_key("step_two", "started"),
     )
     await _wait_for_release(str(ctx.task_id))
     await emit(
-        ctx.engine, ctx.task_id, "node.completed", node="step_two", payload={"pid": os.getpid()}
+        ctx.engine,
+        ctx.task_id,
+        "node.completed",
+        node="step_two",
+        payload={"pid": os.getpid()},
+        dedupe_key=node_key("step_two", "completed"),
     )
     return {"log": [f"step_two:{os.getpid()}"]}
 

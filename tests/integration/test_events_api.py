@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from agentops.api.auth import require_role
 from agentops.api.main import create_app
 from agentops.db.models import UserRole
-from agentops.observability.events import CHANNEL, emit
+from agentops.observability.events import CHANNEL, emit, node_key
 from agentops.settings import Settings, get_settings
 from tests.integration.conftest import SeededUser, create_task
 
@@ -175,3 +175,46 @@ async def test_sse_rejects_bad_last_event_id(
     tid = await create_task(engine, alice)
     r = await client.get(f"/tasks/{tid}/events", headers={**alice.headers, "Last-Event-ID": "x"})
     assert r.status_code == 400
+
+
+async def test_dedupe_key_makes_emit_idempotent(engine: AsyncEngine, alice: SeededUser) -> None:
+    """ADR-025: the same dedupe key twice -> one row, one NOTIFY; NULL keys never collide."""
+    tid = await create_task(engine, alice)
+    dsn = get_settings().libpq_dsn
+    async with await psycopg.AsyncConnection.connect(dsn, autocommit=True) as listener:
+        await listener.execute(f"LISTEN {CHANNEL}")
+        key = node_key("plan", "started", "p1")
+        first = await emit(engine, tid, "node.started", node="plan", dedupe_key=key)
+        again = await emit(engine, tid, "node.started", node="plan", dedupe_key=key)
+        free1 = await emit(engine, tid, "task.status", payload={"status": "running"})
+        free2 = await emit(engine, tid, "task.status", payload={"status": "running"})
+        # same key on another task is independent
+        other = await create_task(engine, alice)
+        elsewhere = await emit(engine, other, "node.started", node="plan", dedupe_key=key)
+
+        notified: list[int] = []
+        gen = listener.notifies(timeout=1.0)
+        async for n in gen:
+            msg = json.loads(n.payload)
+            if msg["task_id"] == str(tid):
+                notified.append(int(msg["id"]))
+
+    assert first is not None and again is None
+    assert free1 is not None and free2 is not None and free1 != free2
+    assert elsewhere is not None
+    assert notified == [first, free1, free2]
+    async with engine.connect() as c:
+        n = (
+            await c.execute(
+                text("SELECT count(*) FROM events WHERE task_id = :t AND dedupe_key = :k"),
+                {"t": tid, "k": key},
+            )
+        ).scalar_one()
+    assert n == 1
+
+
+def test_node_key_skips_none_and_bounds_length() -> None:
+    assert node_key("subtask", "started", "p1", None, "s1", "r0") == "subtask:started:p1:s1:r0"
+    assert node_key("intake", "completed") == "intake:completed"
+    with pytest.raises(ValueError):
+        node_key("x", "y", "z" * 300)

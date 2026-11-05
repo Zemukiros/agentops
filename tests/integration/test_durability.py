@@ -131,8 +131,11 @@ async def test_run_resumes_from_checkpoint_on_another_process_after_crash(
     completed = [(n, p["pid"]) for t, n, p in ev if t == "node.completed"]
     # step_one ran exactly once (on A); step_two completed exactly once (on B)
     assert completed == [("step_one", a.pid), ("step_two", b.pid)]
+    # step_two was interrupted on A and re-run from its first line on B (the completion
+    # above came from B). Its "started" event is idempotent (ADR-025): the re-run produced
+    # the same dedupe key, so the stream holds exactly one, the original from A.
     started_two = [p["pid"] for t, n, p in ev if t == "node.started" and n == "step_two"]
-    assert started_two == [a.pid, b.pid]  # interrupted on A, re-run from its start on B
+    assert started_two == [a.pid]
     segments = [p for t, _, p in ev if t == "run.segment_started"]
     assert [s["worker"] for s in segments] == ["worker-A", "worker-B"]
     assert [s["resumed_from_checkpoint"] for s in segments] == [False, True]
