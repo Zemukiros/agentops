@@ -3,16 +3,16 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 2 — Vertical slice: **complete in fake mode, awaiting review.** One real-model e2e run is pending an `ANTHROPIC_API_KEY` in `.env` (see "Real-model runs"). Phase 3 not started.
+- **Phase:** 2 — Vertical slice: **complete, awaiting review.** Fake mode fully tested; one real-model e2e run completed on 2026-11-05 for $0.040454 (see "Real-model runs"). Phase 3 not started.
 - **Last updated:** 2026-11-05
 - **Test status:** 200 passed, 0 failed (141 unit, 59 integration), fake mode, 2026-11-05. 2 e2e tests (real model) are deselected by default. `make lint` clean (ruff, ruff format, mypy).
-- **Branch:** `phase-2` (not pushed yet).
+- **Branch:** `phase-2`.
 
 ## Phase plan
 | Phase | Goal | Status |
 |---|---|---|
 | 1 | Foundation: repo, config, DB schema + migrations, checkpointer, job queue skeleton, fake model, health API, compose, CI | ☑ approved |
-| 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ (awaiting review; real e2e pending key) |
+| 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ (awaiting review) |
 | 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☐ |
 | 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☐ |
 | 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☐ |
@@ -35,12 +35,29 @@ _Update at the end of every work session and every phase. Keep it short. This is
 - Manual check on the compose stack: `revise_once` task via curl → worker container → SSE showed revise → accept → `task.finished completed` (6 model calls, $0).
 
 ## Real-model runs
-| Date | What | Calls | Cost (ledger) | Result |
-|---|---|---|---|---|
-| — | `tests/e2e/test_real_slice.py` | — | not run yet (no key in `.env`) | — |
+All figures are from the task's budget ledger (`task_budgets`) and the `llm_calls` rows; they agree to the 1e-9 USD.
+
+| Date | What | Models | Calls | Tokens (in / out) | Cost | Cap | Result |
+|---|---|---|---|---|---|---|---|
+| 2026-11-05 | `tests/e2e/test_real_slice.py` (1 task, default request) | Sonnet 5.5 (plan, review, synthesize), Haiku 5.5 (draft); effort `low` | 6 | 10,966 (6,067 / 4,899) | **$0.040454** | $0.10 | `completed`: reviewer sent draft 1 back (≈180 words vs the 120–150 limit, 2/5), accepted the revision 5/5 |
+
+Per call (input, output, actual cost; reserved = worst case held by the ledger, not spent):
+
+| Call | Model | In | Out (cap) | Cost | Reserved |
+|---|---|---|---|---|---|
+| plan | claude-sonnet-5-5 | 1,105 | 355 (3,000) | $0.005760 | $0.033272 |
+| draft r0 | claude-haiku-5-5 | 414 | 308 (2,000) | $0.000195 | $0.001099 |
+| review r0 | claude-sonnet-5-5 | 1,287 | 1,301 (2,000) | $0.015584 | $0.024042 |
+| draft r1 | claude-haiku-5-5 | 915 | 1,602 (2,000) | $0.000892 | $0.001156 |
+| review r1 | claude-sonnet-5-5 | 1,944 | 1,085 (2,000) | $0.014738 | $0.025554 |
+| synthesize | claude-sonnet-5-5 | 402 | 248 (3,000) | $0.003284 | $0.031950 |
+
+- Model IDs confirmed via the Models API first (free).
+- Every call stayed within its reservation. The real-mode input margin (×1.15 + 512) reserved 1.43–2.43× the actual input tokens, so the margin is safe for this run and generous on short prompts.
+- One test assertion crashed after the run completed (raw SQL returns `NUMERIC` as `Decimal`; the check added a float). Fixed by extracting `check_report()`. The fixed checks were re-run against this run's recorded rows rather than paying for a second run.
+- Cumulative real-model spend on AgentOps: **$0.040454**.
 
 ## Next up
-- Run the e2e once (`uv run pytest -m e2e tests/e2e -s`, ≤ $0.10 cap) and record the cost here.
 - Review Phase 2; then Phase 3 plan (all specialists, tool registry + native tools, MCP, sandbox, true parallel waves).
 
 ## Known limitations / stubs (be honest)
@@ -48,7 +65,8 @@ _Update at the end of every work session and every phase. Keep it short. This is
 - Not built yet (inserted later): `recall`, `plan_gate`, `action_gate`, `execute_actions`, `final_review`, `consolidate`.
 - Escalation has no approvals table/API/inbox yet (Phase 4). A `resume` job with `{"resume": {...}}` is the only way to continue an escalated run.
 - A failed subtask fails the whole run immediately (no `completed_partial` yet).
-- Real-mode input-token reservation uses a margin (×1.15 + 512), because `count_tokens` can't see the structured-output schema or thinking config. It has not been checked against real calls yet; the e2e test asserts it.
+- Real-mode input-token reservation uses a margin (×1.15 + 512), because `count_tokens` can't see the structured-output schema or thinking config. Checked on one real run (6 calls): 1.43–2.43× actual input. One run is not a distribution; the e2e test keeps asserting it.
+- Output caps are tight with thinking on: draft r1 used 1,602 of 2,000 output tokens and review r0 1,301 of 2,000. A call that hits the cap returns truncated text or an invalid structured answer, which becomes a retry. Watch this in Phase 3; raise caps per role if it happens (each raise also raises the reserved worst case).
 - Real mode makes one extra `count_tokens` request per attempt (free; adds latency).
 - `make eval` only prints a notice. No scenario harness until Phase 6. Fake scenarios test orchestration logic only and say nothing about model quality.
 - Reviewers see only their own tasks (owner filter everywhere). The cross-user approvals inbox needs a scoped rule in Phase 4.

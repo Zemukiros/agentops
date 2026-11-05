@@ -9,6 +9,7 @@ call reserves its worst case first, so the run cannot spend more than that.
 """
 
 import uuid
+from decimal import Decimal
 from typing import Any
 
 import anthropic
@@ -84,18 +85,29 @@ async def test_real_slice_end_to_end(engine: AsyncEngine, alice: SeededUser) -> 
     report = await _report(engine, tid)
     print_report(report, values)
 
+    check_report(report)
+
+
+def check_report(report: dict[str, Any]) -> None:
     status = report["task"]["status"]
     # A real reviewer may legitimately send work to a human; both are valid slice outcomes.
     assert status in {"completed", "awaiting_approval"}, report["task"]
     assert report["budget"]["used_usd"] <= MAX_USD
     assert report["budget"]["reserved_usd"] == 0
+    assert len(report["calls"]) == len(report["reservations"])
     for c, r in zip(report["calls"], report["reservations"], strict=True):
         assert c["cost_usd"] is not None, c  # every real call is priced
+        assert r["status"] == "settled", r
         # actual usage never exceeded the worst case reserved for it (ADR-024 margin check)
         assert c["input_tokens"] + c["output_tokens"] <= r["tokens"], (c, r)
         assert c["cost_usd"] <= r["usd"] + 1e-9, (c, r)
     if status == "completed":
         assert report["task"]["result"]["final"]
+
+
+def _floats(row: dict[str, Any]) -> dict[str, Any]:
+    """Raw SQL returns NUMERIC as Decimal; compare money as float like the ledger does."""
+    return {k: float(v) if isinstance(v, Decimal) else v for k, v in row.items()}
 
 
 async def _report(engine: AsyncEngine, tid: uuid.UUID) -> dict[str, Any]:
@@ -111,7 +123,7 @@ async def _report(engine: AsyncEngine, tid: uuid.UUID) -> dict[str, Any]:
             ._mapping
         )
         calls = [
-            dict(r._mapping)
+            _floats(dict(r._mapping))
             for r in await c.execute(
                 text(
                     "SELECT role, purpose, model, attempt, ok, input_tokens, output_tokens, "
@@ -121,7 +133,7 @@ async def _report(engine: AsyncEngine, tid: uuid.UUID) -> dict[str, Any]:
             )
         ]
         reservations = [
-            dict(r._mapping)
+            _floats(dict(r._mapping))
             for r in await c.execute(
                 text(
                     "SELECT usd, tokens, status FROM budget_reservations "
@@ -130,18 +142,20 @@ async def _report(engine: AsyncEngine, tid: uuid.UUID) -> dict[str, Any]:
                 {"t": tid},
             )
         ]
-        budget = dict(
-            (
-                await c.execute(
-                    text(
-                        "SELECT used_usd, used_tokens, used_calls, reserved_usd "
-                        "FROM task_budgets WHERE task_id=:t"
-                    ),
-                    {"t": tid},
+        budget = _floats(
+            dict(
+                (
+                    await c.execute(
+                        text(
+                            "SELECT used_usd, used_tokens, used_calls, reserved_usd "
+                            "FROM task_budgets WHERE task_id=:t"
+                        ),
+                        {"t": tid},
+                    )
                 )
+                .one()
+                ._mapping
             )
-            .one()
-            ._mapping
         )
     return {"task": dict(task), "calls": calls, "reservations": reservations, "budget": budget}
 
