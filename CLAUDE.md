@@ -23,12 +23,15 @@
 ## Commands (keep this section accurate as the project evolves)
 ```bash
 uv sync                          # install deps (lockfile committed)
-make up                          # docker compose up (postgres, mailpit, api, worker, ui)
-make migrate                     # alembic upgrade head
-make test                        # unit + integration (fake mode)
+cp .env.example .env             # first time only
+make up                          # docker compose: postgres(5433), mailpit, socket-proxy, migrate, api(8000), worker
+make migrate                     # alembic upgrade head + checkpointer setup + seed users (tokens -> .agentops-tokens)
+make test                        # unit + integration (fake mode; needs postgres from `make up`)
 make test-unit                   # fast, no services
 make lint                        # ruff + ruff format --check + mypy
-make eval                        # scenario suite (fake mode by default)
+make build-sandbox               # build agentops-sandbox image (never run as a service)
+make eval                        # scenario suite (Phase 6; currently prints a notice)
+docker compose --profile observability up -d jaeger   # tracing UI on :16686
 ```
 
 ## Environment

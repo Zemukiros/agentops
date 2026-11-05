@@ -1,0 +1,106 @@
+# AgentOps local stack. Works on native Docker Engine in WSL2 and on Docker Desktop (WSL2 backend).
+# Host ports bind to 127.0.0.1 only and are configurable (5432/8080 are often taken).
+name: agentops
+
+x-app: &app
+  build: .
+  image: agentops-app:dev
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://agentops:agentops@postgres:5432/agentops  # pragma: allowlist secret
+    SMTP_HOST: mailpit
+    SMTP_PORT: "1025"
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  networks: [default]
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: agentops
+      POSTGRES_PASSWORD: agentops  # pragma: allowlist secret  (local dev only)
+      POSTGRES_DB: agentops
+    ports:
+      - "127.0.0.1:${PG_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentops -d agentops"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:v1.33
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+
+  migrate:
+    <<: *app
+    command: ["sh", "-c", "alembic upgrade head && python -m agentops.db.checkpointer"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "agentops.queue.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://agentops:agentops@postgres:5432/agentops  # pragma: allowlist secret
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      docker-socket-proxy: {condition: service_started}
+    networks: [default, docker-proxy]
+    restart: unless-stopped
+
+  # The worker reaches Docker only through this proxy (ADR-011): containers API + POST only.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      # everything else (images, networks, volumes, exec, build, swarm, ...) stays denied
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [docker-proxy]
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/jaeger:2.22.0
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:${JAEGER_UI_PORT:-16686}:16686"
+
+  sandbox:
+    build: ./sandbox
+    image: agentops-sandbox:py312
+    profiles: [build-only]
+    network_mode: none
+
+networks:
+  default: {}
+  docker-proxy:
+    internal: true
+
+volumes:
+  pgdata: {}

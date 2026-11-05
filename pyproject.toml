@@ -1,0 +1,95 @@
+[project]
+name = "agentops"
+version = "0.1.0"
+description = "Multi-agent orchestration platform: supervisor + specialists + reviewer on LangGraph, with durable execution, human approval, memory and tracing."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+dependencies = [
+    # orchestration (pinned exactly: fast-moving APIs, see DECISIONS.md ADR-016)
+    "langgraph==1.2.20",
+    "langgraph-checkpoint-postgres==3.2.0",
+    "langchain-core==1.7.6",
+    # database (one driver: psycopg3, ADR-017)
+    "sqlalchemy[asyncio]==2.1.8",
+    "psycopg[binary,pool]==3.3.8",
+    "alembic==1.20.1",
+    "pgvector==0.5.1",
+    # api
+    "fastapi==0.162.0",
+    "uvicorn[standard]==0.54.0",
+    "sse-starlette==3.6.0",
+    "pydantic==2.14.2",
+    "pydantic-settings==2.16.2",
+    "httpx==0.28.1",
+    "structlog==26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1.post1",
+    "ruff==0.17.3",
+    "mypy==2.4.1",
+    "pre-commit==4.7.0",
+    "detect-secrets==1.5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentops"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["ui", "docs", "*.md", "KICKOFF_PROMPT.md", "CLAUDE.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "SIM", "RUF", "PL"]
+ignore = ["PLR0913", "PLR2004", "S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PLR"]
+"tests/conftest.py" = ["S", "PLR", "E501"]
+"migrations/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+ignore_missing_imports = false
+files = ["agentops", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["agentops.core.*", "agentops.tools.*", "agentops.queue.*"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_any_generics = false
+disallow_untyped_defs = false
+warn_return_any = false
+disable_error_code = ["type-arg", "no-any-return", "no-untyped-def", "no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = ["pgvector.*", "sse_starlette.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+markers = [
+    "unit: fast, no services",
+    "integration: needs Postgres (docker compose)",
+    "e2e: real models / full stack; not run by default",
+    "eval: scenario evaluation; not run by default",
+]
+addopts = "-ra --strict-markers -m 'not e2e and not eval'"
