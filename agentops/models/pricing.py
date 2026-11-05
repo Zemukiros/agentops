@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
-PRICE_TABLE_VERSION = "2026-11-05.1"
+PRICE_TABLE_VERSION = "2026-11-05.2"
 
 
 @dataclass(frozen=True)
@@ -46,12 +46,26 @@ PRICES: dict[tuple[str, str], ModelPrice] = {
     ("fake", "fake-priced-v1"): ModelPrice(
         "fake", "fake-priced-v1", 1.0, 5.0, verified=True, source="test fixture, not billed"
     ),
-    # Real models: TO VERIFY before LLM_MODE=real is used (Phase 2). Prices intentionally None.
+    # Real models. Checked against https://platform.claude.com/docs/en/about-claude/pricing
+    # on 2026-11-05 (first-party Claude API, standard tier, no caching, no inference_geo).
     ("anthropic", "claude-sonnet-5-5"): ModelPrice(
-        "anthropic", "claude-sonnet-5-5", None, None, verified=False, source="to verify"
+        "anthropic",
+        "claude-sonnet-5-5",
+        2.0,
+        10.0,
+        verified=True,
+        source="platform.claude.com/docs/en/about-claude/pricing, checked 2026-11-05",
     ),
     ("anthropic", "claude-haiku-5-5"): ModelPrice(
-        "anthropic", "claude-haiku-5-5", None, None, verified=False, source="to verify"
+        "anthropic",
+        "claude-haiku-5-5",
+        0.10,
+        0.50,
+        verified=True,
+        source="platform.claude.com/docs/en/about-claude/pricing, checked 2026-11-05",
+        long_input_threshold=100_000,  # "prompts over 100,000 tokens" pay the long tier
+        long_input_per_mtok=0.50,
+        long_output_per_mtok=2.50,
     ),
 }
 

@@ -76,3 +76,15 @@ def test_long_prompt_tier(monkeypatch: pytest.MonkeyPatch) -> None:
     assert pricing.cost_usd("t", "tiered", 100_001, 1_000_000) == pytest.approx(
         100_001 * 0.5 / 1e6 + 2.5
     )
+
+
+def test_verified_real_prices_have_a_source() -> None:
+    for p in pricing.PRICES.values():
+        if p.provider != "fake":
+            assert p.verified and p.priced and "checked" in p.source
+    # Haiku 5.5: 1M in + 1M out under the threshold vs over it
+    assert pricing.cost_usd("anthropic", "claude-haiku-5-5", 100_000, 0) == pytest.approx(0.01)
+    assert pricing.cost_usd("anthropic", "claude-haiku-5-5", 100_001, 0) == pytest.approx(
+        100_001 * 0.5 / 1e6
+    )
+    assert pricing.cost_usd("anthropic", "claude-sonnet-5-5", 1000, 1000) == pytest.approx(0.012)

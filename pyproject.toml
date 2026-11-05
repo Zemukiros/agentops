@@ -23,6 +23,7 @@ dependencies = [
     "pydantic-settings==2.16.2",
     "httpx==0.28.1",
     "structlog==26.1.0",
+    "langchain-anthropic==1.7.10",
 ]
 
 [dependency-groups]
