@@ -166,10 +166,24 @@ Rate limits: a Postgres-backed token bucket (one atomic `UPDATE … RETURNING`).
 
 ## ADR-022 · Worker run-segment semantics · accepted
 **Decision.** A worker claims a job, takes the per-thread advisory lock on a dedicated AUTOCOMMIT connection, heartbeats every `JOB_HEARTBEAT_SECONDS`, and invokes the graph with the initial input only if the thread has no checkpoint (otherwise `None`, which continues). A lock it can't get means the job is released without consuming an attempt. A lost lease cancels the run. A task already in a terminal state makes the job a no-op. A job whose lease expires on its final attempt is reaped to `failed`, and its task ends `failed`, so it cannot hang forever. The SSE stream closes after `task.finished`.
-**Known limitation.** Events emitted inside a node are not part of the checkpoint transaction. A node re-run after a crash emits its "started" event twice. The durability test asserts exactly this. Phase 4 side effects use the `side_effects` table instead.
+**Update (Phase 2).** The Phase 1 limitation (a node re-run after a crash emitted its "started" event twice) is fixed by ADR-025. Events are still not part of the checkpoint transaction, but re-emitting is now a no-op. A lost lease cancels the run only when the heartbeat itself saw the loss; any other cancellation (shutdown, a caller's timeout) propagates (tested).
 
 ## ADR-023 · Repo layout deviations · accepted
 **Decision.** As in KICKOFF_PROMPT, with these differences: `core/graph.py` is a graph registry that holds only the `demo` durability probe in Phase 1. `scheduler.py`, `escalation.py`, `nodes/*`, `tools/*`, `memory/*`, `observability/{tracing,cost,replay}.py` are **not created** until their phase (no placeholder code). `mcp`, `langchain-mcp-adapters`, `fastembed` and `docker` were verified but are added as dependencies in the phase that uses them.
+
+## ADR-024 · Budget ledger: reserve worst case, settle actual · accepted
+**Decision.** The source of truth for spend is a `task_budgets` row per task (limits, used, reserved) plus one `budget_reservations` row per model attempt. Before every attempt (retries and structured re-asks included) the ModelClient reserves the attempt's **worst case**: exact input tokens (`get_num_tokens_from_messages`; the fake model counts with the same function that produces its usage, and in real mode ChatAnthropic calls the free count_tokens API) plus `max_output_tokens`, priced from the price table. The reservation is one atomic `UPDATE … WHERE used + reserved + worst <= max`, so it is either granted or the call never happens (`BudgetExceededError`). After the call, `settle` swaps the reservation for actual usage. The task row is created with the task (`POST /tasks`).
+**Why.** Phase 1 compared *consumed* spend before a call, so one call could overshoot. A counter in graph state also can't stop parallel branches (Phase 3) from each spending the same remainder, because every branch gets its own copy of state. A row-locked UPDATE can.
+**Crash between reserve and settle.** The reservation stays open. The next run segment holds the thread's advisory lock, so nothing else is spending for the task, and charges open reservations at their **worst case** (`orphaned`). The provider may have billed the call, so over-counting is the honest direction. A late settle from a zombie attempt does not double-count.
+**No DB CHECK on used ≤ max.** Settle records actual usage even if it exceeds the reservation (that would be an estimation bug; it is logged). Rejecting it would lose a real charge.
+**Precision.** `NUMERIC(18,10)`, exact numeric binds, reservations rounded *up* to that scale. Haiku-class input costs ~1e-7 USD/token, below `NUMERIC(12,6)`.
+**Real mode** refuses a model with no verified price (`ModelConfigError`), because its worst case can't be reserved. Fake mode still allows an unpriced model and records `cost_usd = NULL` + `unpriced_calls`.
+**Trade-off.** Two extra small transactions per attempt, plus a token-count call in real mode (free, adds latency). Worst-case reservation is conservative: a task can be refused while its real spend is still a little under the limit.
+
+## ADR-025 · Idempotent node events · accepted
+**Decision.** `events.dedupe_key` with a partial unique index `(task_id, dedupe_key) WHERE dedupe_key IS NOT NULL`. `emit_on` does `INSERT … ON CONFLICT DO NOTHING`; on a conflict it sends no NOTIFY. Node events build their key with `node_key(node, event, *coordinates)` from **checkpointed state** (plan attempt, wave, subtask id, revision), so a node re-run after a crash or a resume produces the same key. Events that legitimately repeat (`run.segment_started`, `task.status`, `llm.call`) use `NULL`.
+**Why.** LangGraph re-runs an interrupted node from its first line (ADR-003 verify). Events aren't in the checkpoint transaction, so without a key the stream showed duplicates.
+**Trade-off / caveat.** The first emission wins: a re-run's payload (e.g. a new pid) is dropped. Phase 5 replay forks run the same nodes again on purpose, so fork events will need a branch id in the key.
 
 ---
 

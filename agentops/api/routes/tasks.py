@@ -13,6 +13,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from agentops.api.auth import AuthUser, owned_by
 from agentops.api.sse import event_stream
+from agentops.core.budget import open_budget_on
 from agentops.db.models import Task
 from agentops.observability.events import emit_on
 from agentops.queue.jobs import enqueue_on
@@ -67,6 +68,7 @@ async def create_task(body: CreateTask, request: Request, user: AuthUser) -> Tas
         s.add(task)
         await s.flush()
         conn = await s.connection()
+        await open_budget_on(conn, task.id, settings.budget)
         await emit_on(conn, task.id, "task.created", payload={"graph": body.graph})
         await enqueue_on(conn, "run", thread_id=task.id, max_attempts=settings.job_max_attempts)
     return await get_task(task.id, request, user)

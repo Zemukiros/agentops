@@ -1,9 +1,12 @@
 """Deterministic scripted chat model for LLM_MODE=fake (ADR-009).
 
-Determinism without hidden state: the response is chosen by (role, scenario, turn), where
-`turn` = number of AI messages already in the conversation. The same input therefore always
-produces the same output, in any process. That property is what lets a resumed run on a
+Determinism without hidden state: the response is chosen by (role, purpose, scenario, turn),
+where `turn` = number of AI messages already in the conversation. The same input therefore
+always produces the same output, in any process. That property is what lets a resumed run on a
 different worker see exactly what the first worker saw.
+
+`purpose` separates calls made by the same role for different jobs (the supervisor both
+plans and synthesizes), so their scripts don't collide (ADR-027).
 """
 
 from __future__ import annotations
@@ -32,23 +35,28 @@ class ScriptedTurn(BaseModel):
 
 
 class FakeScript(BaseModel):
-    """turns[(role, scenario)] = ordered list of responses by turn index."""
+    """turns["role:purpose:scenario"] = ordered list of responses by turn index.
+
+    Lookup falls back from the most to the least specific key:
+    (purpose, scenario) -> (*, scenario) -> (purpose, *) -> (*, *).
+    """
 
     turns: dict[str, list[ScriptedTurn]] = Field(default_factory=dict)
 
     @staticmethod
-    def key(role: str, scenario: str) -> str:
-        return f"{role}:{scenario}"
+    def key(role: str, scenario: str, purpose: str = "*") -> str:
+        return f"{role}:{purpose}:{scenario}"
 
-    def add(self, role: str, scenario: str, *turns: ScriptedTurn) -> FakeScript:
-        self.turns.setdefault(self.key(role, scenario), []).extend(turns)
+    def add(self, role: str, scenario: str, *turns: ScriptedTurn, purpose: str = "*") -> FakeScript:
+        self.turns.setdefault(self.key(role, scenario, purpose), []).extend(turns)
         return self
 
-    def get(self, role: str, scenario: str, turn: int) -> ScriptedTurn | None:
-        seq = self.turns.get(self.key(role, scenario)) or self.turns.get(self.key(role, "*"))
-        if not seq:
-            return None
-        return seq[min(turn, len(seq) - 1)]
+    def get(self, role: str, scenario: str, turn: int, purpose: str = "*") -> ScriptedTurn | None:
+        for p, sc in ((purpose, scenario), ("*", scenario), (purpose, "*"), ("*", "*")):
+            seq = self.turns.get(self.key(role, sc, p))
+            if seq:
+                return seq[min(turn, len(seq) - 1)]
+        return None
 
 
 class FakeProviderError(RuntimeError):
@@ -60,11 +68,18 @@ def estimate_tokens(text: str) -> int:
     return max(1, (len(text) + 3) // 4)
 
 
+def _prompt_text(messages: Sequence[BaseMessage], tools: Sequence[dict[str, Any]]) -> str:
+    return "".join(m.text for m in messages) + json.dumps(list(tools), sort_keys=True)
+
+
 class ScriptedChatModel(BaseChatModel):
     role: str
     scenario: str = "default"
+    purpose: str = "*"
     script: FakeScript = Field(default_factory=FakeScript)
     model_name: str = "fake-scripted-v1"
+    # Like a provider's max_tokens: reported output usage never exceeds it.
+    max_tokens: int | None = None
 
     @property
     def _llm_type(self) -> str:
@@ -80,6 +95,16 @@ class ScriptedChatModel(BaseChatModel):
         formatted = [convert_to_openai_tool(t) for t in tools]
         return self.bind(tools=formatted, tool_choice=tool_choice, **kwargs)
 
+    def get_num_tokens_from_messages(
+        self,
+        messages: list[BaseMessage],
+        tools: Sequence[Any] | None = None,
+    ) -> int:
+        """Exactly the input-token count `_generate` will report for these messages and
+        tools (the budget ledger reserves with it)."""
+        formatted = [convert_to_openai_tool(t) for t in tools or []]
+        return estimate_tokens(_prompt_text(messages, formatted))
+
     def _generate(
         self,
         messages: list[BaseMessage],
@@ -88,7 +113,7 @@ class ScriptedChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         turn_idx = sum(1 for m in messages if isinstance(m, AIMessage))
-        turn = self.script.get(self.role, self.scenario, turn_idx)
+        turn = self.script.get(self.role, self.scenario, turn_idx, self.purpose)
         tools: list[dict[str, Any]] = kwargs.get("tools") or []
         if turn is None:
             last = messages[-1].text if messages else ""
@@ -113,9 +138,11 @@ class ScriptedChatModel(BaseChatModel):
             }
             for i, c in enumerate(tool_calls)
         ]
-        prompt_text = "".join(m.text for m in messages) + json.dumps(tools, sort_keys=True)
         out_text = turn.content + json.dumps(tool_calls, sort_keys=True)
-        in_tok, out_tok = estimate_tokens(prompt_text), estimate_tokens(out_text)
+        in_tok = estimate_tokens(_prompt_text(messages, tools))
+        out_tok = estimate_tokens(out_text)
+        if self.max_tokens is not None:
+            out_tok = min(out_tok, self.max_tokens)
         msg = AIMessage(
             content=turn.content,
             tool_calls=calls,

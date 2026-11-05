@@ -16,7 +16,7 @@ down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-USD = sa.Numeric(12, 6, asdecimal=False)
+USD = sa.Numeric(18, 10, asdecimal=False)
 
 
 def upgrade() -> None:
@@ -29,6 +29,9 @@ def upgrade() -> None:
         unique=True,
         postgresql_where=sa.text("dedupe_key IS NOT NULL"),
     )
+
+    # what a model call was for (plan, synthesize, review, ...)
+    op.add_column("llm_calls", sa.Column("purpose", sa.String(length=32), nullable=True))
 
     # per-task run options (fake scenario, ...)
     op.add_column(
@@ -64,11 +67,6 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["task_id"], ["tasks.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("task_id"),
         sa.CheckConstraint(
-            "used_usd + reserved_usd <= max_usd AND used_tokens + reserved_tokens <= max_tokens "
-            "AND used_calls + reserved_calls <= max_calls",
-            name="ck_task_budgets_within_limits",
-        ),
-        sa.CheckConstraint(
             "reserved_usd >= 0 AND reserved_tokens >= 0 AND reserved_calls >= 0",
             name="ck_task_budgets_reserved_nonneg",
         ),
@@ -91,7 +89,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["task_id"], ["tasks.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.CheckConstraint(
-            "status IN ('reserved', 'settled', 'released')", name="ck_budget_reservations_status"
+            "status IN ('reserved', 'settled', 'orphaned')", name="ck_budget_reservations_status"
         ),
     )
     op.create_index(
@@ -108,5 +106,6 @@ def downgrade() -> None:
     op.drop_table("budget_reservations")
     op.drop_table("task_budgets")
     op.drop_column("tasks", "config")
+    op.drop_column("llm_calls", "purpose")
     op.drop_index("uq_events_task_dedupe", table_name="events")
     op.drop_column("events", "dedupe_key")

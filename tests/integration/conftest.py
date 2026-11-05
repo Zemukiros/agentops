@@ -3,6 +3,7 @@ Alembic migration + checkpointer setup), truncated between tests."""
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -17,12 +18,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from agentops.api.auth import hash_token
+from agentops.core.budget import open_budget_on
 from agentops.db.session import get_sessionmaker, make_engine
-from agentops.settings import get_settings
+from agentops.settings import Budget, get_settings
 
 ROOT = Path(__file__).resolve().parents[2]
 TABLES = (
-    "events, jobs, llm_calls, tool_calls, approvals, side_effects, memories, tasks, users, "
+    "events, jobs, llm_calls, tool_calls, approvals, side_effects, memories, "
+    "budget_reservations, task_budgets, tasks, users, "
     "checkpoints, checkpoint_blobs, checkpoint_writes"
 )
 
@@ -111,11 +114,24 @@ async def reviewer(engine: AsyncEngine, clean_db: None) -> SeededUser:
     return await _make_user(engine, "rita", "reviewer")
 
 
-async def create_task(engine: AsyncEngine, owner: SeededUser, request: str = "probe") -> uuid.UUID:
+async def create_task(
+    engine: AsyncEngine,
+    owner: SeededUser,
+    request: str = "probe",
+    *,
+    graph: str = "demo",
+    config: dict | None = None,
+    budget: Budget | None = None,
+) -> uuid.UUID:
+    """Insert a task and its budget ledger row (as POST /tasks does)."""
     tid = uuid.uuid4()
     async with engine.begin() as conn:
         await conn.execute(
-            text("INSERT INTO tasks (id, owner_id, request, graph) VALUES (:i, :o, :r, 'demo')"),
-            {"i": tid, "o": owner.id, "r": request},
+            text(
+                "INSERT INTO tasks (id, owner_id, request, graph, config) "
+                "VALUES (:i, :o, :r, :g, CAST(:c AS jsonb))"
+            ),
+            {"i": tid, "o": owner.id, "r": request, "g": graph, "c": json.dumps(config or {})},
         )
+        await open_budget_on(conn, tid, budget or get_settings().budget)
     return tid

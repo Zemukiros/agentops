@@ -134,14 +134,16 @@ class Task(Base):
     __table_args__ = (Index("ix_tasks_owner_created", "owner_id", "created_at"),)
 
 
-_USD = Numeric(12, 6, asdecimal=False)
+_USD = Numeric(18, 10, asdecimal=False)
 
 
 class TaskBudget(Base):
     """Budget ledger, one row per task (ADR-024). Source of truth for spend.
 
-    Invariant (enforced by the reserve UPDATE's WHERE clause and CHECK constraints):
-    used + reserved <= max, for usd, tokens and calls.
+    Guarantee: a reservation is only granted when used + reserved + worst_case <= max (the
+    reserve UPDATE's WHERE clause). Settling records actual usage even if it exceeds the
+    reservation (that would be an estimation bug, logged and evented), so there is
+    deliberately no CHECK on used <= max: losing a real charge would be worse.
     """
 
     __tablename__ = "task_budgets"
@@ -160,11 +162,6 @@ class TaskBudget(Base):
     reserved_calls: Mapped[int] = mapped_column(Integer, server_default="0")
     updated_at: Mapped[datetime] = _now()
     __table_args__ = (
-        CheckConstraint(
-            "used_usd + reserved_usd <= max_usd AND used_tokens + reserved_tokens <= max_tokens "
-            "AND used_calls + reserved_calls <= max_calls",
-            name="ck_task_budgets_within_limits",
-        ),
         CheckConstraint(
             "reserved_usd >= 0 AND reserved_tokens >= 0 AND reserved_calls >= 0",
             name="ck_task_budgets_reserved_nonneg",
@@ -186,7 +183,7 @@ class BudgetReservation(Base):
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (
         CheckConstraint(
-            "status IN ('reserved', 'settled', 'released')", name="ck_budget_reservations_status"
+            "status IN ('reserved', 'settled', 'orphaned')", name="ck_budget_reservations_status"
         ),
         Index(
             "ix_budget_reservations_open",
@@ -263,6 +260,7 @@ class LLMCall(Base):
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
     )
     role: Mapped[str] = mapped_column(String(32))
+    purpose: Mapped[str | None] = mapped_column(String(32), nullable=True)
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(100))
     attempt: Mapped[int] = mapped_column(Integer)
