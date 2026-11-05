@@ -31,6 +31,7 @@ make test-unit                   # fast, no services
 make lint                        # ruff + ruff format --check + mypy
 make build-sandbox               # build agentops-sandbox image (never run as a service)
 make eval                        # scenario suite (Phase 6; currently prints a notice)
+uv run pytest -m e2e tests/e2e -s   # REAL model run, costs money (<= $0.10 cap); needs ANTHROPIC_API_KEY in .env
 docker compose --profile observability up -d jaeger   # tracing UI on :16686
 ```
 
