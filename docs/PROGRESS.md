@@ -29,7 +29,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 - API: `GET /health` (DB + checkpointer, 3 s timeouts, 200/503), `GET /me`, bearer auth, `require_role`, `owned_by` (cross-tenant reads → 404), minimal `POST /tasks` / `GET /tasks/{id}` for the demo graph.
 - `demo` graph (step_one → step_two) on AsyncPostgresSaver, run by the worker. **Cross-process resume test passes:** worker A is SIGKILLed inside step_two, worker B resumes from the checkpoint, step_one ran once, and there is one `input` checkpoint in history. **Race test passes:** a second worker on the same thread releases the job without running it.
 - Manual checks against the real compose stack: a task submitted through the API ran in the worker container and streamed over SSE to `completed`. `/health` returned 503 with postgres stopped and 200 after restart. The socket proxy denies images/networks/volumes/exec-start. The sandbox runs as uid 10001 with no network.
-- CI workflow: lint → mypy → unit → integration (pgvector service container), plus image builds.
+- CI workflow: lint → mypy → unit → integration (pgvector service container), plus image builds. **First run green** on GitHub (run 41979604907, 2026-11-05). Repo: https://github.com/Zemukiros/agentops (public).
 
 ## Next up (Phase 2, after review)
 - Real `TaskState` (plan, results with reducers, reviews, budget), intake → plan → one specialist → review → synthesize, structured `Plan` + DAG validation.
@@ -51,7 +51,6 @@ _Update at the end of every work session and every phase. Keep it short. This is
 - `mcp` is held at 1.x by `langchain-mcp-adapters`.
 - Sandbox bind mounts from the worker container are untested (Phase 3). Docker Desktop has to be re-checked if the dev setup moves off native Docker Engine.
 - Replay forks share the thread head (ADR-015 caveat). The Phase 5 design must track branch checkpoint ids.
-- The CI integration job has not run yet: no GitHub remote until the repo is created.
 
 ## Measured metrics (only from `evals/` runs, with date + config)
 - none yet
