@@ -115,7 +115,9 @@ async def test_require_role_dependency(
 async def test_create_task_enqueues_job_and_owner_isolation(
     client: httpx.AsyncClient, engine: AsyncEngine, alice: SeededUser, bob: SeededUser
 ) -> None:
-    r = await client.post("/tasks", json={"request": "probe"}, headers=alice.headers)
+    r = await client.post(
+        "/tasks", json={"request": "probe", "graph": "demo"}, headers=alice.headers
+    )
     assert r.status_code == 201, r.text
     task = r.json()
     assert task["status"] == "queued" and task["graph"] == "demo"

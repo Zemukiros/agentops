@@ -1,7 +1,8 @@
-"""Graph state types.
+"""Graph state types (DECISIONS.md "Corrected workflow graph", ADR-001/002).
 
-Phase 1 only defines the state of the durability probe graph. The full TaskState (plan,
-results with reducers, reviews, escalations, budget) arrives in Phase 2.
+Pydantic models are used for values the model produces or the UI reads. They are stored in
+checkpoints, so every class here is registered in `CHECKPOINT_TYPES` (the checkpoint
+serializer's msgpack allowlist, ADR-028). Add new state classes there too.
 """
 
 from __future__ import annotations
@@ -9,11 +10,155 @@ from __future__ import annotations
 import operator
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+if TYPE_CHECKING:
+    from agentops.models.client import ModelClient
 
+Specialist = Literal["research", "analysis", "writing", "code"]
+TerminalStatus = Literal[
+    "completed", "completed_partial", "failed", "rejected", "cancelled", "budget_exceeded"
+]
+SubtaskStatus = Literal["accepted", "failed", "needs_human"]
+
+
+class _Frozen(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+# ---- produced by the supervisor (structured output) ---------------------------------------
+class Subtask(_Frozen):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,31}$", description="short slug, e.g. 'draft'")
+    description: str = Field(min_length=1, max_length=2000)
+    specialist: Specialist
+    depends_on: list[str] = Field(default_factory=list)
+    expected_output: str = Field(min_length=1, max_length=1000)
+    complexity: Literal["low", "medium", "high"] = "medium"
+
+
+class Plan(_Frozen):
+    subtasks: list[Subtask] = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+    rationale: str = Field(max_length=2000)
+
+
+class PlanRejection(_Frozen):
+    """A plan that failed validation, kept so the re-plan prompt can show it."""
+
+    attempt: int
+    plan_json: str
+    errors: list[str]
+
+
+# ---- produced by the reviewer (structured output) -----------------------------------------
+class ReviewVerdict(_Frozen):
+    verdict: Literal["accept", "revise", "escalate"]
+    score: int = Field(ge=1, le=5)
+    issues: list[str] = Field(default_factory=list)
+    feedback_for_specialist: str | None = None
+    unsupported_claims: list[str] = Field(default_factory=list)
+
+
+class Review(_Frozen):
+    """A ReviewVerdict as recorded in state, tied to its subtask and revision."""
+
+    subtask_id: str
+    revision: int
+    verdict: ReviewVerdict
+
+
+# ---- terminal results and outcomes ---------------------------------------------------------
+class SubtaskResult(_Frozen):
+    """Only terminal statuses (ADR-002). Retries live in the subgraph's own state."""
+
+    subtask_id: str
+    status: SubtaskStatus
+    output: str | None = None  # last draft (also for needs_human, so a human can judge it)
+    revisions: int = 0
+    reason: str | None = None
+    human_override: bool = False
+
+
+class ScheduleDecision(_Frozen):
+    kind: Literal["dispatch", "escalate", "fail", "all_accepted"]
+    subtask_ids: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class EscalationDecision(_Frozen):
+    """Human answer to an escalation (resume value of escalation_gate's interrupt)."""
+
+    action: Literal["approve", "edit", "reject"]
+    # edit: subtask_id -> replacement output
+    edits: dict[str, str] = Field(default_factory=dict)
+    note: str | None = None
+
+
+class Escalation(_Frozen):
+    round: int
+    subtask_ids: list[str]
+    decision: EscalationDecision
+
+
+class Outcome(_Frozen):
+    status: TerminalStatus
+    reason: str | None = None
+
+
+def merge_results(
+    left: dict[str, SubtaskResult] | None, right: dict[str, SubtaskResult] | None
+) -> dict[str, SubtaskResult]:
+    """Reducer for parallel branches: each branch writes its own subtask id. A later write for
+    the same id (escalation_gate overriding needs_human) wins."""
+    return {**(left or {}), **(right or {})}
+
+
+class TaskState(TypedDict, total=False):
+    task_id: str
+    request: str
+    plan: Plan | None
+    plan_attempts: int
+    plan_rejections: list[PlanRejection]
+    results: Annotated[dict[str, SubtaskResult], merge_results]
+    reviews: Annotated[list[Review], operator.add]
+    wave: int
+    decision: ScheduleDecision | None
+    escalations: Annotated[list[Escalation], operator.add]
+    failure_reason: str | None
+    final: str | None
+    outcome: Outcome | None
+
+
+class SubtaskInput(TypedDict):
+    """What `schedule` sends to one subtask_worker instance."""
+
+    task_id: str
+    request: str
+    subtask: Subtask
+    context: dict[str, str]  # dependency id -> accepted output
+    wave: int
+
+
+class SubtaskOutput(TypedDict):
+    """The only keys a subtask_worker writes back to the parent (no private keys leak)."""
+
+    results: dict[str, SubtaskResult]
+    reviews: list[Review]
+
+
+class SubtaskState(SubtaskInput, total=False):
+    results: dict[str, SubtaskResult]
+    reviews: list[Review]
+    drafts: list[str]
+    revision: int
+    local_reviews: list[Review]
+    failed_reason: str | None
+
+
+# ---- Phase 1 durability probe --------------------------------------------------------------
 class DemoState(TypedDict):
     request: str
     log: Annotated[list[str], operator.add]
@@ -21,7 +166,22 @@ class DemoState(TypedDict):
 
 @dataclass(frozen=True)
 class RunContext:
-    """Per-run dependencies passed via LangGraph's runtime context (not checkpointed)."""
+    """Per-run dependencies passed via LangGraph's runtime context (not checkpointed, ADR-021)."""
 
     task_id: uuid.UUID
     engine: AsyncEngine
+    model: ModelClient | None = None  # None only for the demo graph
+
+
+CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
+    Subtask,
+    Plan,
+    PlanRejection,
+    ReviewVerdict,
+    Review,
+    SubtaskResult,
+    ScheduleDecision,
+    EscalationDecision,
+    Escalation,
+    Outcome,
+)

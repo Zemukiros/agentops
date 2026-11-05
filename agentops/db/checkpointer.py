@@ -13,10 +13,20 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from agentops.core.state import CHECKPOINT_TYPES
 from agentops.settings import get_settings
+
+
+def make_serde() -> JsonPlusSerializer:
+    """Checkpoint serializer with an explicit msgpack allowlist (ADR-028). LangGraph 1.2.20
+    warns that deserializing unregistered types "will be blocked in a future version"; we
+    register exactly our state classes instead of relying on the permissive default."""
+    allowed = [(cls.__module__, cls.__name__) for cls in CHECKPOINT_TYPES]
+    return JsonPlusSerializer(allowed_msgpack_modules=allowed)
 
 
 @asynccontextmanager
@@ -32,7 +42,7 @@ async def open_checkpointer(
     )
     await pool.open()
     try:
-        yield AsyncPostgresSaver(pool)  # type: ignore[arg-type]
+        yield AsyncPostgresSaver(pool, serde=make_serde())  # type: ignore[arg-type]
     finally:
         await pool.close()
 

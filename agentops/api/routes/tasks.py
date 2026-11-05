@@ -1,4 +1,4 @@
-"""Task endpoints. Phase 1 exposes only what the durability probe and SSE need."""
+"""Task endpoints: create (enqueues a run job), read, and stream events over SSE."""
 
 from __future__ import annotations
 
@@ -15,15 +15,19 @@ from agentops.api.auth import AuthUser, owned_by
 from agentops.api.sse import event_stream
 from agentops.core.budget import open_budget_on
 from agentops.db.models import Task
+from agentops.models.scenarios import SCENARIO_NAMES
 from agentops.observability.events import emit_on
 from agentops.queue.jobs import enqueue_on
+from agentops.settings import LLMMode
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 class CreateTask(BaseModel):
     request: str = Field(min_length=1, max_length=20_000)
-    graph: Literal["demo"] = "demo"  # the real workflow graph is added in Phase 2
+    graph: Literal["main", "demo"] = "main"
+    # Fake mode only: which scripted scenario drives the models (models/scenarios.py).
+    scenario: str | None = Field(default=None, max_length=64)
 
 
 class TaskOut(BaseModel):
@@ -63,8 +67,20 @@ async def _get_owned(request: Request, task_id: uuid.UUID, user: AuthUser) -> Ta
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_task(body: CreateTask, request: Request, user: AuthUser) -> TaskOut:
     settings = request.app.state.settings
+    config: dict[str, Any] = {}
+    if body.scenario is not None:
+        if settings.llm_mode is not LLMMode.FAKE:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "scenario is only allowed in fake mode"
+            )
+        if body.scenario not in SCENARIO_NAMES:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                f"unknown scenario; choose one of {sorted(SCENARIO_NAMES)}",
+            )
+        config["scenario"] = body.scenario
     async with request.app.state.sessionmaker() as s, s.begin():
-        task = Task(owner_id=user.id, request=body.request, graph=body.graph)
+        task = Task(owner_id=user.id, request=body.request, graph=body.graph, config=config)
         s.add(task)
         await s.flush()
         conn = await s.connection()
