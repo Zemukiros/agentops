@@ -23,6 +23,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.tools import BaseTool
 
+from agentops.models import pricing
 from agentops.models.client import ChatFactory, ModelConfigError
 from agentops.settings import RoleModel, Settings
 
@@ -68,10 +69,27 @@ def anthropic_factory(settings: Settings) -> ChatFactory:
     return make
 
 
+def required_roles() -> list[str]:
+    """Roles the main graph calls in this phase: supervisor, reviewer, enabled specialists."""
+    from agentops.core.scheduler import ENABLED_SPECIALISTS  # noqa: PLC0415
+
+    return ["supervisor", "reviewer", *sorted(ENABLED_SPECIALISTS)]
+
+
 def real_factory(settings: Settings) -> ChatFactory:
-    providers = {settings.model_for(r).provider for r in settings.role_models}
-    if providers != {"anthropic"}:
-        raise ModelConfigError(
-            f"LLM_MODE=real: every role needs a real provider, got {sorted(providers)}"
-        )
+    """Fail fast (at worker start) if a role the graph uses isn't a priced real model.
+    Note: ROLE_MODELS__* env vars replace the whole default role map, so a role you don't
+    set falls back to the fake provider; this check catches that."""
+    bad = {
+        r: f"{settings.model_for(r).provider}/{settings.model_for(r).model}"
+        for r in required_roles()
+        if settings.model_for(r).provider != "anthropic"
+    }
+    if bad:
+        raise ModelConfigError(f"LLM_MODE=real: these roles have no real model: {bad}")
+    for r in required_roles():
+        cfg = settings.model_for(r)
+        price = pricing.lookup(cfg.provider, cfg.model)
+        if price is None or not price.priced:
+            raise ModelConfigError(f"LLM_MODE=real: no verified price for role {r} ({cfg.model})")
     return anthropic_factory(settings)

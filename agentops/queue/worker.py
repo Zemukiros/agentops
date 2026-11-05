@@ -318,7 +318,12 @@ async def main(
     engine = make_engine(pool_size=4)
     async with open_checkpointer() as saver:
         await saver.setup()
-        worker = Worker(settings, engine, saver, wid)
+        factory: ChatFactory | None = None
+        if settings.llm_mode is LLMMode.REAL:
+            from agentops.models.anthropic import real_factory  # noqa: PLC0415
+
+            factory = real_factory(settings)  # fail fast on misconfiguration
+        worker = Worker(settings, engine, saver, wid, chat_factory=factory)
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, worker.stop)
