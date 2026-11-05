@@ -31,9 +31,10 @@ make test-unit                   # fast, no services
 make lint                        # ruff + ruff format --check + mypy
 make build-sandbox               # build agentops-sandbox image (never run as a service)
 make eval                        # scenario suite (Phase 6; currently prints a notice)
+uv run pytest -m e2e tests/e2e -s   # REAL model run, costs money (<= $0.10 cap); needs ANTHROPIC_API_KEY in .env
 docker compose --profile observability up -d jaeger   # tracing UI on :16686
 ```
 
 ## Environment
-- Developer is on Windows 11 + WSL2 + Docker Desktop (WSL2 backend). The repo lives in the WSL filesystem. Scripts must work in bash on Ubuntu (WSL).
+- Developer is on Windows 11 + WSL2 (Ubuntu). **Docker Engine runs natively inside WSL2, not Docker Desktop.** The repo lives in the WSL filesystem. Scripts must work in bash on Ubuntu (WSL).
 - Python 3.12 via `uv`. Node LTS for the UI.

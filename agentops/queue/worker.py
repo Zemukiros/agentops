@@ -5,6 +5,14 @@ Run: `python -m agentops.queue.worker [--worker-id ID] [--once]`
 Crash semantics: if this process dies mid-run, its lease expires and its advisory lock is
 released by Postgres. The next worker that claims the job invokes the graph with `None`
 input, so LangGraph continues from the last checkpoint instead of restarting.
+
+Terminal states (DECISIONS invariant: exactly one per run):
+- the graph's `outcome` (completed / failed / rejected)
+- BudgetExceededError -> budget_exceeded;  GraphRecursionError -> failed
+- a graph that ends without an outcome -> failed ("graph ended without an outcome")
+- the job's attempts exhausted -> failed (retry path / reaper)
+An interrupted run is not terminal: the task becomes `awaiting_approval` and a `resume` job
+(payload {"resume": <value>}) continues it.
 """
 
 from __future__ import annotations
@@ -22,17 +30,23 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.errors import GraphRecursionError
+from langgraph.types import Command
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from agentops.core.budget import BudgetExceededError, BudgetLedger
 from agentops.core.graph import GRAPHS
-from agentops.core.state import DemoState, RunContext
+from agentops.core.state import RunContext
 from agentops.db.checkpointer import open_checkpointer
-from agentops.db.session import make_engine
+from agentops.db.models import TERMINAL_TASK_STATUSES
+from agentops.db.session import get_sessionmaker, make_engine
+from agentops.models.client import ChatFactory, ModelClient, fake_factory
+from agentops.models.scenarios import DEFAULT_SCENARIO, SCENARIOS
 from agentops.observability.events import emit_on
 from agentops.queue import jobs
 from agentops.queue.locks import thread_lock
-from agentops.settings import Settings, get_settings
+from agentops.settings import LLMMode, Settings, get_settings
 
 log = logging.getLogger("agentops.worker")
 
@@ -51,6 +65,7 @@ async def set_task_status(
     result: dict[str, Any] | None = None,
     error: str | None = None,
     terminal: bool = False,
+    payload: dict[str, Any] | None = None,
 ) -> None:
     async with engine.begin() as conn:
         await conn.execute(
@@ -71,7 +86,9 @@ async def set_task_status(
                 conn, task_id, "task.finished", payload={"status": status, "error": error}
             )
         else:
-            await emit_on(conn, task_id, "task.status", payload={"status": status})
+            await emit_on(
+                conn, task_id, "task.status", payload={"status": status, **(payload or {})}
+            )
 
 
 class Worker:
@@ -81,12 +98,20 @@ class Worker:
         engine: AsyncEngine,
         checkpointer: BaseCheckpointSaver[Any],
         worker_id: str,
+        *,
+        chat_factory: ChatFactory | None = None,
     ) -> None:
+        """`chat_factory` overrides model selection (tests); otherwise fake mode uses the
+        task's scripted scenario and real mode the provider factory."""
         self.settings = settings
         self.engine = engine
         self.checkpointer = checkpointer
         self.worker_id = worker_id
         self._stop = asyncio.Event()
+        self._sessionmaker = get_sessionmaker(engine)
+        self._ledger = BudgetLedger(self._sessionmaker)
+        self._chat_factory = chat_factory
+        self._real_factory: ChatFactory | None = None
 
     def stop(self) -> None:
         self._stop.set()
@@ -95,12 +120,7 @@ class Worker:
         """Poll for jobs until stopped. `once`: return after handling one claimed job."""
         log.info("worker %s started", self.worker_id)
         while not self._stop.is_set():
-            for job_id, thread_id in await jobs.reap_exhausted(self.engine):
-                log.warning("job %s exhausted its attempts after lease expiry", job_id)
-                if thread_id is not None:
-                    await set_task_status(
-                        self.engine, thread_id, "failed", error="worker lost", terminal=True
-                    )
+            await self.reap_once()
             job = await jobs.claim(self.engine, self.worker_id, self.settings.job_lease_seconds)
             if job is None:
                 with contextlib.suppress(TimeoutError):
@@ -109,6 +129,18 @@ class Worker:
             await self.process(job)
             if once:
                 return
+
+    async def reap_once(self) -> list[int]:
+        """Fail jobs whose lease expired on their final attempt, and end their tasks as
+        `failed`, so a task can never hang after its last worker died (ADR-022)."""
+        reaped = await jobs.reap_exhausted(self.engine)
+        for job_id, thread_id in reaped:
+            log.warning("job %s exhausted its attempts after lease expiry", job_id)
+            if thread_id is not None:
+                await set_task_status(
+                    self.engine, thread_id, "failed", error="worker lost", terminal=True
+                )
+        return [job_id for job_id, _ in reaped]
 
     async def process(self, job: jobs.ClaimedJob) -> None:
         if job.thread_id is None:
@@ -122,15 +154,19 @@ class Worker:
             await self._run_with_heartbeat(job)
 
     async def _run_with_heartbeat(self, job: jobs.ClaimedJob) -> None:
+        lease_lost = asyncio.Event()
         run = asyncio.create_task(self._execute(job))
-        hb = asyncio.create_task(self._heartbeat(job, run))
+        hb = asyncio.create_task(self._heartbeat(job, run, lease_lost))
         try:
             await run
         except LeaseLostError:
             log.warning("lease lost for job %s; abandoning", job.id)
             return
         except asyncio.CancelledError:
-            if run.cancelled() and not self._stop.is_set():
+            # Only swallow the cancellation the heartbeat caused. A cancel from outside
+            # (shutdown, a caller's timeout) must propagate.
+            current = asyncio.current_task()
+            if lease_lost.is_set() and (current is None or current.cancelling() == 0):
                 log.warning("job %s cancelled after lease loss", job.id)
                 return
             raise
@@ -143,20 +179,39 @@ class Worker:
                 )
             return
         finally:
+            if not run.done():
+                run.cancel()
             hb.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await hb
         await jobs.complete(self.engine, job.id, self.worker_id)
 
-    async def _heartbeat(self, job: jobs.ClaimedJob, run: asyncio.Task[None]) -> None:
+    async def _heartbeat(
+        self, job: jobs.ClaimedJob, run: asyncio.Task[None], lease_lost: asyncio.Event
+    ) -> None:
         while True:
             await asyncio.sleep(self.settings.job_heartbeat_seconds)
             ok = await jobs.heartbeat(
                 self.engine, job.id, self.worker_id, self.settings.job_lease_seconds
             )
             if not ok:
+                lease_lost.set()
                 run.cancel()
                 return
+
+    def _model_client(self, task_config: dict[str, Any]) -> ModelClient:
+        factory = self._chat_factory
+        if factory is None:
+            if self.settings.llm_mode is LLMMode.FAKE:
+                scenario = str(task_config.get("scenario") or DEFAULT_SCENARIO)
+                factory = fake_factory(SCENARIOS, scenario)
+            else:
+                if self._real_factory is None:
+                    from agentops.models.anthropic import real_factory  # noqa: PLC0415
+
+                    self._real_factory = real_factory(self.settings)
+                factory = self._real_factory
+        return ModelClient(self.settings, self._sessionmaker, factory, ledger=self._ledger)
 
     async def _execute(self, job: jobs.ClaimedJob) -> None:
         assert job.thread_id is not None
@@ -164,34 +219,40 @@ class Worker:
         async with self.engine.connect() as conn:
             row = (
                 await conn.execute(
-                    text("SELECT graph, request, status FROM tasks WHERE id = :id"), {"id": task_id}
+                    text("SELECT graph, request, status, config FROM tasks WHERE id = :id"),
+                    {"id": task_id},
                 )
             ).first()
         if row is None:
             raise RuntimeError(f"task {task_id} not found")
-        graph_name, request, status = row
-        if status in {
-            "completed",
-            "completed_partial",
-            "failed",
-            "rejected",
-            "cancelled",
-            "budget_exceeded",
-        }:
+        graph_name, request, status, task_config = row
+        if status in TERMINAL_TASK_STATUSES:
             log.info("task %s already terminal (%s); nothing to do", task_id, status)
             return
-        builder = GRAPHS.get(graph_name)
-        if builder is None:
+        spec = GRAPHS.get(graph_name)
+        if spec is None:
             raise RuntimeError(f"unknown graph {graph_name!r}")
-        graph = builder(self.checkpointer)
+        graph = spec.build(self.checkpointer)
         config: RunnableConfig = {
             "configurable": {"thread_id": str(task_id)},
             "recursion_limit": self.settings.budget.recursion_limit,
         }
         existing = await self.checkpointer.aget_tuple(config)
-        graph_input: DemoState | None = (
-            None if existing is not None else {"request": request, "log": []}
-        )
+        graph_input: Any
+        if job.kind == "resume":
+            pending = await graph.aget_state(config)
+            if existing is None or not pending.interrupts:
+                log.warning("resume job %s: task %s has no pending interrupt", job.id, task_id)
+                return
+            graph_input = Command(resume=job.payload.get("resume"))
+        else:
+            graph_input = (
+                None if existing is not None else spec.initial_input(str(task_id), request)
+            )
+
+        # This segment holds the thread's advisory lock: nothing else spends for this task, so
+        # reservations still open were left by a crashed segment (ADR-024).
+        orphans = await self._ledger.charge_orphans(task_id) if spec.needs_model else 0
         await set_task_status(self.engine, task_id, "running")
         async with self.engine.begin() as c:
             await emit_on(
@@ -201,19 +262,48 @@ class Worker:
                 payload={
                     "worker": self.worker_id,
                     "job_id": job.id,
+                    "job_kind": job.kind,
                     "attempt": job.attempts,
                     "resumed_from_checkpoint": existing is not None,
+                    "orphaned_reservations_charged": orphans,
                 },
             )
-        ctx = RunContext(task_id=task_id, engine=self.engine)
-        result = await graph.ainvoke(graph_input, config, context=ctx)
+        model = self._model_client(dict(task_config or {})) if spec.needs_model else None
+        ctx = RunContext(task_id=task_id, engine=self.engine, model=model)
+        try:
+            await graph.ainvoke(graph_input, config, context=ctx)
+        except BudgetExceededError as exc:
+            await self._finish(task_id, "budget_exceeded", {}, exc.reason, spec.needs_model)
+            return
+        except GraphRecursionError as exc:
+            await self._finish(task_id, "failed", {}, f"recursion limit: {exc}", spec.needs_model)
+            return
         state = await graph.aget_state(config)
         if state.next:
-            # Interrupted (approval gates arrive in Phase 4).
-            await set_task_status(self.engine, task_id, "awaiting_approval")
+            interrupts = [{"id": i.id, "value": i.value} for i in state.interrupts]
+            await set_task_status(
+                self.engine,
+                task_id,
+                "awaiting_approval",
+                result={"interrupts": interrupts},
+                payload={"interrupts": interrupts},
+            )
             return
+        status_, result, error = spec.result(state.values)
+        await self._finish(task_id, status_, result, error, spec.needs_model)
+
+    async def _finish(
+        self,
+        task_id: uuid.UUID,
+        status: str,
+        result: dict[str, Any],
+        error: str | None,
+        with_budget: bool,
+    ) -> None:
+        if with_budget:
+            result = {**result, "budget": (await self._ledger.snapshot(task_id)).model_dump()}
         await set_task_status(
-            self.engine, task_id, "completed", result={"log": result.get("log", [])}, terminal=True
+            self.engine, task_id, status, result=result, error=error, terminal=True
         )
 
 
@@ -228,7 +318,12 @@ async def main(
     engine = make_engine(pool_size=4)
     async with open_checkpointer() as saver:
         await saver.setup()
-        worker = Worker(settings, engine, saver, wid)
+        factory: ChatFactory | None = None
+        if settings.llm_mode is LLMMode.REAL:
+            from agentops.models.anthropic import real_factory  # noqa: PLC0415
+
+            factory = real_factory(settings)  # fail fast on misconfiguration
+        worker = Worker(settings, engine, saver, wid, chat_factory=factory)
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, worker.stop)

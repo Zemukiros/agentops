@@ -18,19 +18,39 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# Tables owned by langgraph-checkpoint-postgres (created by its own `setup()`, ADR-017).
+_EXTERNAL_TABLE_PREFIX = "checkpoint"
+
+
+def _include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    table = getattr(obj, "table", None)
+    table_name = name if type_ == "table" else getattr(table, "name", None)
+    return not (
+        reflected and compare_to is None and (table_name or "").startswith(_EXTERNAL_TABLE_PREFIX)
+    )
+
 
 def _url() -> str:
     return config.attributes.get("url") or get_settings().sqlalchemy_url
 
 
 def run_migrations_offline() -> None:
-    context.configure(url=_url(), target_metadata=target_metadata, literal_binds=True)
+    context.configure(
+        url=_url(),
+        target_metadata=target_metadata,
+        literal_binds=True,
+        include_object=_include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def _do_run(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection, target_metadata=target_metadata, include_object=_include_object
+    )
     with context.begin_transaction():
         context.run_migrations()
 

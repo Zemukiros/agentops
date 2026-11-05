@@ -30,12 +30,18 @@ class SearchMode(StrEnum):
 
 
 class RoleModel(BaseModel):
-    """Which model serves a role. `provider` is 'fake' in fake mode."""
+    """Which model serves a role. `provider` is 'fake' in fake mode.
+
+    No sampling parameters: current Anthropic models reject non-default temperature/top_p
+    (HTTP 400), so none are sent (verified 2026-11-05, ADR-009).
+    """
 
     provider: str = "fake"
     model: str = "fake-scripted-v1"
-    temperature: float = 0.0
+    # Hard cap on output tokens per call, thinking included. The budget ledger reserves it.
     max_output_tokens: int = 2048
+    # Anthropic `output_config.effort` (low|medium|high|xhigh|max). None = model default.
+    effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
 
 
 class Budget(BaseModel):
@@ -87,6 +93,12 @@ class Settings(BaseSettings):
     # Model client retries
     llm_max_retries: int = 2
     llm_retry_base_seconds: float = 0.5
+    llm_timeout_seconds: float = 120.0
+    # Real-mode input estimate margin (ADR-024): count_tokens can't see the structured-output
+    # schema (sent as output_config.format) or the thinking config, so the reserved input is
+    # ceil(counted * ratio) + tokens. Each llm.call event records estimate vs actual.
+    llm_input_margin_ratio: float = 1.15
+    llm_input_margin_tokens: int = 512
 
     # Mail (Mailpit in dev: captures, sends nothing out)
     smtp_host: str = "localhost"

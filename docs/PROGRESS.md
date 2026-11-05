@@ -3,53 +3,79 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 1 — Architecture and Foundation: **complete, awaiting review.** Phase 2 not started.
+- **Phase:** 2 — Vertical slice: **complete, awaiting review.** Fake mode fully tested; one real-model e2e run completed on 2026-11-05 for $0.040454 (see "Real-model runs"). Phase 3 not started.
 - **Last updated:** 2026-11-05
-- **Test status:** 50 passed, 0 failed (24 unit, 26 integration), fake mode, 2026-11-05. `make lint` clean (ruff, ruff format, mypy strict on core/tools/queue).
+- **Test status:** 200 passed, 0 failed (141 unit, 59 integration), fake mode, 2026-11-05. 2 e2e tests (real model) are deselected by default. `make lint` clean (ruff, ruff format, mypy).
+- **Branch:** `phase-2`.
 
 ## Phase plan
 | Phase | Goal | Status |
 |---|---|---|
-| 1 | Foundation: repo, config, DB schema + migrations, checkpointer, job queue skeleton, fake model, health API, compose, CI | ☑ (awaiting review) |
-| 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☐ |
+| 1 | Foundation: repo, config, DB schema + migrations, checkpointer, job queue skeleton, fake model, health API, compose, CI | ☑ approved |
+| 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ (awaiting review) |
 | 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☐ |
 | 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☐ |
 | 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☐ |
 | 6 | Hardening + evals: injection suite, scenario harness, measured metrics, docs, deploy config | ☐ |
 
-## Done (Phase 1)
-- Stack verified against installed versions. Findings are in DECISIONS.md (ADR-003/008/009/010/011/015 verify notes, ADR-016…023).
-- uv project (Python 3.12, exact pins, `uv.lock`), ruff, mypy, pytest markers, pre-commit (ruff, detect-secrets with a clean `.secrets.baseline`), Makefile.
-- `agentops/settings.py`: pydantic-settings, `SecretStr`, LLM/search modes, per-role models, budgets, OTel, DB, SMTP, queue timing, embedding dim guard.
-- Compose: postgres (pgvector, pg17), mailpit, one-shot migrate, api, worker, docker-socket-proxy (internal network, containers-only), jaeger (profile `observability`), sandbox image (profile `build-only`).
-- Schema + Alembic `0001`: users, tasks, jobs, events, llm_calls, tool_calls, approvals, side_effects, memories (vector(384) + HNSW cosine). Up, down and up again verified; `alembic check` is clean. Checkpointer `setup()` runs via `agentops.db.checkpointer`.
-- Postgres job queue: SKIP LOCKED claim, lease, owner-fenced heartbeat/complete/fail, backoff retry, release, expired-lease reclaim, exhausted-job reaper, per-thread advisory lock.
-- `ModelClient` + `ScriptedChatModel`: budget check before every attempt, an `llm_calls` row per attempt (retries and structured re-asks), versioned price table with unverified prices left NULL.
-- Events writer (insert + NOTIFY in one transaction). Per-process LISTEN broadcaster. SSE `GET /tasks/{id}/events` with `Last-Event-ID` replay; it closes after `task.finished`.
-- API: `GET /health` (DB + checkpointer, 3 s timeouts, 200/503), `GET /me`, bearer auth, `require_role`, `owned_by` (cross-tenant reads → 404), minimal `POST /tasks` / `GET /tasks/{id}` for the demo graph.
-- `demo` graph (step_one → step_two) on AsyncPostgresSaver, run by the worker. **Cross-process resume test passes:** worker A is SIGKILLed inside step_two, worker B resumes from the checkpoint, step_one ran once, and there is one `input` checkpoint in history. **Race test passes:** a second worker on the same thread releases the job without running it.
-- Manual checks against the real compose stack: a task submitted through the API ran in the worker container and streamed over SSE to `completed`. `/health` returned 503 with postgres stopped and 200 after restart. The socket proxy denies images/networks/volumes/exec-start. The sandbox runs as uid 10001 with no network.
-- CI workflow: lint → mypy → unit → integration (pgvector service container), plus image builds. **First run green** on GitHub (run 41979604907, 2026-11-05). Repo: https://github.com/Zemukiros/agentops (public).
+## Done (Phase 2)
+**Phase 1 fixes**
+- Idempotent node events (ADR-025): `events.dedupe_key` + partial unique index; re-run nodes no longer duplicate events. The durability test now asserts exactly one `node.started` after a SIGKILL + re-run.
+- Budget ledger (ADR-024): worst case (exact input + `max_output_tokens`, priced) reserved before every attempt by one atomic conditional UPDATE, settled after. Tests: a single call that doesn't fit is refused before reaching the model; spend never exceeds the limit over 100 calls; 5 concurrent reservations → exactly 1 granted; orphans are charged at worst case once.
+- Worker tests: lost lease cancels the run; exhausted job is reaped and its task ends `failed`. Writing the lease test exposed a real bug: the worker treated *any* cancellation as lease loss and swallowed it. Fixed and tested (an external cancel now propagates).
+- CLAUDE.md / ADR-011: native Docker Engine in WSL2; the proxy blocking exec is intentional (sandbox = run + wait + logs + remove).
 
-## Next up (Phase 2, after review)
-- Real `TaskState` (plan, results with reducers, reviews, budget), intake → plan → one specialist → review → synthesize, structured `Plan` + DAG validation.
-- Real-model factory (`LLM_MODE=real`): verify current model IDs and **prices** first, and fill in `pricing.py` with source and date.
-- First fake-mode scenario script for the vertical slice.
+**Vertical slice** (`main` graph, ADR-026)
+- intake → plan (structured `Plan`, validation: ids, unknown deps, Kahn cycle check, enabled specialist, ≤ 6 subtasks; one re-plan) → schedule (pure `scheduler.decide`, terminal results only) → `subtask_worker` subgraph via `Send` (writing specialist ⇄ reviewer, ≤ 2 revisions) → synthesize. Plus `escalation_gate` with a real `interrupt()` (approve / edit / reject) and `finalize_failed` / `finalize_rejected`.
+- Worker: runs any registered graph spec, builds a ModelClient per task, supports `resume` jobs, and maps budget / recursion / missing outcome to exactly one terminal state.
+- API: `POST /tasks` defaults to `graph=main`; `scenario` only in fake mode (422 otherwise).
+- Fake mode: 8 scripted scenarios (`models/scenarios.py`); scripts keyed by role + purpose (ADR-027).
+- Real mode: `langchain-anthropic` 1.7.10; verified prices filled in; request shape verified offline (json_schema structured output, no temperature, no forced tool_choice); fail-fast config check (ADR-009 note).
+- Checkpoint serde allowlist for state types (ADR-028).
+- Manual check on the compose stack: `revise_once` task via curl → worker container → SSE showed revise → accept → `task.finished completed` (6 model calls, $0).
+
+## Real-model runs
+All figures are from the task's budget ledger (`task_budgets`) and the `llm_calls` rows; they agree to the 1e-9 USD.
+
+| Date | What | Models | Calls | Tokens (in / out) | Cost | Cap | Result |
+|---|---|---|---|---|---|---|---|
+| 2026-11-05 | `tests/e2e/test_real_slice.py` (1 task, default request) | Sonnet 5.5 (plan, review, synthesize), Haiku 5.5 (draft); effort `low` | 6 | 10,966 (6,067 / 4,899) | **$0.040454** | $0.10 | `completed`: reviewer sent draft 1 back (≈180 words vs the 120–150 limit, 2/5), accepted the revision 5/5 |
+
+Per call (input, output, actual cost; reserved = worst case held by the ledger, not spent):
+
+| Call | Model | In | Out (cap) | Cost | Reserved |
+|---|---|---|---|---|---|
+| plan | claude-sonnet-5-5 | 1,105 | 355 (3,000) | $0.005760 | $0.033272 |
+| draft r0 | claude-haiku-5-5 | 414 | 308 (2,000) | $0.000195 | $0.001099 |
+| review r0 | claude-sonnet-5-5 | 1,287 | 1,301 (2,000) | $0.015584 | $0.024042 |
+| draft r1 | claude-haiku-5-5 | 915 | 1,602 (2,000) | $0.000892 | $0.001156 |
+| review r1 | claude-sonnet-5-5 | 1,944 | 1,085 (2,000) | $0.014738 | $0.025554 |
+| synthesize | claude-sonnet-5-5 | 402 | 248 (3,000) | $0.003284 | $0.031950 |
+
+- Model IDs confirmed via the Models API first (free).
+- Every call stayed within its reservation. The real-mode input margin (×1.15 + 512) reserved 1.43–2.43× the actual input tokens, so the margin is safe for this run and generous on short prompts.
+- One test assertion crashed after the run completed (raw SQL returns `NUMERIC` as `Decimal`; the check added a float). Fixed by extracting `check_report()`. The fixed checks were re-run against this run's recorded rows rather than paying for a second run.
+- Cumulative real-model spend on AgentOps: **$0.040454**.
+
+## Next up
+- Review Phase 2; then Phase 3 plan (all specialists, tool registry + native tools, MCP, sandbox, true parallel waves).
 
 ## Known limitations / stubs (be honest)
-- `make eval` only prints a notice. There is no scenario harness until Phase 6.
-- `ModelClient` has no real-model factory yet (`LLM_MODE=real` raises NotImplementedError). Real prices are unverified (NULL).
-- Only the `demo` graph exists. `POST /tasks` accepts `graph="demo"` only.
-- `ui/`, `evals/`, `mcp_servers/` contain only READMEs.
-- Implemented but not covered by tests: the worker cancelling a run when its heartbeat finds the lease lost, and the task being set to `failed` when the reaper fails an exhausted job (the reaper itself is tested).
-- Budget check compares *consumed* budget before a call. It does not estimate the upcoming call's cost, so one call can overshoot the limit.
+- Only the `writing` specialist exists and it makes a single model call (no tools, no ReAct loop, no step cap yet: Phase 3).
+- Not built yet (inserted later): `recall`, `plan_gate`, `action_gate`, `execute_actions`, `final_review`, `consolidate`.
+- Escalation has no approvals table/API/inbox yet (Phase 4). A `resume` job with `{"resume": {...}}` is the only way to continue an escalated run.
+- A failed subtask fails the whole run immediately (no `completed_partial` yet).
+- Real-mode input-token reservation uses a margin (×1.15 + 512), because `count_tokens` can't see the structured-output schema or thinking config. Checked on one real run (6 calls): 1.43–2.43× actual input. One run is not a distribution; the e2e test keeps asserting it.
+- Output caps are tight with thinking on: draft r1 used 1,602 of 2,000 output tokens and review r0 1,301 of 2,000. A call that hits the cap returns truncated text or an invalid structured answer, which becomes a retry. Watch this in Phase 3; raise caps per role if it happens (each raise also raises the reserved worst case).
+- Real mode makes one extra `count_tokens` request per attempt (free; adds latency).
+- `make eval` only prints a notice. No scenario harness until Phase 6. Fake scenarios test orchestration logic only and say nothing about model quality.
 - Reviewers see only their own tasks (owner filter everywhere). The cross-user approvals inbox needs a scoped rule in Phase 4.
-- Node-emitted events are not transactional with checkpoints (ADR-022), so a re-run node can emit duplicates.
+- Replay forks (Phase 5) will need a branch id in event dedupe keys (ADR-025).
 
 ## Open risks
-- LangGraph moves fast (1.2.20 shipped today). The lockfile pins it; bump deliberately.
+- LangGraph moves fast (1.2.20). It warns that unregistered checkpoint types will be blocked; we register ours (ADR-028).
 - `mcp` is held at 1.x by `langchain-mcp-adapters`.
-- Sandbox bind mounts from the worker container are untested (Phase 3). Docker Desktop has to be re-checked if the dev setup moves off native Docker Engine.
+- Sandbox bind mounts from the worker container are untested (Phase 3).
 - Replay forks share the thread head (ADR-015 caveat). The Phase 5 design must track branch checkpoint ids.
 
 ## Measured metrics (only from `evals/` runs, with date + config)

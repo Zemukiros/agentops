@@ -1,4 +1,4 @@
-# AgentOps local stack. Works on native Docker Engine in WSL2 and on Docker Desktop (WSL2 backend).
+# AgentOps local stack. Developed and tested on native Docker Engine inside WSL2.
 # Host ports bind to 127.0.0.1 only and are configurable (5432/8080 are often taken).
 name: agentops
 

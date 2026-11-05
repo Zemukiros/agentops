@@ -73,3 +73,33 @@ async def test_wildcard_scenario() -> None:
     s = FakeScript().add("analysis", "*", ScriptedTurn(content="any"))
     out = await ScriptedChatModel(role="analysis", scenario="zzz", script=s).ainvoke("q")
     assert out.content == "any"
+
+
+async def test_purpose_keeps_same_role_scripts_apart() -> None:
+    """ADR-027: the supervisor plans and synthesizes; both are turn 0."""
+    s = (
+        FakeScript()
+        .add("supervisor", "*", ScriptedTurn(content="PLAN"), purpose="plan")
+        .add("supervisor", "*", ScriptedTurn(content="FINAL"), purpose="synthesize")
+        .add("supervisor", "special", ScriptedTurn(content="SPECIAL PLAN"), purpose="plan")
+    )
+    plan = ScriptedChatModel(role="supervisor", purpose="plan", scenario="x", script=s)
+    synth = ScriptedChatModel(role="supervisor", purpose="synthesize", scenario="x", script=s)
+    special = ScriptedChatModel(role="supervisor", purpose="plan", scenario="special", script=s)
+    assert (await plan.ainvoke("q")).content == "PLAN"
+    assert (await synth.ainvoke("q")).content == "FINAL"
+    assert (await special.ainvoke("q")).content == "SPECIAL PLAN"
+
+
+async def test_token_count_matches_reported_usage_and_output_is_capped() -> None:
+    s = FakeScript().add("writing", "*", ScriptedTurn(content="x" * 4000))
+    m = ScriptedChatModel(role="writing", script=s, max_tokens=50)
+    msgs = [SystemMessage("sys"), HumanMessage("hello there")]
+    out = await m.ainvoke(msgs)
+    assert out.usage_metadata is not None
+    assert out.usage_metadata["input_tokens"] == m.get_num_tokens_from_messages(msgs)
+    assert out.usage_metadata["output_tokens"] == 50
+    structured = await m.with_structured_output(Verdict, include_raw=True).ainvoke(msgs)
+    assert isinstance(structured, dict)
+    raw = structured["raw"]
+    assert raw.usage_metadata["input_tokens"] == m.get_num_tokens_from_messages(msgs, [Verdict])

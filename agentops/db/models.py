@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models. Migration `0001_initial` mirrors this file."""
+"""SQLAlchemy ORM models. Migrations `0001_initial` + `0002_phase2` mirror this file."""
 
 from __future__ import annotations
 
@@ -11,12 +11,14 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     Float,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     func,
@@ -123,11 +125,72 @@ class Task(Base):
     )
     result: Mapped[dict[str, Any] | None] = mapped_column(nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Per-task run options, e.g. {"scenario": "revise_once"} (fake mode only).
+    config: Mapped[dict[str, Any]] = mapped_column(server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     __table_args__ = (Index("ix_tasks_owner_created", "owner_id", "created_at"),)
+
+
+_USD = Numeric(18, 10, asdecimal=False)
+
+
+class TaskBudget(Base):
+    """Budget ledger, one row per task (ADR-024). Source of truth for spend.
+
+    Guarantee: a reservation is only granted when used + reserved + worst_case <= max (the
+    reserve UPDATE's WHERE clause). Settling records actual usage even if it exceeds the
+    reservation (that would be an estimation bug, logged and evented), so there is
+    deliberately no CHECK on used <= max: losing a real charge would be worse.
+    """
+
+    __tablename__ = "task_budgets"
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True
+    )
+    max_usd: Mapped[float] = mapped_column(_USD)
+    max_tokens: Mapped[int] = mapped_column(Integer)
+    max_calls: Mapped[int] = mapped_column(Integer)
+    used_usd: Mapped[float] = mapped_column(_USD, server_default="0")
+    used_tokens: Mapped[int] = mapped_column(Integer, server_default="0")
+    used_calls: Mapped[int] = mapped_column(Integer, server_default="0")
+    unpriced_calls: Mapped[int] = mapped_column(Integer, server_default="0")
+    reserved_usd: Mapped[float] = mapped_column(_USD, server_default="0")
+    reserved_tokens: Mapped[int] = mapped_column(Integer, server_default="0")
+    reserved_calls: Mapped[int] = mapped_column(Integer, server_default="0")
+    updated_at: Mapped[datetime] = _now()
+    __table_args__ = (
+        CheckConstraint(
+            "reserved_usd >= 0 AND reserved_tokens >= 0 AND reserved_calls >= 0",
+            name="ck_task_budgets_reserved_nonneg",
+        ),
+    )
+
+
+class BudgetReservation(Base):
+    """Worst-case hold for one model attempt; settled with actual usage afterwards."""
+
+    __tablename__ = "budget_reservations"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
+    usd: Mapped[float] = mapped_column(_USD)
+    tokens: Mapped[int] = mapped_column(Integer)
+    calls: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(16), server_default="reserved")
+    created_at: Mapped[datetime] = _now()
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('reserved', 'settled', 'orphaned')", name="ck_budget_reservations_status"
+        ),
+        Index(
+            "ix_budget_reservations_open",
+            "task_id",
+            postgresql_where=text("status = 'reserved'"),
+        ),
+    )
 
 
 class Job(Base):
@@ -172,8 +235,20 @@ class Event(Base):
     type: Mapped[str] = mapped_column(String(64))
     node: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(server_default=text("'{}'::jsonb"))
+    # Stable key for events emitted inside graph nodes, so a re-run node cannot duplicate
+    # them (ADR-025). NULL for events that legitimately repeat (e.g. run.segment_started).
+    dedupe_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = _now()
-    __table_args__ = (Index("ix_events_task_id_id", "task_id", "id"),)
+    __table_args__ = (
+        Index("ix_events_task_id_id", "task_id", "id"),
+        Index(
+            "uq_events_task_dedupe",
+            "task_id",
+            "dedupe_key",
+            unique=True,
+            postgresql_where=text("dedupe_key IS NOT NULL"),
+        ),
+    )
 
 
 class LLMCall(Base):
@@ -185,6 +260,7 @@ class LLMCall(Base):
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
     )
     role: Mapped[str] = mapped_column(String(32))
+    purpose: Mapped[str | None] = mapped_column(String(32), nullable=True)
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(100))
     attempt: Mapped[int] = mapped_column(Integer)
