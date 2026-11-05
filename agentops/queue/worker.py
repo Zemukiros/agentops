@@ -95,12 +95,7 @@ class Worker:
         """Poll for jobs until stopped. `once`: return after handling one claimed job."""
         log.info("worker %s started", self.worker_id)
         while not self._stop.is_set():
-            for job_id, thread_id in await jobs.reap_exhausted(self.engine):
-                log.warning("job %s exhausted its attempts after lease expiry", job_id)
-                if thread_id is not None:
-                    await set_task_status(
-                        self.engine, thread_id, "failed", error="worker lost", terminal=True
-                    )
+            await self.reap_once()
             job = await jobs.claim(self.engine, self.worker_id, self.settings.job_lease_seconds)
             if job is None:
                 with contextlib.suppress(TimeoutError):
@@ -109,6 +104,18 @@ class Worker:
             await self.process(job)
             if once:
                 return
+
+    async def reap_once(self) -> list[int]:
+        """Fail jobs whose lease expired on their final attempt, and end their tasks as
+        `failed`, so a task can never hang after its last worker died (ADR-022)."""
+        reaped = await jobs.reap_exhausted(self.engine)
+        for job_id, thread_id in reaped:
+            log.warning("job %s exhausted its attempts after lease expiry", job_id)
+            if thread_id is not None:
+                await set_task_status(
+                    self.engine, thread_id, "failed", error="worker lost", terminal=True
+                )
+        return [job_id for job_id, _ in reaped]
 
     async def process(self, job: jobs.ClaimedJob) -> None:
         if job.thread_id is None:
@@ -122,15 +129,19 @@ class Worker:
             await self._run_with_heartbeat(job)
 
     async def _run_with_heartbeat(self, job: jobs.ClaimedJob) -> None:
+        lease_lost = asyncio.Event()
         run = asyncio.create_task(self._execute(job))
-        hb = asyncio.create_task(self._heartbeat(job, run))
+        hb = asyncio.create_task(self._heartbeat(job, run, lease_lost))
         try:
             await run
         except LeaseLostError:
             log.warning("lease lost for job %s; abandoning", job.id)
             return
         except asyncio.CancelledError:
-            if run.cancelled() and not self._stop.is_set():
+            # Only swallow the cancellation the heartbeat caused. A cancel from outside
+            # (shutdown, a caller's timeout) must propagate.
+            current = asyncio.current_task()
+            if lease_lost.is_set() and (current is None or current.cancelling() == 0):
                 log.warning("job %s cancelled after lease loss", job.id)
                 return
             raise
@@ -143,18 +154,23 @@ class Worker:
                 )
             return
         finally:
+            if not run.done():
+                run.cancel()
             hb.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await hb
         await jobs.complete(self.engine, job.id, self.worker_id)
 
-    async def _heartbeat(self, job: jobs.ClaimedJob, run: asyncio.Task[None]) -> None:
+    async def _heartbeat(
+        self, job: jobs.ClaimedJob, run: asyncio.Task[None], lease_lost: asyncio.Event
+    ) -> None:
         while True:
             await asyncio.sleep(self.settings.job_heartbeat_seconds)
             ok = await jobs.heartbeat(
                 self.engine, job.id, self.worker_id, self.settings.job_lease_seconds
             )
             if not ok:
+                lease_lost.set()
                 run.cancel()
                 return
 
