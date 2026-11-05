@@ -1,7 +1,6 @@
 import asyncio
 import json
 import uuid
-from collections.abc import AsyncIterator
 
 import httpx
 import psycopg
@@ -16,32 +15,9 @@ from agentops.api.main import create_app
 from agentops.db.models import UserRole
 from agentops.observability.events import CHANNEL, emit, node_key
 from agentops.settings import Settings, get_settings
-from tests.integration.conftest import SeededUser, create_task
+from tests.integration.conftest import SeededUser, create_task, parse_sse
 
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-async def app(test_db: str) -> AsyncIterator[FastAPI]:
-    application = create_app(get_settings())
-    async with application.router.lifespan_context(application):
-        yield application
-
-
-@pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test", timeout=20) as c:
-        yield c
-
-
-def _parse_sse(body: str) -> list[dict]:
-    events = []
-    for block in body.replace("\r\n", "\n").split("\n\n"):
-        data = [ln[5:].strip() for ln in block.split("\n") if ln.startswith("data:")]
-        if data:
-            events.append(json.loads("".join(data)))
-    return events
 
 
 async def test_emit_inserts_and_notifies(engine: AsyncEngine, alice: SeededUser) -> None:
@@ -145,7 +121,7 @@ async def test_sse_replays_from_last_event_id(
         f"/tasks/{tid}/events", headers={**alice.headers, "Last-Event-ID": str(e1)}
     )
     assert r.status_code == 200
-    got = _parse_sse(r.text)
+    got = parse_sse(r.text)
     assert [e["id"] for e in got] == [e2, e3]
     assert got[-1]["type"] == "task.finished"
     assert f"id: {e2}" in r.text  # SSE id field set, so browsers resume correctly
@@ -166,9 +142,9 @@ async def test_sse_streams_live_events(
     producer = asyncio.create_task(produce())
     r = await asyncio.wait_for(client.get(f"/tasks/{tid}/events", headers=alice.headers), 10)
     await producer
-    types = [e["type"] for e in _parse_sse(r.text)]
+    types = [e["type"] for e in parse_sse(r.text)]
     assert types == ["task.created", "node.completed", "task.finished"]
-    assert _parse_sse(r.text)[0]["id"] == first
+    assert parse_sse(r.text)[0]["id"] == first
 
 
 async def test_sse_rejects_bad_last_event_id(

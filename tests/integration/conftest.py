@@ -12,12 +12,15 @@ from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+import httpx
 import psycopg
 import pytest
+from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from agentops.api.auth import hash_token
+from agentops.api.main import create_app
 from agentops.core.budget import open_budget_on
 from agentops.db.session import get_sessionmaker, make_engine
 from agentops.settings import Budget, get_settings
@@ -135,3 +138,26 @@ async def create_task(
         )
         await open_budget_on(conn, tid, budget or get_settings().budget)
     return tid
+
+
+@pytest.fixture
+async def app(test_db: str) -> AsyncIterator[FastAPI]:
+    application = create_app(get_settings())
+    async with application.router.lifespan_context(application):
+        yield application
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test", timeout=20) as c:
+        yield c
+
+
+def parse_sse(body: str) -> list[dict]:
+    events = []
+    for block in body.replace("\r\n", "\n").split("\n\n"):
+        data = [ln[5:].strip() for ln in block.split("\n") if ln.startswith("data:")]
+        if data:
+            events.append(json.loads("".join(data)))
+    return events

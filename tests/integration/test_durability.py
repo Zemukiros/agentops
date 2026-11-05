@@ -17,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agentops.core.graph import TEST_HOOK_ENV, build_demo_graph
+from agentops.core.testhooks import TEST_HOOK_NODES_ENV
 from agentops.db.checkpointer import open_checkpointer
 from agentops.queue import jobs
 from agentops.settings import get_settings
@@ -36,9 +37,10 @@ def hook_dir(tmp_path: Path) -> Path:
 def spawn(hook_dir: Path) -> Iterator:
     procs: list[subprocess.Popen] = []
 
-    def _spawn(worker_id: str, *extra: str) -> subprocess.Popen:
+    def _spawn(worker_id: str, *extra: str, env_extra: dict | None = None) -> subprocess.Popen:
         env = {
             **os.environ,
+            **(env_extra or {}),
             TEST_HOOK_ENV: str(hook_dir),
             "JOB_LEASE_SECONDS": str(LEASE_S),
             "JOB_HEARTBEAT_SECONDS": "0.5",
@@ -187,3 +189,46 @@ async def test_two_workers_racing_on_one_thread_only_one_advances(
         engine, "SELECT string_agg(id || ':' || status::text, ',' ORDER BY id) FROM jobs"
     )
     assert statuses == f"{j1}:done,{j2}:done"
+
+
+async def test_main_graph_crash_inside_specialist_resumes_on_another_worker(
+    engine: AsyncEngine, alice: SeededUser, hook_dir: Path, spawn
+) -> None:
+    """Phase 2: the real graph survives a SIGKILL inside a parallel branch (the subtask_worker
+    subgraph). The plan is not redone, node events are not duplicated (ADR-025), and the run
+    ends in exactly one terminal state."""
+    tid = await create_task(
+        engine, alice, "Summarize pgvector", graph="main", config={"scenario": "revise_once"}
+    )
+    await jobs.enqueue(engine, "run", thread_id=tid)
+    hooked = {TEST_HOOK_NODES_ENV: "specialist"}
+
+    a = spawn("worker-A", "--once", env_extra=hooked)
+    wait_for(hook_dir / f"{tid}.specialist.started", a)
+    os.kill(a.pid, signal.SIGKILL)
+    a.wait(10)
+
+    (hook_dir / f"{tid}.release").write_text("go")
+    b = spawn("worker-B", "--once", "--exit-after", "30", env_extra=hooked)
+    finish(b, timeout=40)
+
+    assert await _scalar(engine, "SELECT status::text FROM tasks WHERE id = :t", t=tid) == (
+        "completed"
+    )
+    ev = await _events(engine, tid)
+    # one started event per specialist execution (revision 0 and 1), despite the re-run of r0
+    started = [p["subtask_id"] for t, n, p in ev if t == "node.started" and n == "specialist"]
+    assert started == ["draft", "draft"]
+    async with engine.connect() as c:
+        purposes = [
+            r[0]
+            for r in await c.execute(
+                text("SELECT purpose FROM llm_calls WHERE task_id = :t ORDER BY id"), {"t": tid}
+            )
+        ]
+    # A died before its first draft call; B did not re-plan
+    assert purposes == ["plan", "draft", "review", "draft", "review", "synthesize"]
+    segments = [p for t, _, p in ev if t == "run.segment_started"]
+    assert [s["worker"] for s in segments] == ["worker-A", "worker-B"]
+    assert [s["resumed_from_checkpoint"] for s in segments] == [False, True]
+    assert [t for t, _, _ in ev].count("task.finished") == 1
