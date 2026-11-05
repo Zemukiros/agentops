@@ -49,7 +49,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 ## Open risks
 - LangGraph moves fast (1.2.20 shipped today). The lockfile pins it; bump deliberately.
 - `mcp` is held at 1.x by `langchain-mcp-adapters`.
-- Sandbox bind mounts from the worker container are untested (Phase 3). Docker Desktop has to be re-checked if the dev setup moves off native Docker Engine.
+- Sandbox bind mounts from the worker container are untested (Phase 3).
 - Replay forks share the thread head (ADR-015 caveat). The Phase 5 design must track branch checkpoint ids.
 
 ## Measured metrics (only from `evals/` runs, with date + config)

@@ -35,5 +35,5 @@ docker compose --profile observability up -d jaeger   # tracing UI on :16686
 ```
 
 ## Environment
-- Developer is on Windows 11 + WSL2 + Docker Desktop (WSL2 backend). The repo lives in the WSL filesystem. Scripts must work in bash on Ubuntu (WSL).
+- Developer is on Windows 11 + WSL2 (Ubuntu). **Docker Engine runs natively inside WSL2, not Docker Desktop.** The repo lives in the WSL filesystem. Scripts must work in bash on Ubuntu (WSL).
 - Python 3.12 via `uv`. Node LTS for the UI.
