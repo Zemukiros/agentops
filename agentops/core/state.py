@@ -10,13 +10,14 @@ from __future__ import annotations
 import operator
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 if TYPE_CHECKING:
     from agentops.models.client import ModelClient
+    from agentops.tools.registry import ToolRegistry
 
 Specialist = Literal["research", "analysis", "writing", "code"]
 TerminalStatus = Literal[
@@ -107,6 +108,34 @@ class Escalation(_Frozen):
     decision: EscalationDecision
 
 
+class ProposedAction(_Frozen):
+    """A write/external/destructive tool call outside the task workspace. Never executed by a
+    specialist (ADR-003); stored for approval and execution in Phase 4.
+
+    `hash` covers task, tool and canonical args only, so a node re-run after a crash, or a
+    later revision proposing the same thing, yields the same hash and the reducer keeps one.
+    """
+
+    hash: str
+    tool: str
+    args: dict[str, Any]
+    risk: Literal["write", "external", "destructive"]
+    agent: str
+    subtask_id: str
+    revision: int
+    rationale: str | None = None
+
+
+def merge_proposals(
+    left: dict[str, ProposedAction] | None, right: dict[str, ProposedAction] | None
+) -> dict[str, ProposedAction]:
+    """Reducer keyed by action hash; the first proposal of an action wins (ADR-030)."""
+    out = dict(left or {})
+    for h, action in (right or {}).items():
+        out.setdefault(h, action)
+    return out
+
+
 class Outcome(_Frozen):
     status: TerminalStatus
     reason: str | None = None
@@ -131,6 +160,7 @@ class TaskState(TypedDict, total=False):
     wave: int
     decision: ScheduleDecision | None
     escalations: Annotated[list[Escalation], operator.add]
+    proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
     failure_reason: str | None
     final: str | None
     partial: bool
@@ -153,11 +183,13 @@ class SubtaskOutput(TypedDict):
 
     results: dict[str, SubtaskResult]
     reviews: list[Review]
+    proposed_actions: dict[str, ProposedAction]
 
 
 class SubtaskState(SubtaskInput, total=False):
     results: dict[str, SubtaskResult]
     reviews: list[Review]
+    proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
     drafts: list[str]
     revision: int
     local_reviews: list[Review]
@@ -177,6 +209,8 @@ class RunContext:
     task_id: uuid.UUID
     engine: AsyncEngine
     model: ModelClient | None = None  # None only for the demo graph
+    tools: ToolRegistry | None = None  # None only for the demo graph
+    owner_id: uuid.UUID | None = None  # rate-limit key; set by the worker
 
 
 CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
@@ -189,5 +223,6 @@ CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     ScheduleDecision,
     EscalationDecision,
     Escalation,
+    ProposedAction,
     Outcome,
 )

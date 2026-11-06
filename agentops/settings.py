@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
@@ -102,6 +103,12 @@ class Settings(BaseSettings):
     # ceil(counted * ratio) + tokens. Each llm.call event records estimate vs actual.
     llm_input_margin_ratio: float = 1.15
     llm_input_margin_tokens: int = 512
+
+    # Per-task workspaces (ADR-008/011). WORKSPACE_ROOT is the path as this process sees it;
+    # WORKSPACE_HOST_ROOT is the same directory as the Docker host sees it (the sandbox's bind
+    # mount source). They differ when the worker runs in a container.
+    workspace_root: Path = Path("var/workspaces")
+    workspace_host_root: Path | None = None
 
     # Mail (Mailpit in dev: captures, sends nothing out)
     smtp_host: str = "localhost"

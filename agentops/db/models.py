@@ -292,8 +292,23 @@ class ToolCall(Base):
     output_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     latency_ms: Mapped[int] = mapped_column(Integer)
+    # ok | error | validation_error | denied | proposed | rate_limited | timeout (ADR-030)
+    status: Mapped[str] = mapped_column(String(20), server_default="ok")
+    source: Mapped[str] = mapped_column(String(8), server_default="native")
+    revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    step: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tool_call_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = _now()
     __table_args__ = (Index("ix_tool_calls_task", "task_id"),)
+
+
+class RateLimitBucket(Base):
+    """Token bucket per key (ADR-006, ADR-030): refilled continuously, taken atomically."""
+
+    __tablename__ = "rate_limit_buckets"
+    key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    tokens: Mapped[float] = mapped_column(Float)
+    updated_at: Mapped[datetime] = _now()
 
 
 class Approval(Base):
