@@ -47,6 +47,8 @@ from agentops.observability.events import emit_on
 from agentops.queue import jobs
 from agentops.queue.locks import thread_lock
 from agentops.settings import LLMMode, Settings, get_settings
+from agentops.tools.catalog import build_registry
+from agentops.tools.registry import ToolRegistry
 
 log = logging.getLogger("agentops.worker")
 
@@ -100,6 +102,7 @@ class Worker:
         worker_id: str,
         *,
         chat_factory: ChatFactory | None = None,
+        tools: ToolRegistry | None = None,
     ) -> None:
         """`chat_factory` overrides model selection (tests); otherwise fake mode uses the
         task's scripted scenario and real mode the provider factory."""
@@ -112,6 +115,7 @@ class Worker:
         self._ledger = BudgetLedger(self._sessionmaker)
         self._chat_factory = chat_factory
         self._real_factory: ChatFactory | None = None
+        self._tools = tools if tools is not None else build_registry(settings)
 
     def stop(self) -> None:
         self._stop.set()
@@ -219,13 +223,15 @@ class Worker:
         async with self.engine.connect() as conn:
             row = (
                 await conn.execute(
-                    text("SELECT graph, request, status, config FROM tasks WHERE id = :id"),
+                    text(
+                        "SELECT graph, request, status, config, owner_id FROM tasks WHERE id = :id"
+                    ),
                     {"id": task_id},
                 )
             ).first()
         if row is None:
             raise RuntimeError(f"task {task_id} not found")
-        graph_name, request, status, task_config = row
+        graph_name, request, status, task_config, owner_id = row
         if status in TERMINAL_TASK_STATUSES:
             log.info("task %s already terminal (%s); nothing to do", task_id, status)
             return
@@ -269,7 +275,13 @@ class Worker:
                 },
             )
         model = self._model_client(dict(task_config or {})) if spec.needs_model else None
-        ctx = RunContext(task_id=task_id, engine=self.engine, model=model)
+        ctx = RunContext(
+            task_id=task_id,
+            engine=self.engine,
+            model=model,
+            tools=self._tools if spec.needs_model else None,
+            owner_id=owner_id,
+        )
         try:
             await graph.ainvoke(graph_input, config, context=ctx)
         except BudgetExceededError as exc:

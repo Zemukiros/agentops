@@ -38,13 +38,13 @@ def test_valid_plan_has_no_errors() -> None:
         (plan(st("a"), st("b", "c"), st("c", "b")), "dependency cycle among ['b', 'c']"),
         (plan(st("a", "zzz")), "unknown ids ['zzz']"),
         (plan(st("a"), st("a")), "duplicate subtask ids: ['a']"),
-        (plan(st("a", specialist="research")), "specialist 'research' is not available"),
+        (plan(st("a", specialist="code")), "specialist 'code' is not available"),
         (plan(*(st(f"s{i}") for i in range(7))), "too many subtasks: 7 > 6"),
         (plan(st("a", "a")), "depends on itself"),
     ],
 )
 def test_invalid_plans(p: Plan, needle: str) -> None:
-    errors = validate_plan(p)
+    errors = validate_plan(p, enabled=frozenset({"writing", "research", "analysis"}))
     assert any(needle in e for e in errors), errors
 
 

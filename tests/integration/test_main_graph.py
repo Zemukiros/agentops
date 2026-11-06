@@ -133,7 +133,7 @@ async def test_default_completes_with_final_output(
     assert t["result"]["budget"]["llm_calls"] == 4
     assert await calls(engine, tid) == [
         ("supervisor", "plan", 1, True),
-        ("writing", "draft", 1, True),
+        ("writing", "act", 1, True),
         ("reviewer", "review", 1, True),
         ("supervisor", "synthesize", 1, True),
     ]
@@ -149,7 +149,7 @@ async def test_revise_once_then_accept(engine: AsyncEngine, saver: Any, alice: S
     sub = (await task_row(engine, tid))["result"]["subtasks"]["draft"]
     assert (sub["status"], sub["revisions"]) == ("accepted", 1)
     purposes = [p for _, p, _, _ in await calls(engine, tid)]
-    assert purposes == ["plan", "draft", "review", "draft", "review", "synthesize"]
+    assert purposes == ["plan", "act", "review", "act", "review", "synthesize"]
     verdicts = await rows(
         engine,
         "SELECT payload->>'verdict', (payload->>'revision')::int FROM events "
@@ -285,7 +285,7 @@ async def test_revisions_exhausted_pauses_for_a_human(
     assert sub["draft"].startswith("Draft v3") and len(sub["reviews"]) == 3
     # the loop is capped: exactly 3 drafts and 3 reviews, then it stopped spending
     purposes = [p for _, p, _, _ in await calls(engine, tid)]
-    assert purposes == ["plan"] + ["draft", "review"] * 3
+    assert purposes == ["plan"] + ["act", "review"] * 3
     assert (await graph_values(saver, tid))["results"]["draft"].status == "needs_human"
 
 
@@ -339,7 +339,7 @@ async def test_reviewer_escalate_goes_straight_to_a_human(
     t = await task_row(engine, tid)
     assert t["status"] == "awaiting_approval"
     assert t["result"]["interrupts"][0]["value"]["subtasks"][0]["reason"] == "reviewer escalated"
-    assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "draft", "review"]
+    assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "act", "review"]
 
 
 async def test_resume_without_pending_interrupt_is_a_noop(

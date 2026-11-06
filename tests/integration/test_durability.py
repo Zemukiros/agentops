@@ -231,7 +231,7 @@ async def test_main_graph_crash_inside_specialist_resumes_on_another_worker(
             )
         ]
     # A died before its first draft call; B did not re-plan
-    assert purposes == ["plan", "draft", "review", "draft", "review", "synthesize"]
+    assert purposes == ["plan", "act", "review", "act", "review", "synthesize"]
     segments = [p for t, _, p in ev if t == "run.segment_started"]
     assert [s["worker"] for s in segments] == ["worker-A", "worker-B"]
     assert [s["resumed_from_checkpoint"] for s in segments] == [False, True]

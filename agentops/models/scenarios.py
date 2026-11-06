@@ -1,6 +1,6 @@
 """Scripted fake-mode scenarios for the `main` graph (LLM_MODE=fake, ADR-009/027).
 
-Purposes are qualified (ADR-027): "plan/p2", "draft/r1/<subtask>", "review/r0/<subtask>",
+Purposes are qualified (ADR-027): "plan/p2", "act/r1/<subtask>", "review/r0/<subtask>",
 "synthesize", "final_review". A script registered for a more specific purpose wins, so a
 scenario can target one attempt, one revision or one subtask. Within an attempt, the turn
 index counts the model's own answers since the last human message.
@@ -79,7 +79,7 @@ def build_scenarios() -> FakeScript:
     s.add("supervisor", "*", ONE_SUBTASK, purpose="plan")
     s.add("supervisor", "*", FINAL, purpose="synthesize")
     for r in range(3):
-        s.add("writing", "*", _draft(r), purpose=f"draft/r{r}")
+        s.add("writing", "*", _draft(r), purpose=f"act/r{r}")
     s.add("reviewer", "*", ACCEPT, purpose="review")
     s.add("reviewer", "*", _verdict("accept", 4), purpose="final_review")
 
@@ -103,12 +103,12 @@ def build_scenarios() -> FakeScript:
     s.add("supervisor", "bad_plan_twice", cyclic, purpose="plan/p1")
     s.add("supervisor", "bad_plan_twice", _plan(_subtask("x", ["ghost"])), purpose="plan/p2")
     # the writing model fails on every attempt -> subtask failed -> nothing usable -> failed
-    s.add("writing", "specialist_error", PROVIDER_DOWN, purpose="draft")
+    s.add("writing", "specialist_error", PROVIDER_DOWN, purpose="act")
 
     # ADR-029 partial results: `facts` fails, `summary` is blocked, `intro` is accepted
     for name in ("partial_ok", "partial_low_score", "partial_with_escalation"):
         s.add("supervisor", name, THREE_WITH_DEPENDENT, purpose="plan")
-        s.add("writing", name, PROVIDER_DOWN, purpose="draft/facts")
+        s.add("writing", name, PROVIDER_DOWN, purpose="act/facts")
     s.add("reviewer", "partial_low_score", _verdict("escalate", 2), purpose="final_review")
     # intro also needs a human; after approval the run can still end completed_partial
     s.add("reviewer", "partial_with_escalation", REVISE, purpose="review/intro")

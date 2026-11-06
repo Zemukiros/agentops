@@ -13,7 +13,8 @@ pytestmark = pytest.mark.unit
 def _models_in(tp: object, seen: set[type]) -> set[type[BaseModel]]:
     found: set[type[BaseModel]] = set()
     if isinstance(tp, type) and issubclass(tp, BaseModel):
-        if tp in seen:
+        # LangChain messages are on LangGraph's built-in safe list (verified round-trip).
+        if tp.__module__.startswith("langchain_core.") or tp in seen:
             return found
         seen.add(tp)
         found.add(tp)

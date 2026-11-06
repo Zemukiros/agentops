@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
 
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -83,6 +84,26 @@ class SubtaskResult(_Frozen):
     revisions: int = 0
     reason: str | None = None
     human_override: bool = False
+
+
+class ToolLogEntry(_Frozen):
+    """One tool call in a specialist attempt, as the reviewer sees it (truncated)."""
+
+    step: int
+    tool: str
+    status: str
+    args: dict[str, Any]
+    preview: str
+
+
+class AttemptRecord(_Frozen):
+    """How one specialist attempt ended. Each one counts toward MAX_REVISIONS."""
+
+    revision: int
+    outcome: Literal["reviewed", "step_cap"]
+    draft: str | None = None
+    verdict: ReviewVerdict | None = None
+    note: str | None = None  # what the specialist is told before its next attempt
 
 
 class ScheduleDecision(_Frozen):
@@ -190,9 +211,15 @@ class SubtaskState(SubtaskInput, total=False):
     results: dict[str, SubtaskResult]
     reviews: list[Review]
     proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
-    drafts: list[str]
     revision: int
+    history: list[AttemptRecord]  # finished attempts, oldest first
     local_reviews: list[Review]
+    # the current attempt (reset when a new attempt starts)
+    messages: list[BaseMessage]
+    step: int  # tool calls made in this attempt
+    tool_log: list[ToolLogEntry]
+    draft: str | None
+    attempt_outcome: Literal["reviewed", "step_cap"] | None
     failed_reason: str | None
 
 
@@ -224,5 +251,7 @@ CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     EscalationDecision,
     Escalation,
     ProposedAction,
+    ToolLogEntry,
+    AttemptRecord,
     Outcome,
 )

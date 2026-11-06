@@ -23,8 +23,7 @@ from collections.abc import Mapping
 from agentops.core.state import Plan, ScheduleDecision, Subtask, SubtaskResult
 
 MAX_SUBTASKS = 6
-# Phase 2 ships one specialist. Phase 3 enables the rest (ADR-026).
-ENABLED_SPECIALISTS: frozenset[str] = frozenset({"writing"})
+ENABLED_SPECIALISTS: frozenset[str] = frozenset({"research", "analysis", "writing", "code"})
 
 
 def validate_plan(
