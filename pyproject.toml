@@ -26,6 +26,7 @@ dependencies = [
     "langchain-anthropic==1.7.10",
     "sqlglot==30.29.0",
     "readability-lxml==0.9",
+    "docker==7.2.0",
 ]
 
 [dependency-groups]
@@ -93,11 +94,12 @@ markers = [
     "unit: fast, no services",
     "integration: needs Postgres (docker compose)",
     "e2e: real models / full stack; not run by default",
+    "sandbox: needs a Docker daemon + the agentops-sandbox image (own CI job)",
     "eval: scenario evaluation; not run by default",
 ]
 addopts = "-ra --strict-markers -m 'not e2e and not eval'"
 
 [[tool.mypy.overrides]]
-# readability-lxml and lxml ship no type information (no py.typed, no stubs package pinned).
-module = ["readability", "readability.*", "lxml", "lxml.*"]
+# readability-lxml, lxml and docker ship no type information (no py.typed; stub packages not pinned).
+module = ["readability", "lxml", "lxml.*", "docker", "docker.*"]
 ignore_missing_imports = true

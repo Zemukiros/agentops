@@ -3,20 +3,52 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 2 — Vertical slice: **complete, awaiting review.** Fake mode fully tested; one real-model e2e run completed on 2026-11-05 for $0.040454 (see "Real-model runs"). Phase 3 not started.
-- **Last updated:** 2026-11-05
-- **Test status:** 200 passed, 0 failed (141 unit, 59 integration), fake mode, 2026-11-05. 2 e2e tests (real model) are deselected by default. `make lint` clean (ruff, ruff format, mypy).
-- **Branch:** `phase-2`.
+- **Phase:** 3 — **in progress, stopped after step 5 of 10** (2026-11-06). Phase 2 approved and merged (PR #1).
+- **Branch:** `phase-3` (pushed; no PR yet). Last commit is a WIP commit for step 5 (sandbox).
+- **Last updated:** 2026-11-06
+- **Test status at stop:** lint, ruff format and mypy clean. Unit 381 passed; sandbox 9 passed (real Docker). Integration: 467 passed for the whole suite at the step 4 commit (`6cbbb7f`); **not re-run after the step 5 changes** (they only add `run_python` to the tool catalog) — run `make test` first thing.
 
 ## Phase plan
 | Phase | Goal | Status |
 |---|---|---|
 | 1 | Foundation: repo, config, DB schema + migrations, checkpointer, job queue skeleton, fake model, health API, compose, CI | ☑ approved |
-| 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ (awaiting review) |
-| 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☐ |
+| 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ approved, merged |
+| 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ◐ steps 0–5 of 10 done |
 | 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☐ |
 | 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☐ |
 | 6 | Hardening + evals: injection suite, scenario harness, measured metrics, docs, deploy config | ☐ |
+
+## Phase 3 — where it stopped
+Approved plan + the 7 user changes (partial-result rule, proposal dedupe, MCP stdio env/timeouts/restart, host-path sandbox mount + through-proxy check, step cap = failed attempt, separate sandbox CI job, readability-lxml vetting).
+
+| Step | What | Status | Commit |
+|---|---|---|---|
+| 0 | Failure policy: `blocked`, independent work continues, `completed_partial` needs ≥1 accepted + deterministic "What's missing" section + final review ≥ `FINAL_REVIEW_MIN_SCORE` (ADR-029). Fake scripts: qualified purposes, scenario-first lookup, per-attempt turn index (ADR-027 update) | ☑ | `579e743` |
+| 1 | Tool registry (deny → validate → propose → rate limit → timeout → log + event), untrusted framing, Postgres token bucket, workspace tools, migration 0003 | ☑ | `11ad03a` |
+| 2 | ReAct specialists (research, analysis, code, writing), step cap = failed attempt (counts toward revisions, never raises), reviewer sees the tool log, parallel waves (barrier test) | ☑ | `f08d09c` |
+| 3 | SQL tools: `demo` schema, read-only LOGIN role, sqlglot single-SELECT, statement timeout | ☑ | `96f2ebe` |
+| 4 | `web_search` (fixture + Tavily adapter) and `fetch_url` (SSRF guard after DNS, IP pinning, redirect re-checks, caps, readability) | ☑ | `6cbbb7f` |
+| 5 | Sandbox + `run_python`: container per run, host-path bind mount of the task workspace, isolation tests (no network, no secrets, loop killed, fork bomb contained, truncation, never exec) | ☑ code + tests; WIP commit (integration suite not re-run) | WIP |
+| 6 | **MCP — next.** `mcp==2.3.0` `MCPServer` "notes" server (stdio + streamable HTTP), allowlist config, `server__tool` names, default risk destructive, sanitized descriptions, JSON Schema → Pydantic. Stdio subprocess with an explicit minimal env + canary test, startup/call timeouts, restart on crash | ☐ | |
+| 7 | ProposedAction: reducer dedupe test (crash re-run can't duplicate proposals), "no specialist path executes a proposal" test, `send_email` spec (proposal-only) | ☐ (model, hash and reducer already exist from step 1; tests + send_email spec remain) | |
+| 8 | Prompt-injection test with `fixtures/web/injected.html` (page already added in step 4) | ☐ | |
+| 9 | Compose/CI wiring: worker `WORKSPACE_ROOT=/workspaces` + `WORKSPACE_HOST_ROOT` (host path) bind mount, `make` target creating `var/workspaces` (mode 0777: worker uid 10000, sandbox uid 10001), `mcp-notes` service, SQL role env; **through-proxy check** `docker compose exec worker python -m agentops.tools.sandbox --selfcheck`; CI: separate `sandbox` job (build image, `AGENTOPS_REQUIRE_SANDBOX=1 pytest -m sandbox`) | ☐ | |
+| 10 | Full suite → one real e2e run (research → analysis → writing, ledger cap $0.40, estimate $0.10–0.25) → docs → summary | ☐ | |
+
+**Resume checklist (next session):**
+1. `git checkout phase-3 && make up && make migrate && make test` (confirms the step 5 WIP against the integration suite), plus `uv run pytest -m sandbox tests/sandbox`.
+2. Step 6: re-read the `mcp` 2.3.0 server/client API from the installed package before writing code (FastMCP was renamed `MCPServer` in 2.x; `mcp` is not a dependency yet — add `mcp==2.3.0`).
+3. Not yet written: ADR-030 (registry + risk/scope table), ADR-031 (sandbox host-path mount), ADR-032 (MCP on SDK v2, replaces ADR-008's 1.x pin), ADR-033 (SQL read-only role), ADR-034 (untrusted framing). The design is in the code docstrings (`tools/registry.py`, `tools/spec.py`, `tools/sandbox.py`, `tools/native/sql.py`, `tools/framing.py`); copy into DECISIONS.md.
+
+**Decisions made this phase (record as ADRs):**
+- MCP: `mcp==2.3.0` directly (user choice); no `langchain-mcp-adapters`.
+- Live search: Tavily via httpx (user choice), verified against Tavily's API reference 2026-11-06 (Bearer auth, `search_depth: "basic"` = 1 credit). Never called unless `TAVILY_API_KEY` is set.
+- readability-lxml 0.9 vetted before install: pure wheel identical to the sdist, no install hooks/entry points/.pth; its only network (`urlopen`) and `webbrowser` code is in the CLI `main()`, unreachable from `Document(...).summary()`; single individual maintainer, Apache-2.0.
+- New dependencies (exact pins): `sqlglot==30.29.0`, `readability-lxml==0.9` (+ lxml 6.1.3, lxml-html-clean 0.4.6, chardet 5.2.0, cssselect 1.3.0), `docker==7.2.0`. mypy ignores missing types for readability/lxml/docker only.
+- Final review runs only for partial deliverables in Phase 3; reviewing complete deliverables arrives with the Phase 4 gates.
+- Manual smoke (not a test): `guarded_fetch("https://example.com/")` succeeded with the connection pinned to the checked IP and the TLS certificate verified against the hostname; `localhost` was blocked after real DNS resolution.
+
+**Real-model spend in Phase 3 so far: $0.00.** Cumulative AgentOps: $0.040454.
 
 ## Done (Phase 2)
 **Phase 1 fixes**
@@ -57,7 +89,7 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - One test assertion crashed after the run completed (raw SQL returns `NUMERIC` as `Decimal`; the check added a float). Fixed by extracting `check_report()`. The fixed checks were re-run against this run's recorded rows rather than paying for a second run.
 - Cumulative real-model spend on AgentOps: **$0.040454**.
 
-## Next up
+## Next up (as of Phase 2; see the Phase 3 section above for the current next step)
 - Review Phase 2; then Phase 3 plan (all specialists, tool registry + native tools, MCP, sandbox, true parallel waves).
 
 ## Known limitations / stubs (be honest)
