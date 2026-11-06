@@ -73,6 +73,8 @@ class Settings(BaseSettings):
         default_factory=lambda: {str(r): RoleModel() for r in ROLES}
     )
     anthropic_api_key: SecretStr | None = None
+    # SEARCH_MODE=live only (free tier needs an account); tests never use it.
+    tavily_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
 
     budget: Budget = Field(default_factory=Budget)

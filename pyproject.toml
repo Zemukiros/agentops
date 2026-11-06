@@ -25,6 +25,7 @@ dependencies = [
     "structlog==26.1.0",
     "langchain-anthropic==1.7.10",
     "sqlglot==30.29.0",
+    "readability-lxml==0.9",
 ]
 
 [dependency-groups]
@@ -95,3 +96,8 @@ markers = [
     "eval: scenario evaluation; not run by default",
 ]
 addopts = "-ra --strict-markers -m 'not e2e and not eval'"
+
+[[tool.mypy.overrides]]
+# readability-lxml and lxml ship no type information (no py.typed, no stubs package pinned).
+module = ["readability", "readability.*", "lxml", "lxml.*"]
+ignore_missing_imports = true
