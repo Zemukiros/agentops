@@ -22,7 +22,7 @@ Specialist = Literal["research", "analysis", "writing", "code"]
 TerminalStatus = Literal[
     "completed", "completed_partial", "failed", "rejected", "cancelled", "budget_exceeded"
 ]
-SubtaskStatus = Literal["accepted", "failed", "needs_human"]
+SubtaskStatus = Literal["accepted", "failed", "needs_human", "blocked"]
 
 
 class _Frozen(BaseModel):
@@ -72,7 +72,9 @@ class Review(_Frozen):
 
 # ---- terminal results and outcomes ---------------------------------------------------------
 class SubtaskResult(_Frozen):
-    """Only terminal statuses (ADR-002). Retries live in the subgraph's own state."""
+    """Only terminal statuses (ADR-002). Retries live in the subgraph's own state.
+    `blocked` is set by the scheduler (never by a subtask_worker) for subtasks that depend,
+    directly or transitively, on a failed or blocked subtask (ADR-029)."""
 
     subtask_id: str
     status: SubtaskStatus
@@ -83,8 +85,10 @@ class SubtaskResult(_Frozen):
 
 
 class ScheduleDecision(_Frozen):
-    kind: Literal["dispatch", "escalate", "fail", "all_accepted"]
+    kind: Literal["dispatch", "escalate", "fail", "all_accepted", "partial"]
     subtask_ids: list[str] = Field(default_factory=list)
+    # subtasks newly marked blocked by this decision (written into results by `schedule`)
+    blocked: dict[str, str] = Field(default_factory=dict)  # id -> reason
     reason: str | None = None
 
 
@@ -129,6 +133,8 @@ class TaskState(TypedDict, total=False):
     escalations: Annotated[list[Escalation], operator.add]
     failure_reason: str | None
     final: str | None
+    partial: bool
+    final_review: ReviewVerdict | None
     outcome: Outcome | None
 
 

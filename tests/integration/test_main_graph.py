@@ -91,7 +91,8 @@ async def event_types(engine: AsyncEngine, tid: uuid.UUID) -> list[str]:
 async def calls(engine: AsyncEngine, tid: uuid.UUID) -> list[tuple[str, str, int, bool]]:
     return await rows(
         engine,
-        "SELECT role, purpose, attempt, ok FROM llm_calls WHERE task_id=:t ORDER BY id",
+        "SELECT role, split_part(purpose, '/', 1), attempt, ok FROM llm_calls "
+        "WHERE task_id=:t ORDER BY id",
         t=tid,
     )
 
@@ -198,7 +199,7 @@ async def test_two_invalid_plans_fail(engine: AsyncEngine, saver: Any, alice: Se
     await assert_single_terminal(engine, tid, "failed")
     t = await task_row(engine, tid)
     assert "no valid plan after 2 attempts" in t["error"]
-    assert "not available" in t["error"]  # the second plan's error
+    assert "unknown ids ['ghost']" in t["error"]  # the second plan's error
     assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "plan"]  # no more spend
 
 
@@ -210,7 +211,7 @@ async def test_specialist_error_fails_the_subtask_and_the_run(
     await assert_single_terminal(engine, tid, "failed")
     t = await task_row(engine, tid)
     assert t["result"]["subtasks"]["draft"]["status"] == "failed"
-    assert "subtask(s) ['draft'] failed" in t["error"]
+    assert "no subtask was accepted; failed or blocked: ['draft']" in t["error"]
     writing = [(a, ok) for r, _, a, ok in await calls(engine, tid) if r == "writing"]
     assert writing == [(1, False), (2, False), (3, False)]  # every retry recorded
 
@@ -369,3 +370,90 @@ async def test_only_escalation_gate_interrupts(
     state = await build_main_graph(saver).aget_state(cfg)
     assert state.next == ("escalation_gate",)
     assert [t.name for t in state.tasks if t.interrupts] == ["escalation_gate"]
+
+
+# ---- ADR-029: failures don't kill independent work; partial results ------------------------
+async def test_partial_result_completed_partial(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    """intro (independent) is accepted, facts fails, summary (depends on facts) is blocked:
+    the run ends completed_partial with a deliverable that lists what's missing."""
+    tid = await new_task(engine, alice, "partial_ok")
+    await run_job(engine, saver, tid)
+    await assert_single_terminal(engine, tid, "completed_partial")
+    t = await task_row(engine, tid)
+    subs = t["result"]["subtasks"]
+    assert {k: v["status"] for k, v in subs.items()} == {
+        "intro": "accepted",
+        "facts": "failed",
+        "summary": "blocked",
+    }
+    final = t["result"]["final"]
+    assert "## What's missing" in final
+    assert "**facts** (failed)" in final and "**summary** (blocked)" in final
+    assert "Missing: A short markdown summary." in final
+    assert t["result"]["partial"] is True
+    assert t["result"]["final_review"]["score"] == 4
+    assert "did not complete" in t["error"]  # the reason is recorded, not hidden
+    # intro and facts were dispatched together; summary was never dispatched
+    dispatched = await rows(
+        engine,
+        "SELECT payload->>'subtask_id', (payload->>'wave')::int FROM events "
+        "WHERE task_id=:t AND type='subtask.dispatched' ORDER BY id",
+        t=tid,
+    )
+    assert sorted(dispatched) == [("facts", 1), ("intro", 1)]
+    blocked = await rows(
+        engine,
+        "SELECT payload->>'subtask_id' FROM events WHERE task_id=:t AND type='subtask.blocked'",
+        t=tid,
+    )
+    assert blocked == [("summary",)]
+    base = [p for _, p, _, _ in await calls(engine, tid)]
+    assert base.count("synthesize") == 1 and base.count("final_review") == 1
+
+
+async def test_partial_result_below_threshold_fails(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "partial_low_score")
+    await run_job(engine, saver, tid)
+    await assert_single_terminal(engine, tid, "failed")
+    t = await task_row(engine, tid)
+    assert "partial deliverable scored 2/5, below 3" in t["error"]
+    assert "## What's missing" in t["result"]["final"]  # kept for inspection
+
+
+async def test_nothing_usable_fails_without_synthesis(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "specialist_error")
+    await run_job(engine, saver, tid)
+    await assert_single_terminal(engine, tid, "failed")
+    base = [p for _, p, _, _ in await calls(engine, tid)]
+    assert "synthesize" not in base and "final_review" not in base
+
+
+async def test_complete_runs_skip_final_review(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["result"]["partial"] is False and t["result"]["final_review"] is None
+    assert "## What's missing" not in t["result"]["final"]
+
+
+async def test_failure_plus_escalation_then_approve_is_partial(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "partial_with_escalation")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    [intr] = t["result"]["interrupts"]
+    assert [s["subtask_id"] for s in intr["value"]["subtasks"]] == ["intro"]
+    await run_job(engine, saver, tid, kind="resume", payload={"resume": {"action": "approve"}})
+    await assert_single_terminal(engine, tid, "completed_partial")
+    subs = (await task_row(engine, tid))["result"]["subtasks"]
+    assert subs["intro"]["human_override"] is True and subs["summary"]["status"] == "blocked"

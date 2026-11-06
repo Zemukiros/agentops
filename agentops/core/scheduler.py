@@ -1,14 +1,18 @@
-"""Plan validation and scheduling decisions. Pure functions, no I/O (ADR-002, ADR-026).
+"""Plan validation and scheduling decisions. Pure functions, no I/O (ADR-002, ADR-026, ADR-029).
 
-`decide` sees only terminal subtask results (accepted | failed | needs_human). Every
+`decide` sees only terminal subtask results (accepted | failed | needs_human | blocked). Every
 combination maps to exactly one decision, so the schedule loop can never fall through and
 end the run silently. Order of precedence:
 
-1. every subtask accepted                 -> all_accepted
-2. any subtask failed                     -> fail (no path to "all accepted" remains)
-3. subtasks whose deps are all accepted   -> dispatch (unless the wave cap is reached)
-4. any subtask needs a human              -> escalate (only once nothing else can run)
-5. anything else                          -> fail ("stalled"; unreachable for a valid DAG)
+1. every subtask accepted                     -> all_accepted
+2. pending subtasks that depend (transitively) on a failed/blocked one are marked `blocked`
+   in the same decision; a failure never stops independent work (ADR-029)
+3. subtasks whose deps are all accepted       -> dispatch (unless the wave cap is reached)
+4. any subtask needs a human                  -> escalate (only once nothing else can run)
+5. everything terminal, >= 1 accepted         -> partial (synthesize + final review decide
+                                                 between completed_partial and failed)
+6. everything terminal, nothing accepted      -> fail
+7. anything else                              -> fail ("stalled"; unreachable for a valid DAG)
 """
 
 from __future__ import annotations
@@ -86,44 +90,74 @@ def max_waves(plan: Plan) -> int:
     return len(plan.subtasks)
 
 
-def decide(plan: Plan, results: Mapping[str, SubtaskResult], wave: int) -> ScheduleDecision:
-    by_status: dict[str, list[str]] = {"accepted": [], "failed": [], "needs_human": []}
+def decide(  # noqa: PLR0911  (one return per documented case)
+    plan: Plan, results: Mapping[str, SubtaskResult], wave: int
+) -> ScheduleDecision:
+    by_status: dict[str, set[str]] = {
+        "accepted": set(),
+        "failed": set(),
+        "needs_human": set(),
+        "blocked": set(),
+    }
     for sid, r in results.items():
-        by_status[r.status].append(sid)
-    accepted = set(by_status["accepted"])
+        by_status[r.status].add(sid)
+    accepted = by_status["accepted"]
     plan_ids = [s.id for s in plan.subtasks]
 
     if all(i in accepted for i in plan_ids):
         return ScheduleDecision(kind="all_accepted")
 
-    if by_status["failed"]:
-        failed = sorted(by_status["failed"])
-        blocked = sorted(
-            s.id for s in plan.subtasks if s.id not in results and _depends_on_any(s, failed, plan)
-        )
-        reason = f"subtask(s) {failed} failed"
-        if blocked:
-            reason += f"; blocked dependents: {blocked}"
-        return ScheduleDecision(kind="fail", subtask_ids=failed, reason=reason)
+    dead = by_status["failed"] | by_status["blocked"]
+    newly_blocked: dict[str, str] = {}
+    for s in plan.subtasks:
+        if s.id in results:
+            continue
+        culprits = sorted(d for d in dead if _depends_on_any(s, [d], plan))
+        if culprits:
+            newly_blocked[s.id] = f"depends on failed or blocked subtask(s) {culprits}"
+    pending = [s for s in plan.subtasks if s.id not in results and s.id not in newly_blocked]
 
-    ready = [s.id for s in plan.subtasks if s.id not in results and set(s.depends_on) <= accepted]
+    ready = [s.id for s in pending if set(s.depends_on) <= accepted]
     if ready:
         if wave >= max_waves(plan):
             return ScheduleDecision(
-                kind="fail", reason=f"wave cap reached ({wave}/{max_waves(plan)})"
+                kind="fail",
+                blocked=newly_blocked,
+                reason=f"wave cap reached ({wave}/{max_waves(plan)})",
             )
-        return ScheduleDecision(kind="dispatch", subtask_ids=ready)
+        return ScheduleDecision(kind="dispatch", subtask_ids=ready, blocked=newly_blocked)
 
     if by_status["needs_human"]:
-        return ScheduleDecision(kind="escalate", subtask_ids=sorted(by_status["needs_human"]))
+        return ScheduleDecision(
+            kind="escalate", subtask_ids=sorted(by_status["needs_human"]), blocked=newly_blocked
+        )
 
-    pending = sorted(i for i in plan_ids if i not in results)
+    if pending:
+        ids = sorted(s.id for s in pending)
+        return ScheduleDecision(
+            kind="fail",
+            subtask_ids=ids,
+            blocked=newly_blocked,
+            reason=f"scheduler stalled; pending: {ids}",
+        )
+
+    missing = sorted(by_status["failed"] | by_status["blocked"] | set(newly_blocked))
+    if accepted:
+        return ScheduleDecision(
+            kind="partial",
+            subtask_ids=missing,
+            blocked=newly_blocked,
+            reason=f"subtask(s) {missing} did not complete",
+        )
     return ScheduleDecision(
-        kind="fail", subtask_ids=pending, reason=f"scheduler stalled; pending: {pending}"
+        kind="fail",
+        subtask_ids=missing,
+        blocked=newly_blocked,
+        reason=f"no subtask was accepted; failed or blocked: {missing}",
     )
 
 
-def _depends_on_any(s: Subtask, targets: list[str], plan: Plan) -> bool:
+def _depends_on_any(s: Subtask, targets: list[str] | set[str], plan: Plan) -> bool:
     """True if `s` depends on any target, directly or transitively."""
     by_id = {x.id: x for x in plan.subtasks}
     stack, seen = list(s.depends_on), set()

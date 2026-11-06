@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agentops.core.budget import BudgetLedger
 from agentops.db.models import LLMCall
 from agentops.models import pricing
-from agentops.models.fake import FakeScript, ScriptedChatModel
+from agentops.models.fake import REASK, FakeScript, ScriptedChatModel
 from agentops.observability.events import emit_on
 from agentops.settings import LLMMode, RoleModel, Settings
 
@@ -105,6 +105,10 @@ class ModelClient:
         self._sleep = sleep
 
     @property
+    def settings(self) -> Settings:
+        return self._settings
+
+    @property
     def ledger(self) -> BudgetLedger:
         return self._ledger
 
@@ -164,7 +168,10 @@ class ModelClient:
                     convo = [
                         *messages,
                         a.raw,
-                        HumanMessage(f"Your previous answer was invalid: {a.error}. Answer again."),
+                        HumanMessage(
+                            f"Your previous answer was invalid: {a.error}. Answer again.",
+                            name=REASK,
+                        ),
                     ]
                 await self._sleep(self._settings.llm_retry_base_seconds * 2 ** (attempt - 1))
 

@@ -11,11 +11,12 @@
                            |                     |-- approve/edit -> schedule
                            |                     '-- reject       -> finalize_rejected -> END
                            |-- fail         -> finalize_failed -> END
+                           |-- partial      -> synthesize -> final_review -> END
                            '-- all accepted -> synthesize -> END
 
   Not built yet, inserted later between existing nodes (no rewrite): recall (after intake),
-  plan_gate (after plan), action_gate + execute_actions (before synthesize), final_review +
-  consolidate (after synthesize).
+  plan_gate (after plan), action_gate + execute_actions (before synthesize), consolidate
+  (after synthesize). `final_review` exists but only scores partial deliverables (ADR-029).
 
   Every path that reaches END sets `outcome`. The worker treats a run that ends without one
   as `failed` (never silent).
@@ -36,12 +37,13 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 
 from agentops.core.nodes.escalation import after_escalation, escalation_gate
+from agentops.core.nodes.final_review import final_review
 from agentops.core.nodes.finalize import finalize_failed, finalize_rejected
 from agentops.core.nodes.intake import intake
 from agentops.core.nodes.plan import after_plan, plan
 from agentops.core.nodes.schedule import route_schedule, schedule
 from agentops.core.nodes.subtask import build_subtask_graph
-from agentops.core.nodes.synthesize import synthesize
+from agentops.core.nodes.synthesize import after_synthesize, synthesize
 from agentops.core.state import DemoState, Outcome, RunContext, TaskState
 from agentops.core.testhooks import TEST_HOOK_ENV, block_if_hooked
 from agentops.observability.events import emit, node_key
@@ -60,6 +62,7 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g.add_node("subtask_worker", build_subtask_graph())
     g.add_node("escalation_gate", escalation_gate)
     g.add_node("synthesize", synthesize)
+    g.add_node("final_review", final_review)
     g.add_node("finalize_failed", finalize_failed)
     g.add_node("finalize_rejected", finalize_rejected)
 
@@ -73,7 +76,8 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     )
     g.add_edge("subtask_worker", "schedule")
     g.add_conditional_edges("escalation_gate", after_escalation, ["schedule", "finalize_rejected"])
-    g.add_edge("synthesize", END)
+    g.add_conditional_edges("synthesize", after_synthesize, ["final_review", END])
+    g.add_edge("final_review", END)
     g.add_edge("finalize_failed", END)
     g.add_edge("finalize_rejected", END)
     return g.compile(checkpointer=checkpointer)
@@ -95,6 +99,10 @@ def main_result(values: Mapping[str, Any]) -> tuple[str, dict[str, Any], str | N
         "subtasks": {
             sid: r.model_dump(mode="json", exclude={"output"}) for sid, r in results.items()
         },
+        "partial": bool(values.get("partial")),
+        "final_review": (
+            values["final_review"].model_dump(mode="json") if values.get("final_review") else None
+        ),
     }
     return outcome.status, result, outcome.reason if outcome.status != "completed" else None
 

@@ -223,7 +223,11 @@ async def test_main_graph_crash_inside_specialist_resumes_on_another_worker(
         purposes = [
             r[0]
             for r in await c.execute(
-                text("SELECT purpose FROM llm_calls WHERE task_id = :t ORDER BY id"), {"t": tid}
+                text(
+                    "SELECT split_part(purpose, '/', 1) FROM llm_calls "
+                    "WHERE task_id = :t ORDER BY id"
+                ),
+                {"t": tid},
             )
         ]
     # A died before its first draft call; B did not re-plan

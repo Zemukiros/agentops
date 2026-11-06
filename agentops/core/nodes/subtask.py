@@ -61,7 +61,10 @@ async def specialist(state: SubtaskState, runtime: Runtime[RunContext]) -> dict[
     )
     try:
         res = await model_of(runtime).invoke(
-            sub.specialist, msgs, task_id=runtime.context.task_id, purpose="draft"
+            sub.specialist,
+            msgs,
+            task_id=runtime.context.task_id,
+            purpose=f"draft/r{state.get('revision', 0)}/{sub.id}",
         )
     except ModelCallError as exc:
         return {"failed_reason": f"specialist failed: {exc}"}
@@ -88,7 +91,7 @@ async def review(state: SubtaskState, runtime: Runtime[RunContext]) -> dict[str,
             "reviewer",
             msgs,
             task_id=runtime.context.task_id,
-            purpose="review",
+            purpose=f"review/r{revision}/{sub.id}",
             schema=ReviewVerdict,
         )
     except ModelCallError as exc:

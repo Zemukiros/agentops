@@ -260,7 +260,7 @@ class LLMCall(Base):
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True
     )
     role: Mapped[str] = mapped_column(String(32))
-    purpose: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    purpose: Mapped[str | None] = mapped_column(String(64), nullable=True)
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(100))
     attempt: Mapped[int] = mapped_column(Integer)

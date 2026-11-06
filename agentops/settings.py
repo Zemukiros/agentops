@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_retry_base_seconds: float = 0.5
     llm_timeout_seconds: float = 120.0
+    # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
+    # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
+    final_review_min_score: int = Field(default=3, ge=1, le=5)
     # Real-mode input estimate margin (ADR-024): count_tokens can't see the structured-output
     # schema (sent as output_config.format) or the thinking config, so the reserved input is
     # ceil(counted * ratio) + tokens. Each llm.call event records estimate vs actual.
