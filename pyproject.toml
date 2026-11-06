@@ -24,6 +24,7 @@ dependencies = [
     "httpx==0.28.1",
     "structlog==26.1.0",
     "langchain-anthropic==1.7.10",
+    "sqlglot==30.29.0",
 ]
 
 [dependency-groups]

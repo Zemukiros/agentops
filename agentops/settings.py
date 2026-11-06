@@ -18,6 +18,7 @@ ROLES: tuple[Role, ...] = ("supervisor", "research", "analysis", "writing", "cod
 
 
 _DEV_PEPPER = "dev-only-pepper-change-me"  # pragma: allowlist secret
+_DEV_SQL_PASSWORD = "dev-only-readonly-change-me"  # noqa: S105  # pragma: allowlist secret
 
 
 class LLMMode(StrEnum):
@@ -110,6 +111,12 @@ class Settings(BaseSettings):
     workspace_root: Path = Path("var/workspaces")
     workspace_host_root: Path | None = None
 
+    # SQL tools (ADR-033): a separate LOGIN role with SELECT on the `demo` schema only, read-only
+    # transactions and a statement timeout. Same host/database as DATABASE_URL.
+    sql_tool_role: str = "agentops_readonly"
+    sql_tool_password: SecretStr = SecretStr(_DEV_SQL_PASSWORD)
+    sql_tool_statement_timeout_ms: int = 3000
+
     # Mail (Mailpit in dev: captures, sends nothing out)
     smtp_host: str = "localhost"
     smtp_port: int = 1025
@@ -138,6 +145,8 @@ class Settings(BaseSettings):
             )
         if self.env == "prod" and self.api_token_pepper.get_secret_value() == _DEV_PEPPER:
             raise ValueError("API_TOKEN_PEPPER must be set in prod")
+        if self.env == "prod" and self.sql_tool_password.get_secret_value() == _DEV_SQL_PASSWORD:
+            raise ValueError("SQL_TOOL_PASSWORD must be set in prod")
         return self
 
     def model_for(self, role: str) -> RoleModel:
@@ -155,6 +164,16 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 return "postgresql://" + url[len(prefix) :]
         return url
+
+    @property
+    def sql_tool_dsn(self) -> str:
+        """libpq DSN for the read-only SQL-tool role (same host and database)."""
+        from sqlalchemy.engine import make_url  # noqa: PLC0415
+
+        url = make_url(self.libpq_dsn).set(
+            username=self.sql_tool_role, password=self.sql_tool_password.get_secret_value()
+        )
+        return url.render_as_string(hide_password=False)
 
 
 EMBEDDING_DIM = 384  # schema constant; migration 0001 uses it. Settings must agree.
