@@ -101,6 +101,10 @@ class Settings(BaseSettings):
     # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
     # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
     final_review_min_score: int = Field(default=3, ge=1, le=5)
+    # Approvals (ADR-035): a blocking approval left pending this long resolves as reject.
+    approval_ttl_seconds: int = Field(default=86_400, ge=1)
+    # Highest per-task max_usd a reviewer may approve when a run hits its budget.
+    budget_max_raise_usd: float = Field(default=2.0, gt=0)
     # Real-mode input estimate margin (ADR-024): count_tokens can't see the structured-output
     # schema (sent as output_config.format) or the thinking config, so the reserved input is
     # ceil(counted * ratio) + tokens. Each llm.call event records estimate vs actual.

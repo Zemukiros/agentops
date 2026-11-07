@@ -28,6 +28,7 @@ dependencies = [
     "readability-lxml==0.9",
     "docker==7.2.0",
     "mcp==2.3.0",
+    "jsonschema==4.26.0",
 ]
 
 [dependency-groups]
@@ -60,6 +61,7 @@ ignore = ["PLR0913", "PLR2004", "S101"]
 "tests/**" = ["S", "PLR", "ASYNC109", "ASYNC110", "ASYNC220", "ASYNC221", "ASYNC240"]
 "tests/conftest.py" = ["S", "PLR", "E501"]
 "tests/e2e/**" = ["S", "PLR", "E501"]  # report-printing lines
+"tests/integration/test_approvals_api.py" = ["S", "PLR", "E501"]
 "migrations/**" = ["E501"]
 
 [tool.mypy]
@@ -102,6 +104,6 @@ markers = [
 addopts = "-ra --strict-markers -m 'not e2e and not eval'"
 
 [[tool.mypy.overrides]]
-# readability-lxml, lxml and docker ship no type information (no py.typed; stub packages not pinned).
-module = ["readability", "lxml", "lxml.*", "docker", "docker.*"]
+# readability-lxml, lxml, docker and jsonschema ship no type information (no py.typed; stub packages not pinned).
+module = ["readability", "lxml", "lxml.*", "docker", "docker.*", "jsonschema", "jsonschema.*"]
 ignore_missing_imports = true

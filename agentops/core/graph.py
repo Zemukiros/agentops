@@ -75,7 +75,9 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
         ["subtask_worker", "escalation_gate", "finalize_failed", "synthesize"],
     )
     g.add_edge("subtask_worker", "schedule")
-    g.add_conditional_edges("escalation_gate", after_escalation, ["schedule", "finalize_rejected"])
+    g.add_conditional_edges(
+        "escalation_gate", after_escalation, ["schedule", "finalize_rejected", END]
+    )
     g.add_conditional_edges("synthesize", after_synthesize, ["final_review", END])
     g.add_edge("final_review", END)
     g.add_edge("finalize_failed", END)

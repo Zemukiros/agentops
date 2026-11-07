@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
 
 from langchain_core.messages import BaseMessage
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 if TYPE_CHECKING:
@@ -114,13 +114,113 @@ class ScheduleDecision(_Frozen):
     reason: str | None = None
 
 
-class EscalationDecision(_Frozen):
-    """Human answer to an escalation (resume value of escalation_gate's interrupt)."""
+# ---- human decisions (resume values; validated by interrupt(response_schema=...) and the API)
+DecisionAction = Literal["approve", "edit", "reject", "take_over"]
 
-    action: Literal["approve", "edit", "reject"]
-    # edit: subtask_id -> replacement output
-    edits: dict[str, str] = Field(default_factory=dict)
-    note: str | None = None
+
+class _Decision(_Frozen):
+    note: str | None = Field(default=None, max_length=2000)
+
+
+def _needs(cond: bool, msg: str) -> None:
+    if not cond:
+        raise ValueError(msg)
+
+
+class EscalationDecision(_Decision):
+    """escalation_gate for needs_human subtasks."""
+
+    action: DecisionAction
+    edits: dict[str, str] = Field(default_factory=dict)  # edit: subtask_id -> replacement output
+    deliverable: str | None = Field(default=None, max_length=50_000)  # take_over
+
+    @model_validator(mode="after")
+    def _check(self) -> EscalationDecision:
+        if self.action == "edit":
+            _needs(bool(self.edits), "edit needs `edits`")
+        if self.action == "take_over":
+            _needs(bool(self.deliverable), "take_over needs `deliverable`")
+        return self
+
+
+class PlanDecision(_Decision):
+    """plan_gate (approve_plan)."""
+
+    action: DecisionAction
+    plan: Plan | None = None  # edit: the replacement plan (re-validated as a DAG)
+    deliverable: str | None = Field(default=None, max_length=50_000)  # take_over
+
+    @model_validator(mode="after")
+    def _check(self) -> PlanDecision:
+        if self.action == "edit":
+            _needs(self.plan is not None, "edit needs `plan`")
+        if self.action == "take_over":
+            _needs(bool(self.deliverable), "take_over needs `deliverable`")
+        return self
+
+
+class ActionDecision(_Decision):
+    """action_gate (approve_action). take_over = a human did it themselves (not executed)."""
+
+    action: DecisionAction
+    args: dict[str, Any] | None = None  # edit: replacement args (re-validated by the tool)
+
+    @model_validator(mode="after")
+    def _check(self) -> ActionDecision:
+        if self.action == "edit":
+            _needs(self.args is not None, "edit needs `args`")
+        return self
+
+
+class FinalDecision(_Decision):
+    """escalation_gate for a deliverable whose final review scored below threshold."""
+
+    action: DecisionAction
+    deliverable: str | None = Field(default=None, max_length=50_000)  # edit / take_over
+
+    @model_validator(mode="after")
+    def _check(self) -> FinalDecision:
+        if self.action in {"edit", "take_over"}:
+            _needs(bool(self.deliverable), f"{self.action} needs `deliverable`")
+        return self
+
+
+class BudgetDecision(_Decision):
+    """Worker-level pause when the ledger refuses a call (not a graph interrupt). approve raises
+    one or more limits; each given limit must be above the current one."""
+
+    action: Literal["approve", "reject"]
+    max_usd: float | None = Field(default=None, gt=0)
+    max_llm_calls: int | None = Field(default=None, gt=0)
+    max_tokens: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def _check(self) -> BudgetDecision:
+        if self.action == "approve":
+            _needs(
+                any(v is not None for v in (self.max_usd, self.max_llm_calls, self.max_tokens)),
+                "approve needs at least one raised limit (max_usd, max_llm_calls, max_tokens)",
+            )
+        return self
+
+
+class RecursionDecision(_Decision):
+    """Worker-level pause when the graph hits its recursion limit."""
+
+    action: Literal["approve", "reject", "take_over"]
+    deliverable: str | None = Field(default=None, max_length=50_000)
+
+    @model_validator(mode="after")
+    def _check(self) -> RecursionDecision:
+        if self.action == "take_over":
+            _needs(bool(self.deliverable), "take_over needs `deliverable`")
+        return self
+
+
+class SideEffectResolution(_Decision):
+    """Non-blocking inbox item for an action whose outcome is unknown. Records only."""
+
+    action: Literal["confirmed_done", "not_done"]
 
 
 class Escalation(_Frozen):
@@ -249,6 +349,12 @@ CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     SubtaskResult,
     ScheduleDecision,
     EscalationDecision,
+    PlanDecision,
+    ActionDecision,
+    FinalDecision,
+    BudgetDecision,
+    RecursionDecision,
+    SideEffectResolution,
     Escalation,
     ProposedAction,
     ToolLogEntry,

@@ -35,6 +35,7 @@ from langgraph.types import Command
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from agentops import approvals
 from agentops.core.budget import BudgetExceededError, BudgetLedger
 from agentops.core.graph import GRAPHS
 from agentops.core.state import RunContext
@@ -126,6 +127,8 @@ class Worker:
         log.info("worker %s started", self.worker_id)
         while not self._stop.is_set():
             await self.reap_once()
+            for approval_id in await approvals.sweep_expired(self.engine):
+                log.info("approval %s expired; resolved as reject", approval_id)
             job = await jobs.claim(self.engine, self.worker_id, self.settings.job_lease_seconds)
             if job is None:
                 with contextlib.suppress(TimeoutError):
@@ -245,17 +248,11 @@ class Worker:
             "recursion_limit": self.settings.budget.recursion_limit,
         }
         existing = await self.checkpointer.aget_tuple(config)
-        graph_input: Any
-        if job.kind == "resume":
-            pending = await graph.aget_state(config)
-            if existing is None or not pending.interrupts:
-                log.warning("resume job %s: task %s has no pending interrupt", job.id, task_id)
-                return
-            graph_input = Command(resume=job.payload.get("resume"))
-        else:
-            graph_input = (
-                None if existing is not None else spec.initial_input(str(task_id), request)
-            )
+        go, graph_input = await self._select_input(
+            job, graph=graph, config=config, existing=existing, spec=spec, request=request
+        )
+        if not go:
+            return
 
         # This segment holds the thread's advisory lock: nothing else spends for this task, so
         # reservations still open were left by a crashed segment (ADR-024).
@@ -286,14 +283,91 @@ class Worker:
         try:
             await graph.ainvoke(graph_input, config, context=ctx)
         except BudgetExceededError as exc:
-            await self._finish(task_id, "budget_exceeded", {}, exc.reason, spec.needs_model)
+            # Can happen inside a parallel branch, where interrupt() is forbidden: pause at the
+            # worker level instead (ADR-035). The graph resumes from its last checkpoint.
+            snap = await self._ledger.snapshot(task_id)
+            await self._pause(
+                task_id,
+                kind="budget",
+                payload={
+                    "reason": exc.reason,
+                    "max_usd": snap.max_usd,
+                    "used_usd": snap.usd_used,
+                    "llm_calls": snap.llm_calls,
+                    "max_llm_calls": snap.max_llm_calls,
+                    "tokens_used": snap.tokens_used,
+                    "max_tokens": snap.max_tokens,
+                    "actions": ["approve (with a raised max_usd)", "reject"],
+                },
+            )
             return
         except GraphRecursionError as exc:
-            await self._finish(task_id, "failed", {}, f"recursion limit: {exc}", spec.needs_model)
+            await self._pause(
+                task_id,
+                kind="recursion",
+                payload={
+                    "reason": f"recursion limit {self.settings.budget.recursion_limit} reached",
+                    "detail": str(exc)[:500],
+                    "actions": [
+                        "approve (continue)",
+                        "take_over (supply the deliverable)",
+                        "reject",
+                    ],
+                },
+            )
             return
+        await self._after_invoke(graph, config, task_id, spec)
+
+    async def _select_input(
+        self,
+        job: jobs.ClaimedJob,
+        *,
+        graph: Any,
+        config: RunnableConfig,
+        existing: Any,
+        spec: Any,
+        request: str,
+    ) -> tuple[bool, Any]:
+        """(continue?, graph input) for this job."""
+        assert job.thread_id is not None
+        worker_resume = job.payload.get("worker_resume") if job.kind == "resume" else None
+        if worker_resume is not None:
+            # A decision on a worker-level pause (budget / recursion): apply it, then either
+            # finish here or continue the graph from its last checkpoint.
+            ended = await self._apply_worker_decision(
+                job.thread_id, worker_resume, spec.needs_model
+            )
+            return (not ended), None
+        if job.kind == "resume":
+            pending = await graph.aget_state(config)
+            if existing is None or not pending.interrupts:
+                log.warning(
+                    "resume job %s: task %s has no pending interrupt", job.id, job.thread_id
+                )
+                return False, None
+            return True, Command(resume=job.payload.get("resume"))
+        return True, (
+            None if existing is not None else spec.initial_input(str(job.thread_id), request)
+        )
+
+    async def _after_invoke(
+        self, graph: Any, config: RunnableConfig, task_id: uuid.UUID, spec: Any
+    ) -> None:
         state = await graph.aget_state(config)
         if state.next:
             interrupts = [{"id": i.id, "value": i.value} for i in state.interrupts]
+            async with self.engine.begin() as c:
+                for i in state.interrupts:
+                    v = i.value if isinstance(i.value, dict) else {}
+                    if "kind" in v and "key" in v:
+                        await approvals.record_pending(
+                            c,
+                            task_id,
+                            kind=v["kind"],
+                            key=v["key"],
+                            payload=v,
+                            settings=self.settings,
+                        )
             await set_task_status(
                 self.engine,
                 task_id,
@@ -304,6 +378,94 @@ class Worker:
             return
         status_, result, error = spec.result(state.values)
         await self._finish(task_id, status_, result, error, spec.needs_model)
+
+    async def _pause(self, task_id: uuid.UUID, *, kind: str, payload: dict[str, Any]) -> None:
+        """Worker-level pause. The key counts only DECIDED approvals of this kind, so a crashed
+        and re-run segment that pauses again produces the same key (no duplicate row)."""
+        async with self.engine.begin() as c:
+            decided = (
+                await c.execute(
+                    text(
+                        "SELECT count(*) FROM approvals WHERE task_id = :t AND level = :k "
+                        "AND status <> 'pending'"
+                    ),
+                    {"t": task_id, "k": kind},
+                )
+            ).scalar_one()
+            key = f"{kind}:{'b' if kind == 'budget' else 'x'}{int(decided) + 1}"
+            await approvals.record_pending(
+                c,
+                task_id,
+                kind=kind,
+                key=key,
+                payload=payload,
+                settings=self.settings,
+                source="worker",
+            )
+        await set_task_status(
+            self.engine,
+            task_id,
+            "awaiting_approval",
+            result={"approval_required": {"kind": kind, "key": key, **payload}},
+            payload={"approval_required": kind},
+        )
+
+    async def _apply_worker_decision(
+        self, task_id: uuid.UUID, resume: dict[str, Any], with_budget: bool
+    ) -> bool:
+        """Returns True if the decision ended the run, False if the graph should continue."""
+        kind, decision = resume["kind"], resume["decision"]
+        action = decision["action"]
+        note = decision.get("note")
+        if kind == "budget":
+            if action == "approve":
+                async with self.engine.begin() as c:
+                    await c.execute(
+                        text(
+                            "UPDATE task_budgets SET "
+                            "max_usd = coalesce(CAST(:usd AS numeric), max_usd), "
+                            "max_calls = coalesce(CAST(:calls AS integer), max_calls), "
+                            "max_tokens = coalesce(CAST(:tok AS integer), max_tokens), "
+                            "updated_at = now() WHERE task_id = :t"
+                        ),
+                        {
+                            "usd": decision.get("max_usd"),
+                            "calls": decision.get("max_llm_calls"),
+                            "tok": decision.get("max_tokens"),
+                            "t": task_id,
+                        },
+                    )
+                    await emit_on(
+                        c,
+                        task_id,
+                        "budget.raised",
+                        payload={
+                            k: decision.get(k) for k in ("max_usd", "max_llm_calls", "max_tokens")
+                        },
+                    )
+                return False
+            reason = "budget exhausted; raise " + (
+                "expired" if note == "approval expired" else "rejected"
+            )
+            await self._finish(task_id, "budget_exceeded", {}, reason, with_budget)
+            return True
+        if kind == "recursion":
+            if action == "approve":
+                return False
+            if action == "take_over":
+                await self._finish(
+                    task_id,
+                    "completed",
+                    {"final": decision["deliverable"], "taken_over": True},
+                    None,
+                    with_budget,
+                )
+                return True
+            await self._finish(
+                task_id, "failed", {}, "recursion limit reached; continuation rejected", with_budget
+            )
+            return True
+        raise RuntimeError(f"unknown worker-level approval kind {kind!r}")
 
     async def _finish(
         self,

@@ -16,6 +16,7 @@ from langgraph.graph import END, START, StateGraph
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from agentops import approvals
 from agentops.core import graph as graph_mod
 from agentops.core import prompts
 from agentops.core.graph import GraphSpec, build_main_graph
@@ -55,6 +56,45 @@ async def run_job(
     job = await jobs.claim(engine, "w-test", s.job_lease_seconds)
     assert job is not None
     await worker.process(job)
+
+
+async def process_next(engine: AsyncEngine, saver: Any, settings: Settings | None = None) -> None:
+    """Let an in-process worker handle the next queued job (e.g. a decision's resume)."""
+    s = settings or get_settings()
+    job = await jobs.claim(engine, "w-test", s.job_lease_seconds)
+    assert job is not None, "no job queued"
+    await Worker(s, engine, saver, "w-test").process(job)
+
+
+async def decide_pending(
+    engine: AsyncEngine, tid: uuid.UUID, kind: str, raw: dict, user_id: uuid.UUID | None = None
+) -> dict:
+    """Decide the task's pending approval of `kind` exactly as the API does (validate, then the
+    version-checked decide + apply in one transaction)."""
+    async with engine.connect() as c:
+        row = (
+            await c.execute(
+                text(
+                    "SELECT id, version, payload FROM approvals WHERE task_id=:t AND level=:k "
+                    "AND status='pending'"
+                ),
+                {"t": tid, "k": kind},
+            )
+        ).one()
+    decision = approvals.validate_decision(kind, raw, dict(row.payload), get_settings())
+    status = approvals.STATUS_FOR_ACTION[decision["action"]]
+    async with engine.begin() as c:
+        won = await approvals.decide(
+            c,
+            row.id,
+            expected_version=row.version,
+            decision=decision,
+            status=status,
+            decided_by=user_id,
+        )
+        assert won is not None
+        await approvals.apply(c, won, decision, status)
+    return decision
 
 
 async def new_task(
@@ -216,19 +256,44 @@ async def test_specialist_error_fails_the_subtask_and_the_run(
     assert writing == [(1, False), (2, False), (3, False)]  # every retry recorded
 
 
-async def test_budget_exhaustion_ends_budget_exceeded(
+async def test_budget_exhaustion_pauses_then_reject_ends_budget_exceeded(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "default", budget=Budget(max_llm_calls=2))
     await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"  # not a terminal: a reviewer decides
+    need = t["result"]["approval_required"]
+    assert need["kind"] == "budget" and "llm call limit" in need["reason"]
+    assert len(await calls(engine, tid)) == 2  # the third call was never made
+    await decide_pending(engine, tid, "budget", {"action": "reject"})
+    await process_next(engine, saver)
     await assert_single_terminal(engine, tid, "budget_exceeded")
     t = await task_row(engine, tid)
-    assert "llm call limit" in t["error"]
-    assert t["result"]["budget"]["llm_calls"] == 2
-    assert len(await calls(engine, tid)) == 2  # the third call was never made
+    assert "rejected" in t["error"] and t["result"]["budget"]["llm_calls"] == 2
 
 
-async def test_recursion_limit_ends_failed(
+async def test_budget_raise_continues_from_the_checkpoint(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default", budget=Budget(max_llm_calls=2))
+    await run_job(engine, saver, tid)
+    with pytest.raises(approvals.DecisionError, match="above the current limit"):
+        approvals.validate_decision(
+            "budget",
+            {"action": "approve", "max_llm_calls": 2},
+            {"max_llm_calls": 2},
+            get_settings(),
+        )
+    await decide_pending(engine, tid, "budget", {"action": "approve", "max_llm_calls": 20})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    base = [p for _, p, _, _ in await calls(engine, tid)]
+    assert base.count("plan") == 1  # continued from the checkpoint, not restarted
+    assert "budget.raised" in await event_types(engine, tid)
+
+
+async def test_recursion_limit_pauses_for_take_over(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "default")
@@ -236,8 +301,41 @@ async def test_recursion_limit_ends_failed(
         update={"budget": get_settings().budget.model_copy(update={"recursion_limit": 3})}
     )
     await run_job(engine, saver, tid, settings=tight)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"  # not a crash
+    assert t["result"]["approval_required"]["kind"] == "recursion"
+    await decide_pending(
+        engine, tid, "recursion", {"action": "take_over", "deliverable": "Human-written answer."}
+    )
+    await process_next(engine, saver, tight)
+    await assert_single_terminal(engine, tid, "completed")
+    r = (await task_row(engine, tid))["result"]
+    assert r["final"] == "Human-written answer." and r["taken_over"] is True
+
+
+async def test_recursion_limit_continue_then_reject(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default")
+    tight = get_settings().model_copy(
+        update={"budget": get_settings().budget.model_copy(update={"recursion_limit": 3})}
+    )
+    await run_job(engine, saver, tid, settings=tight)
+    await decide_pending(engine, tid, "recursion", {"action": "approve"})
+    await process_next(engine, saver, tight)  # continues 3 more steps, pauses again
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    async with engine.connect() as c:
+        keys = [
+            r[0]
+            for r in await c.execute(
+                text("SELECT key FROM approvals WHERE task_id=:t ORDER BY created_at"), {"t": tid}
+            )
+        ]
+    assert keys == ["recursion:x1", "recursion:x2"]
+    await decide_pending(engine, tid, "recursion", {"action": "reject"})
+    await process_next(engine, saver, tight)
     await assert_single_terminal(engine, tid, "failed")
-    assert "recursion limit" in (await task_row(engine, tid))["error"]
 
 
 async def test_graph_without_outcome_is_marked_failed(

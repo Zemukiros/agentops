@@ -24,6 +24,7 @@ from agentops.core.nodes.common import node_event
 from agentops.core.state import (
     Escalation,
     EscalationDecision,
+    Outcome,
     RunContext,
     SubtaskResult,
     TaskState,
@@ -35,9 +36,11 @@ def escalation_payload(state: TaskState) -> dict[str, Any]:
     assert decision is not None and decision.kind == "escalate"
     results = state.get("results", {})
     reviews = state.get("reviews", [])
+    rnd = len(state.get("escalations", [])) + 1
     return {
         "kind": "escalation",
-        "round": len(state.get("escalations", [])) + 1,
+        "key": f"escalation:e{rnd}",
+        "round": rnd,
         "subtasks": [
             {
                 "subtask_id": sid,
@@ -47,7 +50,7 @@ def escalation_payload(state: TaskState) -> dict[str, Any]:
             }
             for sid in decision.subtask_ids
         ],
-        "actions": ["approve", "edit", "reject"],
+        "actions": ["approve", "edit", "reject", "take_over"],
     }
 
 
@@ -74,6 +77,11 @@ async def escalation_gate(state: TaskState, runtime: Runtime[RunContext]) -> dic
     if decision.action == "reject":
         out["failure_reason"] = decision.note or "rejected by reviewer"
         return out
+    if decision.action == "take_over":
+        # A human supplies the whole deliverable; nothing else runs (ADR-035).
+        out["final"] = decision.deliverable
+        out["outcome"] = Outcome(status="completed", reason="taken over by a human")
+        return out
     results = state.get("results", {})
     out["results"] = {
         sid: SubtaskResult(
@@ -89,6 +97,10 @@ async def escalation_gate(state: TaskState, runtime: Runtime[RunContext]) -> dic
     return out
 
 
-def after_escalation(state: TaskState) -> Literal["schedule", "finalize_rejected"]:
+def after_escalation(state: TaskState) -> Literal["schedule", "finalize_rejected", "__end__"]:
     last = state["escalations"][-1]
-    return "finalize_rejected" if last.decision.action == "reject" else "schedule"
+    if last.decision.action == "reject":
+        return "finalize_rejected"
+    if last.decision.action == "take_over":
+        return "__end__"
+    return "schedule"
