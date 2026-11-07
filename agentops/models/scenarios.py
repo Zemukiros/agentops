@@ -115,6 +115,8 @@ def build_scenarios() -> FakeScript:
     # self-reported confidence below PLAN_CONFIDENCE_THRESHOLD -> plan_gate asks a human
     low = _plan(_subtask("draft"), confidence=0.3)
     s.add("supervisor", "low_confidence_plan", low, purpose="plan")
+    # a complete deliverable the final reviewer scores below threshold -> escalation_gate
+    s.add("reviewer", "final_low", _verdict("escalate", 2), purpose="final_review")
     # writing proposes an email (external -> never sent; recorded as a ProposedAction)
     s.add(
         "writing",
@@ -153,5 +155,6 @@ SCENARIO_NAMES = frozenset(
         "partial_with_escalation",
         "proposes_email",
         "low_confidence_plan",
+        "final_low",
     }
 )

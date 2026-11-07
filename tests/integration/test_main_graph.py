@@ -170,12 +170,13 @@ async def test_default_completes_with_final_output(
     t = await task_row(engine, tid)
     assert t["result"]["final"].startswith("Final deliverable")
     assert t["result"]["subtasks"]["draft"]["status"] == "accepted"
-    assert t["result"]["budget"]["llm_calls"] == 4
+    assert t["result"]["budget"]["llm_calls"] == 5  # plan, act, review, synthesize, final_review
     assert await calls(engine, tid) == [
         ("supervisor", "plan", 1, True),
         ("writing", "act", 1, True),
         ("reviewer", "review", 1, True),
         ("supervisor", "synthesize", 1, True),
+        ("reviewer", "final_review", 1, True),
     ]
     ev = await event_types(engine, tid)
     for expected in ("plan.created", "subtask.dispatched", "review.verdict", "subtask.finished"):
@@ -189,7 +190,7 @@ async def test_revise_once_then_accept(engine: AsyncEngine, saver: Any, alice: S
     sub = (await task_row(engine, tid))["result"]["subtasks"]["draft"]
     assert (sub["status"], sub["revisions"]) == ("accepted", 1)
     purposes = [p for _, p, _, _ in await calls(engine, tid)]
-    assert purposes == ["plan", "act", "review", "act", "review", "synthesize"]
+    assert purposes == ["plan", "act", "review", "act", "review", "synthesize", "final_review"]
     verdicts = await rows(
         engine,
         "SELECT payload->>'verdict', (payload->>'revision')::int FROM events "
@@ -511,15 +512,40 @@ async def test_partial_result_completed_partial(
     assert base.count("synthesize") == 1 and base.count("final_review") == 1
 
 
-async def test_partial_result_below_threshold_fails(
+async def test_partial_below_threshold_escalates_then_reject(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    """ADR-029 as amended in Phase 4: a low final review escalates instead of failing."""
+    tid = await new_task(engine, alice, "partial_low_score")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    [intr] = t["result"]["interrupts"]
+    v = intr["value"]
+    assert (v["kind"], v["key"], v["partial"], v["review"]["score"]) == (
+        "final_review",
+        "final:f1",
+        True,
+        2,
+    )
+    assert "## What's missing" in v["deliverable"]
+    await decide_pending(engine, tid, "final_review", {"action": "reject", "note": "not useful"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "rejected")
+
+
+async def test_partial_below_threshold_human_accepts(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "partial_low_score")
     await run_job(engine, saver, tid)
-    await assert_single_terminal(engine, tid, "failed")
-    t = await task_row(engine, tid)
-    assert "partial deliverable scored 2/5, below 3" in t["error"]
-    assert "## What's missing" in t["result"]["final"]  # kept for inspection
+    await decide_pending(engine, tid, "final_review", {"action": "approve"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed_partial")
+    assert (
+        "accepted by a human after a final review score of 2/5"
+        in (await task_row(engine, tid))["error"]
+    )
 
 
 async def test_nothing_usable_fails_without_synthesis(
@@ -532,14 +558,56 @@ async def test_nothing_usable_fails_without_synthesis(
     assert "synthesize" not in base and "final_review" not in base
 
 
-async def test_complete_runs_skip_final_review(
+async def test_complete_runs_are_final_reviewed_too(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "default")
     await run_job(engine, saver, tid)
     t = await task_row(engine, tid)
-    assert t["result"]["partial"] is False and t["result"]["final_review"] is None
+    assert t["status"] == "completed" and t["result"]["partial"] is False
+    assert t["result"]["final_review"]["score"] == 4
     assert "## What's missing" not in t["result"]["final"]
+
+
+@pytest.mark.parametrize(
+    ("decision", "status", "final"),
+    [
+        (
+            {"action": "approve"},
+            "completed",
+            "Final deliverable: the summary, with a concrete example.",
+        ),
+        (
+            {"action": "edit", "deliverable": "Human-polished deliverable."},
+            "completed",
+            "Human-polished deliverable.",
+        ),
+        (
+            {"action": "take_over", "deliverable": "Written by a human."},
+            "completed",
+            "Written by a human.",
+        ),
+        ({"action": "reject"}, "rejected", None),
+    ],
+)
+async def test_low_final_review_escalates_for_complete_deliverables(
+    engine: AsyncEngine,
+    saver: Any,
+    alice: SeededUser,
+    decision: dict,
+    status: str,
+    final: str | None,
+) -> None:
+    tid = await new_task(engine, alice, "final_low")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    assert t["result"]["interrupts"][0]["value"]["partial"] is False
+    await decide_pending(engine, tid, "final_review", decision)
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, status)
+    if final is not None:
+        assert (await task_row(engine, tid))["result"]["final"] == final
 
 
 async def test_failure_plus_escalation_then_approve_is_partial(

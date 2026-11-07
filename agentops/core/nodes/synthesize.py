@@ -85,9 +85,30 @@ async def synthesize(state: TaskState, runtime: Runtime[RunContext]) -> dict[str
     await node_event(
         runtime, "synthesize", "completed", payload={"chars": len(final), "partial": partial}
     )
-    if partial:
-        return {"final": final, "partial": True}
-    return {"final": final, "partial": False, "outcome": Outcome(status="completed")}
+    return {"final": final, "partial": partial}
+
+
+def delivery_outcome(state: TaskState, *, note: str | None = None) -> Outcome:
+    """completed if every subtask was accepted and every action done; otherwise
+    completed_partial with what's missing (ADR-029, ADR-037)."""
+    plan = state.get("plan")
+    results = state.get("results", {})
+    gaps = [
+        sid
+        for sid in ([s.id for s in plan.subtasks] if plan else [])
+        if (r := results.get(sid)) is None or r.status != "accepted"
+    ]
+    actions = unperformed_actions(state)
+    if not gaps and not actions:
+        return Outcome(status="completed", reason=note)
+    parts = []
+    if gaps:
+        parts.append(f"subtask(s) {gaps} did not complete")
+    if actions:
+        parts.append(f"actions not performed: {[f'{a.tool} ({a.status})' for a in actions]}")
+    if note:
+        parts.append(note)
+    return Outcome(status="completed_partial", reason="; ".join(parts))
 
 
 def after_synthesize(state: TaskState) -> Literal["final_review", "__end__"]:

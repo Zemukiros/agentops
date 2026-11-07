@@ -38,7 +38,7 @@ from langgraph.runtime import Runtime
 
 from agentops.core.nodes.actions import action_gate, after_action_gate, execute_actions
 from agentops.core.nodes.escalation import after_escalation, escalation_gate
-from agentops.core.nodes.final_review import final_review
+from agentops.core.nodes.final_review import after_final_review, final_review
 from agentops.core.nodes.finalize import finalize_failed, finalize_rejected
 from agentops.core.nodes.intake import intake
 from agentops.core.nodes.plan import after_plan, plan
@@ -87,7 +87,7 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
         "escalation_gate", after_escalation, ["schedule", "finalize_rejected", END]
     )
     g.add_conditional_edges("synthesize", after_synthesize, ["final_review", END])
-    g.add_edge("final_review", END)
+    g.add_conditional_edges("final_review", after_final_review, ["escalation_gate", END])
     g.add_edge("finalize_failed", END)
     g.add_edge("finalize_rejected", END)
     return g.compile(checkpointer=checkpointer)

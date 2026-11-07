@@ -328,6 +328,9 @@ class TaskState(TypedDict, total=False):
     final: str | None
     partial: bool
     final_review: ReviewVerdict | None
+    final_review_failed: bool
+    last_gate_action: str | None
+    final_decisions: Annotated[list[FinalDecision], operator.add]
     outcome: Outcome | None
 
 
