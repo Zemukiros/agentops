@@ -4,7 +4,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 
 ## Current status
 - **Phase:** 4 — **complete, awaiting review** (2026-11-07). Phase 3 approved and merged (PR #2). Phase 5 not started.
-- **Branch:** `phase-4` (pushed; no PR yet).
+- **Branch:** `phase-4`, PR #3 (open, not merged).
 - **Last updated:** 2026-11-07
 - **Test status:** 561 passed, 0 failed on `make test` (fake mode): 402 unit, 150 integration, 9 sandbox (real Docker). Lint, ruff format, mypy clean. Not in `make test`: 1 `model` test (real fastembed; passed), 4 `e2e` tests (real models).
 - **Real-model spend this phase:** $0.083560 (one run, two tasks). Cumulative AgentOps: **$0.278175**.
@@ -121,7 +121,7 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Phase 4 real spend: **$0.083560**. Cumulative real-model spend on AgentOps: **$0.278175**.
 
 ## Next up
-- Review Phase 4 (PR `phase-4` → `main`).
+- Review Phase 4 (PR #3, `phase-4` → `main`).
 - Phase 5 plan: UI (React) on the existing API and SSE: task detail with plan DAG and live activity, approvals inbox, trace/cost view, memory browser, replay (ADR-015 caveat: branch-aware checkpoint ids; event dedupe keys need a branch id).
 
 ## Known limitations / stubs (be honest)
