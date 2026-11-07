@@ -59,6 +59,7 @@ ignore = ["PLR0913", "PLR2004", "S101"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "PLR", "ASYNC109", "ASYNC110", "ASYNC220", "ASYNC221", "ASYNC240"]
 "tests/conftest.py" = ["S", "PLR", "E501"]
+"tests/e2e/**" = ["S", "PLR", "E501"]  # report-printing lines
 "migrations/**" = ["E501"]
 
 [tool.mypy]

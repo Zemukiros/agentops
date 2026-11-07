@@ -202,6 +202,7 @@ async def review(state: SubtaskState, runtime: Runtime[RunContext]) -> dict[str,
         history=state.get("history", []),
         draft=state.get("draft") or "",
         tool_log=state.get("tool_log", []),
+        context=state["context"],
     )
     try:
         res = await model_of(runtime).invoke(

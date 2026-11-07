@@ -136,8 +136,11 @@ async def _report(engine: AsyncEngine, tid: uuid.UUID) -> dict[str, Any]:
             _floats(dict(r._mapping))
             for r in await c.execute(
                 text(
-                    "SELECT usd, tokens, status FROM budget_reservations "
-                    "WHERE task_id=:t ORDER BY id"
+                    # paired by the explicit link: under parallel branches, reservation
+                    # and call rows are written in different orders
+                    "SELECT r.usd, r.tokens, r.status FROM llm_calls l "
+                    "JOIN budget_reservations r ON r.id = l.reservation_id "
+                    "WHERE l.task_id=:t ORDER BY l.id"
                 ),
                 {"t": tid},
             )

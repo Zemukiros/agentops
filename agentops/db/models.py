@@ -273,6 +273,12 @@ class LLMCall(Base):
     latency_ms: Mapped[int] = mapped_column(Integer)
     request_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
     response: Mapped[dict[str, Any] | None] = mapped_column(nullable=True)
+    # the worst-case hold this attempt was admitted under (ADR-024)
+    reservation_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("budget_reservations.id", ondelete="SET NULL", name="fk_llm_calls_reservation"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = _now()
     __table_args__ = (Index("ix_llm_calls_task", "task_id"),)
 

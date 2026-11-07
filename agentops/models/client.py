@@ -241,6 +241,7 @@ class ModelClient:
             out_tok=out_tok,
             cost=cost,
             reserved_usd=reservation.usd,
+            reservation_id=reservation.id,
             latency_ms=latency_ms,
             digest=_digest(convo),
             response=raw,
@@ -262,6 +263,7 @@ class ModelClient:
         out_tok: int,
         cost: float | None,
         reserved_usd: float,
+        reservation_id: int,
         latency_ms: int,
         digest: str,
         response: AIMessage | None,
@@ -286,6 +288,7 @@ class ModelClient:
                 latency_ms=latency_ms,
                 request_digest=digest,
                 response=resp,
+                reservation_id=reservation_id,
             )
             s.add(call)
             await s.flush()
@@ -305,6 +308,7 @@ class ModelClient:
                     "output_tokens": out_tok,
                     "cost_usd": cost,
                     "reserved_usd": reserved_usd,
+                    "reservation_id": reservation_id,
                     "latency_ms": latency_ms,
                 },
             )
