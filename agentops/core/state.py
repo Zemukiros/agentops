@@ -274,6 +274,26 @@ def merge_proposals(
     return out
 
 
+class ActionDecisionRecord(_Frozen):
+    hash: str
+    key: str  # approval key
+    decision: ActionDecision
+
+
+class ActionOutcome(_Frozen):
+    """What happened to one proposed action (ADR-004, ADR-037)."""
+
+    hash: str
+    tool: str
+    status: Literal["done", "failed", "unknown", "rejected", "human_done", "not_considered"]
+    idempotency_key: str | None = None
+    detail: str | None = None
+
+
+def merge_by_key(left: dict[str, Any] | None, right: dict[str, Any] | None) -> dict[str, Any]:
+    return {**(left or {}), **(right or {})}
+
+
 class Outcome(_Frozen):
     status: TerminalStatus
     reason: str | None = None
@@ -302,6 +322,8 @@ class TaskState(TypedDict, total=False):
     decision: ScheduleDecision | None
     escalations: Annotated[list[Escalation], operator.add]
     proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
+    action_decisions: Annotated[dict[str, ActionDecisionRecord], merge_by_key]
+    action_outcomes: Annotated[dict[str, ActionOutcome], merge_by_key]
     failure_reason: str | None
     final: str | None
     partial: bool
@@ -378,6 +400,8 @@ CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     SideEffectResolution,
     Escalation,
     ProposedAction,
+    ActionDecisionRecord,
+    ActionOutcome,
     ToolLogEntry,
     AttemptRecord,
     Outcome,

@@ -36,6 +36,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 
+from agentops.core.nodes.actions import action_gate, after_action_gate, execute_actions
 from agentops.core.nodes.escalation import after_escalation, escalation_gate
 from agentops.core.nodes.final_review import final_review
 from agentops.core.nodes.finalize import finalize_failed, finalize_rejected
@@ -63,6 +64,8 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g.add_node("schedule", schedule)
     g.add_node("subtask_worker", build_subtask_graph())
     g.add_node("escalation_gate", escalation_gate)
+    g.add_node("action_gate", action_gate)
+    g.add_node("execute_actions", execute_actions)
     g.add_node("synthesize", synthesize)
     g.add_node("final_review", final_review)
     g.add_node("finalize_failed", finalize_failed)
@@ -75,8 +78,10 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g.add_conditional_edges(
         "schedule",
         route_schedule,
-        ["subtask_worker", "escalation_gate", "finalize_failed", "synthesize"],
+        ["subtask_worker", "escalation_gate", "finalize_failed", "action_gate"],
     )
+    g.add_conditional_edges("action_gate", after_action_gate, ["action_gate", "execute_actions"])
+    g.add_edge("execute_actions", "synthesize")
     g.add_edge("subtask_worker", "schedule")
     g.add_conditional_edges(
         "escalation_gate", after_escalation, ["schedule", "finalize_rejected", END]

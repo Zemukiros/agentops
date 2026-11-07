@@ -62,6 +62,7 @@ ignore = ["PLR0913", "PLR2004", "S101"]
 "tests/conftest.py" = ["S", "PLR", "E501"]
 "tests/e2e/**" = ["S", "PLR", "E501"]  # report-printing lines
 "tests/integration/test_approvals_api.py" = ["S", "PLR", "E501"]
+"tests/integration/test_actions.py" = ["S", "PLR", "E501"]
 "migrations/**" = ["E501"]
 
 [tool.mypy]

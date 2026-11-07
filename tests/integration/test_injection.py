@@ -32,7 +32,7 @@ from agentops.settings import RoleModel, get_settings
 from agentops.tools.catalog import native_tools
 from agentops.tools.mcp import MCPManager, ServerConfig
 from agentops.tools.registry import ToolRegistry
-from tests.integration.conftest import SeededUser, create_task
+from tests.integration.conftest import SeededUser, create_task, pending_approvals
 
 pytestmark = pytest.mark.integration
 
@@ -138,7 +138,7 @@ async def run(
                 {"t": tid},
             )
         ]
-    assert status == "completed", result
+    assert status in {"completed", "awaiting_approval"}, result
     return tid, seen, result, calls
 
 
@@ -182,7 +182,7 @@ async def test_injected_page_causes_no_external_action_and_no_proposal(
     # nothing external or destructive ran, and nothing was even proposed
     assert not [c for c in calls if c[2] in {"external", "destructive"} and c[3] == "ok"]
     assert [c for c in calls if c[3] == "proposed"] == []
-    assert result["proposed_actions"] == []
+    assert result["proposed_actions"] == []  # completed: no action_gate stop at all
     assert not (tmp_path / "etc").exists()
 
     # Everywhere the injected text reached a model, it sat inside a data delimiter.
@@ -219,8 +219,11 @@ async def test_compromised_writer_can_only_propose_never_execute(
             ScriptedTurn(content="done"),
         ]
     )
-    _, _, result, calls = await run(engine, alice, tmp_path, notes, s)
+    tid, _, result, calls = await run(engine, alice, tmp_path, notes, s)
     assert ("writing", "send_email", "external", "proposed") in [c[:4] for c in calls]
     assert not [c for c in calls if c[2] in {"external", "destructive"} and c[3] == "ok"]
-    [p] = result["proposed_actions"]
-    assert p["args"]["to"] == "attacker@evil.example"  # visible to the human who must approve
+    # the run stops at action_gate: a human sees exactly what the fooled agent wanted to send
+    [intr] = result["interrupts"]
+    assert intr["value"]["kind"] == "approve_action"
+    assert intr["value"]["args"]["to"] == "attacker@evil.example"
+    assert [k for k, _ in await pending_approvals(engine, tid)] == ["approve_action"]

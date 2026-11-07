@@ -21,7 +21,13 @@ from agentops.core.testhooks import TEST_HOOK_NODES_ENV
 from agentops.db.checkpointer import open_checkpointer
 from agentops.queue import jobs
 from agentops.settings import get_settings
-from tests.integration.conftest import ROOT, SeededUser, create_task
+from tests.integration.conftest import (
+    ROOT,
+    SeededUser,
+    create_task,
+    graph_state_values,
+    pending_approvals,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -262,7 +268,7 @@ async def test_rerun_after_crash_cannot_duplicate_a_proposal(
     finish(b, timeout=40)
 
     async with engine.connect() as c:
-        status, result = (
+        status, _result = (
             await c.execute(text("SELECT status::text, result FROM tasks WHERE id=:t"), {"t": tid})
         ).one()
         attempts = (
@@ -274,7 +280,8 @@ async def test_rerun_after_crash_cannot_duplicate_a_proposal(
                 {"t": tid},
             )
         ).scalar_one()
-    assert status == "completed"
+    assert status == "awaiting_approval"  # Phase 4: paused at action_gate
     assert attempts == 2  # both executions of the node are logged: nothing hidden
-    [proposal] = result["proposed_actions"]  # but state holds exactly one
-    assert proposal["tool"] == "send_email" and proposal["args"]["to"] == "team@example.com"
+    [proposal] = (await graph_state_values(tid))["proposed_actions"].values()  # state holds one
+    assert proposal.tool == "send_email" and proposal.args["to"] == "team@example.com"
+    assert await pending_approvals(engine, tid) == [("approve_action", f"action:{proposal.hash}")]

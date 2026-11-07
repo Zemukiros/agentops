@@ -26,7 +26,13 @@ from agentops.tools.mcp import MCPManager, ServerConfig
 from agentops.tools.native.email import EmailIn, send_email
 from agentops.tools.registry import ToolRegistry
 from agentops.tools.spec import ToolContext, ToolOutput, ToolSpec
-from tests.integration.conftest import ROOT, SeededUser, create_task
+from tests.integration.conftest import (
+    ROOT,
+    SeededUser,
+    create_task,
+    graph_state_values,
+    pending_approvals,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -168,7 +174,7 @@ async def test_specialist_run_records_proposals_and_executes_none(
         assert job is not None
         await w.process(job)
     async with engine.connect() as c:
-        status, result = (
+        status, _result = (
             await c.execute(text("SELECT status::text, result FROM tasks WHERE id=:t"), {"t": tid})
         ).one()
         logged = [
@@ -178,9 +184,11 @@ async def test_specialist_run_records_proposals_and_executes_none(
                 {"t": tid},
             )
         ]
-    assert status == "completed"
+    # Phase 4: the run now pauses at action_gate for the first proposal; nothing executed
+    assert status == "awaiting_approval"
     assert calls == []  # no proposal-only executor ran
-    assert sorted(a["tool"] for a in result["proposed_actions"]) == sorted(
+    values = await graph_state_values(tid)
+    assert sorted(a.tool for a in values["proposed_actions"].values()) == sorted(
         ["send_email", "notes__create_note", "notes__delete_note"]
     )
     assert logged == [
@@ -295,7 +303,7 @@ async def test_same_action_proposed_in_two_revisions_is_kept_once(
         assert job is not None
         await w.process(job)
     async with engine.connect() as c:
-        status, result = (
+        status, _result = (
             await c.execute(text("SELECT status::text, result FROM tasks WHERE id=:t"), {"t": tid})
         ).one()
         logged = (
@@ -307,7 +315,8 @@ async def test_same_action_proposed_in_two_revisions_is_kept_once(
                 {"t": tid},
             )
         ).scalar_one()
-    assert status == "completed" and result["subtasks"]["w"]["revisions"] == 1
+    assert status == "awaiting_approval"  # Phase 4: paused at action_gate
     assert logged == [0, 1]  # proposed in both revisions...
-    [proposal] = result["proposed_actions"]  # ...kept once
-    assert proposal["revision"] == 0  # first proposal wins
+    [proposal] = (await graph_state_values(tid))["proposed_actions"].values()  # ...kept once
+    assert proposal.revision == 0  # first proposal wins
+    assert [k for k, _ in await pending_approvals(engine, tid)] == ["approve_action"]

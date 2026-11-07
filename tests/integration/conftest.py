@@ -161,3 +161,76 @@ def parse_sse(body: str) -> list[dict]:
         if data:
             events.append(json.loads("".join(data)))
     return events
+
+
+async def graph_state_values(tid: uuid.UUID) -> dict:
+    """The main graph's current state for a task (e.g. proposals while paused at action_gate)."""
+    from agentops.core.graph import build_main_graph  # noqa: PLC0415
+    from agentops.db.checkpointer import open_checkpointer  # noqa: PLC0415
+
+    async with open_checkpointer(get_settings().libpq_dsn, max_size=1) as saver:
+        snap = await build_main_graph(saver).aget_state({"configurable": {"thread_id": str(tid)}})
+    return dict(snap.values)
+
+
+async def pending_approvals(engine: AsyncEngine, tid: uuid.UUID) -> list[tuple[str, str]]:
+    async with engine.connect() as c:
+        rows = await c.execute(
+            text(
+                "SELECT level, key FROM approvals WHERE task_id=:t AND status='pending' "
+                "ORDER BY key"
+            ),
+            {"t": tid},
+        )
+        return [(r[0], r[1]) for r in rows]
+
+
+async def work(
+    engine: AsyncEngine,
+    saver: object,
+    *,
+    settings: object | None = None,
+    chat_factory: object | None = None,
+    tools: object | None = None,
+) -> None:
+    """Let an in-process worker handle the next queued job."""
+    from agentops.queue import jobs  # noqa: PLC0415
+    from agentops.queue.worker import Worker  # noqa: PLC0415
+
+    s = settings or get_settings()
+    job = await jobs.claim(engine, "w-conftest", s.job_lease_seconds)  # type: ignore[attr-defined]
+    assert job is not None, "no job queued"
+    w = Worker(s, engine, saver, "w-conftest", chat_factory=chat_factory, tools=tools)  # type: ignore[arg-type]
+    await w.process(job)
+
+
+async def decide(
+    engine: AsyncEngine, tid: uuid.UUID, kind: str, raw: dict, user_id: uuid.UUID | None = None
+) -> dict:
+    """Decide the task's pending approval of `kind` exactly as the API does."""
+    from agentops import approvals  # noqa: PLC0415
+
+    async with engine.connect() as c:
+        row = (
+            await c.execute(
+                text(
+                    "SELECT id, version, payload FROM approvals WHERE task_id=:t AND level=:k "
+                    "AND status='pending'"
+                ),
+                {"t": tid, "k": kind},
+            )
+        ).one()
+    decision = approvals.validate_decision(kind, raw, dict(row.payload), get_settings())
+    status = approvals.STATUS_FOR_ACTION[decision["action"]]
+    async with engine.begin() as c:
+        won = await approvals.decide(
+            c,
+            row.id,
+            expected_version=row.version,
+            decision=decision,
+            status=status,
+            decided_by=user_id,
+        )
+        assert won is not None
+        await approvals.apply(c, won, decision, status)
+    return decision
