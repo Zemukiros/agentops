@@ -17,7 +17,9 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 RUN uv sync --frozen --no-dev
 
-RUN useradd --uid 10000 --create-home --shell /usr/sbin/nologin agentops
+RUN useradd --uid 10000 --create-home --shell /usr/sbin/nologin agentops \
+    && mkdir -p /var/lib/agentops/mcp /var/lib/agentops/notes /workspaces \
+    && chown -R agentops:agentops /var/lib/agentops /workspaces
 USER agentops
 EXPOSE 8000
 CMD ["uvicorn", "agentops.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

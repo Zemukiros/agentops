@@ -58,6 +58,9 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U agentops -d agentops"
           --health-interval 2s --health-timeout 3s --health-retries 30
+      mailpit:  # captures mail from the send_email executor test; delivers nothing
+        image: axllent/mailpit:v1.33
+        ports: ["1025:1025", "8025:8025"]
     env:
       DATABASE_URL: postgresql+psycopg://agentops:agentops@localhost:5433/agentops  # pragma: allowlist secret
       TEST_DATABASE_URL: postgresql+psycopg://agentops:agentops@localhost:5433/agentops_test  # pragma: allowlist secret
@@ -68,6 +71,20 @@ jobs:
       - run: uv sync --frozen
       - run: make migrate
       - run: uv run pytest -m integration
+
+  # Docker-dependent sandbox tests in their own job so the fast jobs stay fast (Phase 3).
+  sandbox:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: {version: "${{ env.UV_VERSION }}", enable-cache: true}
+      - run: uv sync --frozen
+      - run: docker build -t agentops-sandbox:py312 sandbox
+      - run: uv run pytest -m sandbox
+        env:
+          AGENTOPS_REQUIRE_SANDBOX: "1"  # fail, don't skip, if Docker or the image is missing
 
   images:
     needs: lint
