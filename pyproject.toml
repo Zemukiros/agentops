@@ -66,6 +66,7 @@ ignore = ["PLR0913", "PLR2004", "S101"]
 "tests/integration/test_actions.py" = ["S", "PLR", "E501"]
 "tests/integration/test_main_graph.py" = ["S", "PLR", "E501"]
 "tests/integration/test_memory.py" = ["S", "PLR", "E501"]
+"tests/integration/test_durability_gates.py" = ["S", "PLR", "E501"]
 "tests/unit/test_memory_screen.py" = ["S", "PLR", "E501"]
 "migrations/**" = ["E501"]
 

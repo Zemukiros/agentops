@@ -109,6 +109,7 @@ def idempotency_key(task_id: str, action_hash: str, args: dict[str, Any]) -> str
 
 
 async def execute_actions(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]:
+    await block_if_hooked(str(runtime.context.task_id), "execute_actions")
     proposals = state.get("proposed_actions", {}) or {}
     decisions = state.get("action_decisions", {}) or {}
     done_before = state.get("action_outcomes", {}) or {}

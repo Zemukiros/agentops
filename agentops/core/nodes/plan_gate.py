@@ -20,6 +20,7 @@ from langgraph.types import interrupt
 from agentops.core import scheduler
 from agentops.core.nodes.common import node_event
 from agentops.core.state import Outcome, PlanDecision, RunContext, TaskState
+from agentops.core.testhooks import block_if_hooked
 
 
 def plan_payload(state: TaskState) -> dict[str, Any]:
@@ -40,7 +41,9 @@ async def plan_gate(state: TaskState, runtime: Runtime[RunContext]) -> dict[str,
     if conf is None or not conf.needs_approval:
         return {"plan_decision": None}
     payload = plan_payload(state)  # pure
+    await block_if_hooked(str(runtime.context.task_id), "plan_gate")
     decision: PlanDecision = interrupt(payload, response_schema=PlanDecision)
+    await block_if_hooked(str(runtime.context.task_id), "plan_gate_resumed")
     await node_event(
         runtime,
         "plan_gate",

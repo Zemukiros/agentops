@@ -343,12 +343,16 @@ class Worker:
             return (not ended), None
         if job.kind == "resume":
             pending = await graph.aget_state(config)
-            if existing is None or not pending.interrupts:
-                log.warning(
-                    "resume job %s: task %s has no pending interrupt", job.id, job.thread_id
-                )
-                return False, None
-            return True, Command(resume=job.payload.get("resume"))
+            if existing is not None and pending.interrupts:
+                return True, Command(resume=job.payload.get("resume"))
+            if existing is not None and pending.next:
+                # The interrupt was already consumed by an earlier attempt of THIS job, which
+                # then died mid-run (lease expired, job redelivered): continue from the
+                # checkpoint instead of dropping the run (found by the Phase 4 durability tests).
+                log.warning("resume job %s: interrupt already consumed; continuing", job.id)
+                return True, None
+            log.warning("resume job %s: task %s has nothing to resume", job.id, job.thread_id)
+            return False, None
         return True, (
             None if existing is not None else spec.initial_input(str(job.thread_id), request)
         )

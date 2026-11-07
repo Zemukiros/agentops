@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from agentops.api.auth import hash_token
 from agentops.api.main import create_app
 from agentops.core.budget import open_budget_on
+from agentops.core.testhooks import TEST_HOOK_ENV
 from agentops.db.session import get_sessionmaker, make_engine
 from agentops.settings import Budget, get_settings
 
@@ -234,3 +236,61 @@ async def decide(
         assert won is not None
         await approvals.apply(c, won, decision, status)
     return decision
+
+
+# ---- worker subprocesses + crash hooks (durability tests) ----------------------------------
+LEASE_S = 2.0
+
+
+@pytest.fixture
+def hook_dir(tmp_path: Path) -> Path:
+    return tmp_path
+
+
+@pytest.fixture
+def spawn(hook_dir: Path) -> Iterator:
+    procs: list[subprocess.Popen] = []
+
+    def _spawn(worker_id: str, *extra: str, env_extra: dict | None = None) -> subprocess.Popen:
+        env = {
+            **os.environ,
+            **(env_extra or {}),
+            TEST_HOOK_ENV: str(hook_dir),
+            "JOB_LEASE_SECONDS": str(LEASE_S),
+            "JOB_HEARTBEAT_SECONDS": "0.5",
+            "JOB_POLL_SECONDS": "0.1",
+            "LOG_LEVEL": "INFO",
+        }
+        p = subprocess.Popen(
+            [sys.executable, "-m", "agentops.queue.worker", "--worker-id", worker_id, *extra],
+            cwd=ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        procs.append(p)
+        return p
+
+    yield _spawn
+    for p in procs:
+        if p.poll() is None:
+            p.kill()
+        p.wait(10)
+
+
+def wait_for(path: Path, proc: subprocess.Popen, timeout: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not path.exists():
+        if proc.poll() is not None:
+            out = proc.stdout.read() if proc.stdout else ""
+            pytest.fail(f"worker exited early ({proc.returncode}):\n{out}")
+        if time.monotonic() > deadline:
+            pytest.fail(f"timed out waiting for {path.name}")
+        time.sleep(0.05)
+
+
+def finish(proc: subprocess.Popen, timeout: float = 30.0) -> str:
+    out, _ = proc.communicate(timeout=timeout)
+    assert proc.returncode == 0, out
+    return out

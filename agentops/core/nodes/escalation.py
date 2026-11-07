@@ -76,6 +76,7 @@ async def final_gate(state: TaskState, runtime: Runtime[RunContext]) -> dict[str
     payload = final_payload(state)  # pure
     await block_if_hooked(str(runtime.context.task_id), "escalation_gate")
     decision: FinalDecision = interrupt(payload, response_schema=FinalDecision)
+    await block_if_hooked(str(runtime.context.task_id), "escalation_gate_resumed")
     score = payload["review"]["score"] if payload["review"] else None
     await node_event(
         runtime,
@@ -112,6 +113,7 @@ async def escalation_gate(state: TaskState, runtime: Runtime[RunContext]) -> dic
     payload = escalation_payload(state)  # pure
     await block_if_hooked(str(runtime.context.task_id), "escalation_gate")
     raw = interrupt(payload, response_schema=EscalationDecision)
+    await block_if_hooked(str(runtime.context.task_id), "escalation_gate_resumed")
     decision = EscalationDecision.model_validate(raw)
     ids: list[str] = [s["subtask_id"] for s in payload["subtasks"]]
     unknown = sorted(set(decision.edits) - set(ids))
