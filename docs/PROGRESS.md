@@ -3,52 +3,44 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 3 — **in progress, stopped after step 5 of 10** (2026-11-06). Phase 2 approved and merged (PR #1).
-- **Branch:** `phase-3` (pushed; no PR yet). Last commit is a WIP commit for step 5 (sandbox).
-- **Last updated:** 2026-11-06
-- **Test status at stop:** lint, ruff format and mypy clean. Unit 381 passed; sandbox 9 passed (real Docker). Integration: 467 passed for the whole suite at the step 4 commit (`6cbbb7f`); **not re-run after the step 5 changes** (they only add `run_python` to the tool catalog) — run `make test` first thing.
+- **Phase:** 3 — **complete, awaiting review** (2026-11-07). Phase 4 not started.
+- **Branch:** `phase-3` (pushed; no PR yet — CI's new `sandbox` job runs on the PR).
+- **Last updated:** 2026-11-07
+- **Test status:** 511 passed, 0 failed on `make test` (fake mode): 393 unit, 109 integration, 9 sandbox (real Docker). Lint, ruff format, mypy clean. 3 e2e tests (real models) deselected by default.
+- **Real-model spend this phase:** $0.154161 (two runs). Cumulative AgentOps: **$0.194615**.
 
 ## Phase plan
 | Phase | Goal | Status |
 |---|---|---|
 | 1 | Foundation: repo, config, DB schema + migrations, checkpointer, job queue skeleton, fake model, health API, compose, CI | ☑ approved |
 | 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ approved, merged |
-| 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ◐ steps 0–5 of 10 done |
+| 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☑ (awaiting review) |
 | 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☐ |
 | 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☐ |
 | 6 | Hardening + evals: injection suite, scenario harness, measured metrics, docs, deploy config | ☐ |
 
-## Phase 3 — where it stopped
+## Done (Phase 3)
 Approved plan + the 7 user changes (partial-result rule, proposal dedupe, MCP stdio env/timeouts/restart, host-path sandbox mount + through-proxy check, step cap = failed attempt, separate sandbox CI job, readability-lxml vetting).
 
-| Step | What | Status | Commit |
-|---|---|---|---|
-| 0 | Failure policy: `blocked`, independent work continues, `completed_partial` needs ≥1 accepted + deterministic "What's missing" section + final review ≥ `FINAL_REVIEW_MIN_SCORE` (ADR-029). Fake scripts: qualified purposes, scenario-first lookup, per-attempt turn index (ADR-027 update) | ☑ | `579e743` |
-| 1 | Tool registry (deny → validate → propose → rate limit → timeout → log + event), untrusted framing, Postgres token bucket, workspace tools, migration 0003 | ☑ | `11ad03a` |
-| 2 | ReAct specialists (research, analysis, code, writing), step cap = failed attempt (counts toward revisions, never raises), reviewer sees the tool log, parallel waves (barrier test) | ☑ | `f08d09c` |
-| 3 | SQL tools: `demo` schema, read-only LOGIN role, sqlglot single-SELECT, statement timeout | ☑ | `96f2ebe` |
-| 4 | `web_search` (fixture + Tavily adapter) and `fetch_url` (SSRF guard after DNS, IP pinning, redirect re-checks, caps, readability) | ☑ | `6cbbb7f` |
-| 5 | Sandbox + `run_python`: container per run, host-path bind mount of the task workspace, isolation tests (no network, no secrets, loop killed, fork bomb contained, truncation, never exec) | ☑ code + tests; WIP commit (integration suite not re-run) | WIP |
-| 6 | **MCP — next.** `mcp==2.3.0` `MCPServer` "notes" server (stdio + streamable HTTP), allowlist config, `server__tool` names, default risk destructive, sanitized descriptions, JSON Schema → Pydantic. Stdio subprocess with an explicit minimal env + canary test, startup/call timeouts, restart on crash | ☐ | |
-| 7 | ProposedAction: reducer dedupe test (crash re-run can't duplicate proposals), "no specialist path executes a proposal" test, `send_email` spec (proposal-only) | ☐ (model, hash and reducer already exist from step 1; tests + send_email spec remain) | |
-| 8 | Prompt-injection test with `fixtures/web/injected.html` (page already added in step 4) | ☐ | |
-| 9 | Compose/CI wiring: worker `WORKSPACE_ROOT=/workspaces` + `WORKSPACE_HOST_ROOT` (host path) bind mount, `make` target creating `var/workspaces` (mode 0777: worker uid 10000, sandbox uid 10001), `mcp-notes` service, SQL role env; **through-proxy check** `docker compose exec worker python -m agentops.tools.sandbox --selfcheck`; CI: separate `sandbox` job (build image, `AGENTOPS_REQUIRE_SANDBOX=1 pytest -m sandbox`) | ☐ | |
-| 10 | Full suite → one real e2e run (research → analysis → writing, ledger cap $0.40, estimate $0.10–0.25) → docs → summary | ☐ | |
+| Step | What | Commit |
+|---|---|---|
+| 0 | Failure policy: `blocked`, independent work continues; `completed_partial` needs ≥1 accepted + a deterministic "What's missing" section + final review ≥ `FINAL_REVIEW_MIN_SCORE`; otherwise `failed` (ADR-029). Fake scripts: qualified purposes, scenario-first lookup, per-attempt turn index (ADR-027 update) | `579e743` |
+| 1 | Tool registry: deny → validate → propose → rate limit → timeout → `tool_calls` + event; untrusted framing; Postgres token bucket; workspace tools (ADR-030, ADR-034) | `11ad03a` |
+| 2 | ReAct specialists (research, analysis, code, writing); step cap = failed attempt (counts toward revisions, never raises); reviewer sees the tool log; parallel waves (barrier test proves concurrency) | `f08d09c` |
+| 3 | SQL tools: `demo` schema, read-only LOGIN role, sqlglot single-SELECT, statement timeout (ADR-033) | `96f2ebe` |
+| 4 | `web_search` (fixtures + Tavily adapter) and `fetch_url` (SSRF guard after DNS, IP pinning, redirect re-checks, caps, readability) | `6cbbb7f` |
+| 5 | Sandbox + `run_python`: container per run, host-path bind mount, isolation tests (ADR-011, ADR-031) | `6ef96f8` (WIP, confirmed by the full suite at `52d8c48`) |
+| 6 | MCP on SDK v2: notes server over stdio + streamable HTTP; allowlist, expected server name, `server__tool`, default destructive, sanitized descriptions, schema subset; stdio env fully chosen by us (canary test), startup/call timeouts, restart on crash with one retry for reads (ADR-032) | `52d8c48` |
+| 7 | ProposedActions: `send_email` (proposal-only; real Mailpit executor for Phase 4), every proposal-only tool tested for every allowed agent, executor confined to the registry (AST), dedupe across crash re-run and across revisions (mutation-checked) | `21fa815` |
+| 8 | Prompt injection: an injected fixture page causes no external action and no proposal; injected text reaches later prompts only inside data delimiters; a compromised writer can only propose | `a0f4744` |
+| 9 | Compose/CI: host-path workspace mount, `mcp-notes` service (no env file), `make up` creates `var/workspaces`; **through-proxy selfcheck OK** (worker → proxy → sandbox reads the worker's file, writes one back, worker reads it); CI `sandbox` job (fails rather than skips without Docker), Mailpit for the integration job | `13982e6` |
+| 10 | Real e2e (research → analysis → writing). Run 1 found a bug (below); fixed; run 2 passed. `llm_calls.reservation_id` (migration 0004) links each call to its reservation | `5326057` |
 
-**Resume checklist (next session):**
-1. `git checkout phase-3 && make up && make migrate && make test` (confirms the step 5 WIP against the integration suite), plus `uv run pytest -m sandbox tests/sandbox`.
-2. Step 6: re-read the `mcp` 2.3.0 server/client API from the installed package before writing code (FastMCP was renamed `MCPServer` in 2.x; `mcp` is not a dependency yet — add `mcp==2.3.0`).
-3. Not yet written: ADR-030 (registry + risk/scope table), ADR-031 (sandbox host-path mount), ADR-032 (MCP on SDK v2, replaces ADR-008's 1.x pin), ADR-033 (SQL read-only role), ADR-034 (untrusted framing). The design is in the code docstrings (`tools/registry.py`, `tools/spec.py`, `tools/sandbox.py`, `tools/native/sql.py`, `tools/framing.py`); copy into DECISIONS.md.
+**Bug found by the real run (would not show in fake mode):** the reviewer of a dependent subtask was never shown the accepted upstream outputs the specialist worked from (`reviewer_messages` built the subtask block with an empty context). In run 1 it judged every number the writer carried over as unsupported, sent the brief back, then escalated it. Fixed: reviewers get the same `<context>` blocks, and the prompt says those outputs were already reviewed and accepted. Regression unit test added. Run 2: all three subtasks accepted first time.
 
-**Decisions made this phase (record as ADRs):**
-- MCP: `mcp==2.3.0` directly (user choice); no `langchain-mcp-adapters`.
-- Live search: Tavily via httpx (user choice), verified against Tavily's API reference 2026-11-06 (Bearer auth, `search_depth: "basic"` = 1 credit). Never called unless `TAVILY_API_KEY` is set.
-- readability-lxml 0.9 vetted before install: pure wheel identical to the sdist, no install hooks/entry points/.pth; its only network (`urlopen`) and `webbrowser` code is in the CLI `main()`, unreachable from `Document(...).summary()`; single individual maintainer, Apache-2.0.
-- New dependencies (exact pins): `sqlglot==30.29.0`, `readability-lxml==0.9` (+ lxml 6.1.3, lxml-html-clean 0.4.6, chardet 5.2.0, cssselect 1.3.0), `docker==7.2.0`. mypy ignores missing types for readability/lxml/docker only.
-- Final review runs only for partial deliverables in Phase 3; reviewing complete deliverables arrives with the Phase 4 gates.
-- Manual smoke (not a test): `guarded_fetch("https://example.com/")` succeeded with the connection pinned to the checked IP and the TLS certificate verified against the hostname; `localhost` was blocked after real DNS resolution.
+**Also found (test bug, not a system bug):** the e2e check paired `llm_calls` with `budget_reservations` by row order. Under parallel branches reservations (written before a call) and call rows (written after) interleave, so the check compared a call with another call's reservation. Re-checked run 1 through the `llm.call` events' recorded reservation: every cost and token count was within its own reservation (max 88%). Now linked explicitly by `llm_calls.reservation_id`.
 
-**Real-model spend in Phase 3 so far: $0.00.** Cumulative AgentOps: $0.040454.
+**Manual checks:** pinned-TLS fetch of example.com succeeded (certificate verified against the hostname while connecting to the checked IP); `localhost` blocked after real DNS. Worker container loaded all native tools plus `notes__*` (stdio) and `notes_http__*` (HTTP). The brief's revenue table matched an independent SQL query exactly.
 
 ## Done (Phase 2)
 **Phase 1 fixes**
@@ -87,27 +79,40 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Model IDs confirmed via the Models API first (free).
 - Every call stayed within its reservation. The real-mode input margin (×1.15 + 512) reserved 1.43–2.43× the actual input tokens, so the margin is safe for this run and generous on short prompts.
 - One test assertion crashed after the run completed (raw SQL returns `NUMERIC` as `Decimal`; the check added a float). Fixed by extracting `check_report()`. The fixed checks were re-run against this run's recorded rows rather than paying for a second run.
-- Cumulative real-model spend on AgentOps: **$0.040454**.
 
-## Next up (as of Phase 2; see the Phase 3 section above for the current next step)
-- Review Phase 2; then Phase 3 plan (all specialists, tool registry + native tools, MCP, sandbox, true parallel waves).
+**Phase 3** (`tests/e2e/test_real_phase3.py`; research/writing on Haiku 5.5, plan/analysis/review/synthesis on Sonnet 5.5, effort `low`; search and pages from fixtures, no paid search API; SQL via the read-only role; Python in the real sandbox):
+
+| Date | Run | Calls | Tokens | Cost | Cap | Result |
+|---|---|---|---|---|---|---|
+| 2026-11-07 | 1 | 16 | 49,724 | **$0.078255** | $0.40 | `awaiting_approval`: research and analysis accepted (4/5); the brief was escalated by a reviewer that couldn't see the upstream outputs (bug, fixed above). Every call within its own reservation (re-checked via events) |
+| 2026-11-07 | 2 (after fix; approved re-run) | 13 | 34,514 | **$0.075906** | $0.40 | `completed`: research (2 searches, 2 fetches), analysis (`describe_schema`, `sql_query`, `run_python` in the sandbox), brief — all accepted first time; revenue table verified against the database |
+
+- Output caps are still tight with thinking on: the brief used 2,004 of 2,500 output tokens; one review used 1,364 of 2,000.
+- Phase 3 real spend: **$0.154161**. Cumulative real-model spend on AgentOps: **$0.194615**.
+
+## Next up
+- Review Phase 3 (PR `phase-3` → `main`; the new CI `sandbox` job runs there for the first time).
+- Phase 4 plan: plan/action/escalation gates with an approvals table + API, `execute_actions` behind `side_effects` (proposals are already hash-keyed and deduped), final review for complete deliverables, memory (pgvector), recovery hardening.
 
 ## Known limitations / stubs (be honest)
-- Only the `writing` specialist exists and it makes a single model call (no tools, no ReAct loop, no step cap yet: Phase 3).
-- Not built yet (inserted later): `recall`, `plan_gate`, `action_gate`, `execute_actions`, `final_review`, `consolidate`.
+- **Proposed actions are recorded, never executed.** `action_gate` / `execute_actions` are Phase 4. `send_email`'s executor is real (Mailpit) and tested directly, but nothing calls it yet.
+- Not built yet (inserted later): `recall`, `plan_gate`, `action_gate`, `execute_actions`, `consolidate`. `final_review` exists but only scores partial deliverables.
 - Escalation has no approvals table/API/inbox yet (Phase 4). A `resume` job with `{"resume": {...}}` is the only way to continue an escalated run.
-- A failed subtask fails the whole run immediately (no `completed_partial` yet).
-- Real-mode input-token reservation uses a margin (×1.15 + 512), because `count_tokens` can't see the structured-output schema or thinking config. Checked on one real run (6 calls): 1.43–2.43× actual input. One run is not a distribution; the e2e test keeps asserting it.
-- Output caps are tight with thinking on: draft r1 used 1,602 of 2,000 output tokens and review r0 1,301 of 2,000. A call that hits the cap returns truncated text or an invalid structured answer, which becomes a retry. Watch this in Phase 3; raise caps per role if it happens (each raise also raises the reserved worst case).
+- Injection tests prove the guards with scripted models, not real-model resistance (Phase 6 suite). A fooled writing agent can still *propose* an email; only human approval (Phase 4) stops it.
+- MCP: only a supported JSON Schema subset is loaded (objects of primitives, string enums, arrays of primitives); other tools are skipped. MCP calls don't pass the task's idempotency key yet.
+- `run_python` returns stdout/stderr and the names of new files; there is no per-task CPU/time budget beyond each run's own limits.
+- Sandbox via the socket proxy can create containers with any bind mount; the worker code (not the model) builds the mount (ADR-031). Only native Docker Engine in WSL2 is tested.
+- Real-mode reservations (input margin ×1.15 + 512, plus the full output cap) checked on three real runs, 35 calls: every call's actual cost and tokens within its own reservation (asserted per call); highest observed cost/reserved ratio 0.88.
+- Output caps are tight with thinking on (brief 2,004 / 2,500); a capped call becomes a retry.
 - Real mode makes one extra `count_tokens` request per attempt (free; adds latency).
 - `make eval` only prints a notice. No scenario harness until Phase 6. Fake scenarios test orchestration logic only and say nothing about model quality.
 - Reviewers see only their own tasks (owner filter everywhere). The cross-user approvals inbox needs a scoped rule in Phase 4.
 - Replay forks (Phase 5) will need a branch id in event dedupe keys (ADR-025).
 
 ## Open risks
-- LangGraph moves fast (1.2.20). It warns that unregistered checkpoint types will be blocked; we register ours (ADR-028).
-- `mcp` is held at 1.x by `langchain-mcp-adapters`.
-- Sandbox bind mounts from the worker container are untested (Phase 3).
+- LangGraph moves fast (1.2.20). It warns that unregistered checkpoint types will be blocked; we register ours (ADR-028, tested).
+- `mcp` 2.x is young (2.3.0); its stdio client's inherited-env list and error codes were read from the installed package. Re-check on upgrade (ADR-032).
+- The new CI `sandbox` job has not run on GitHub yet (CI triggers on PRs and pushes to `main`).
 - Replay forks share the thread head (ADR-015 caveat). The Phase 5 design must track branch checkpoint ids.
 
 ## Measured metrics (only from `evals/` runs, with date + config)
