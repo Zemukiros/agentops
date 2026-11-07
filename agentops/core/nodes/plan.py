@@ -26,6 +26,7 @@ async def plan(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]
         specialists=sorted(scheduler.ENABLED_SPECIALISTS),
         max_subtasks=scheduler.MAX_SUBTASKS,
         previous=previous,
+        memories=state.get("memories") or [],
     )
     try:
         res = await model_of(runtime).invoke(

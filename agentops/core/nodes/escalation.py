@@ -153,9 +153,9 @@ async def escalation_gate(state: TaskState, runtime: Runtime[RunContext]) -> dic
     return out
 
 
-def after_escalation(state: TaskState) -> Literal["schedule", "finalize_rejected", "__end__"]:
+def after_escalation(state: TaskState) -> Literal["schedule", "finalize_rejected", "consolidate"]:
     if state.get("last_gate_action") == "reject":
         return "finalize_rejected"
     if state.get("outcome") is not None:
-        return "__end__"
+        return "consolidate"
     return "schedule"

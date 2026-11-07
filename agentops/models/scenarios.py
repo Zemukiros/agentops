@@ -82,6 +82,22 @@ def build_scenarios() -> FakeScript:
         s.add("writing", "*", _draft(r), purpose=f"act/r{r}")
     s.add("reviewer", "*", ACCEPT, purpose="review")
     s.add("reviewer", "*", _verdict("accept", 4), purpose="final_review")
+    s.add(
+        "supervisor",
+        "*",
+        ScriptedTurn(
+            structured={
+                "memories": [
+                    {
+                        "kind": "lesson",
+                        "text": "A single writing subtask was enough for a short summary request.",
+                        "importance": 0.5,
+                    }
+                ]
+            }
+        ),
+        purpose="consolidate",
+    )
 
     # revise once, then accept
     s.add("reviewer", "revise_once", REVISE, purpose="review/r0")

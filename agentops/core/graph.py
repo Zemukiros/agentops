@@ -1,22 +1,17 @@
 """Graph registry.
 
-- `main`: the orchestration workflow (DECISIONS.md "Corrected workflow graph"). Phase 2
-  builds this subset (ADR-026):
+- `main`: the orchestration workflow (DECISIONS.md "Corrected workflow graph"; ADR-026,
+  ADR-029, ADR-035..038):
 
-      START -> intake -> plan --(invalid, retry once)--> plan
-                           |--(no valid plan / model failure)--> finalize_failed -> END
-                           v
-                        schedule --[Send]--> subtask_worker (subgraph) --> schedule
-                           |-- escalate     -> escalation_gate
-                           |                     |-- approve/edit -> schedule
-                           |                     '-- reject       -> finalize_rejected -> END
-                           |-- fail         -> finalize_failed -> END
-                           |-- partial      -> synthesize -> final_review -> END
-                           '-- all accepted -> synthesize -> END
-
-  Not built yet, inserted later between existing nodes (no rewrite): recall (after intake),
-  plan_gate (after plan), action_gate + execute_actions (before synthesize), consolidate
-  (after synthesize). `final_review` exists but only scores partial deliverables (ADR-029).
+      START -> intake -> recall -> plan ⟲(1 re-plan) -> plan_gate
+        plan_gate: approve/edit -> schedule | reject -> finalize_rejected | take_over -> consolidate
+        schedule --[Send]--> subtask_worker (subgraph) --> schedule
+          |-- escalate          -> escalation_gate (approve/edit -> schedule, reject, take_over)
+          |-- fail              -> finalize_failed
+          '-- all accepted / partial -> action_gate ⟲ -> execute_actions -> synthesize
+                                        -> final_review (low -> escalation_gate in final mode)
+      every terminal path (finalize_failed, finalize_rejected, final_review ok, take_over,
+      synthesis failure) -> consolidate -> END
 
   Every path that reaches END sets `outcome`. The worker treats a run that ends without one
   as `failed` (never silent).
@@ -41,6 +36,7 @@ from agentops.core.nodes.escalation import after_escalation, escalation_gate
 from agentops.core.nodes.final_review import after_final_review, final_review
 from agentops.core.nodes.finalize import finalize_failed, finalize_rejected
 from agentops.core.nodes.intake import intake
+from agentops.core.nodes.memory import consolidate, recall
 from agentops.core.nodes.plan import after_plan, plan
 from agentops.core.nodes.plan_gate import after_plan_gate, plan_gate
 from agentops.core.nodes.schedule import route_schedule, schedule
@@ -59,6 +55,8 @@ AnyGraph = CompiledStateGraph[Any, RunContext, Any, Any]
 def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g = StateGraph(TaskState, context_schema=RunContext)
     g.add_node("intake", intake)
+    g.add_node("recall", recall)
+    g.add_node("consolidate", consolidate)
     g.add_node("plan", plan)
     g.add_node("plan_gate", plan_gate)
     g.add_node("schedule", schedule)
@@ -72,9 +70,12 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g.add_node("finalize_rejected", finalize_rejected)
 
     g.add_edge(START, "intake")
-    g.add_edge("intake", "plan")
+    g.add_edge("intake", "recall")
+    g.add_edge("recall", "plan")
     g.add_conditional_edges("plan", after_plan, ["plan", "plan_gate", "finalize_failed"])
-    g.add_conditional_edges("plan_gate", after_plan_gate, ["schedule", "finalize_rejected", END])
+    g.add_conditional_edges(
+        "plan_gate", after_plan_gate, ["schedule", "finalize_rejected", "consolidate"]
+    )
     g.add_conditional_edges(
         "schedule",
         route_schedule,
@@ -84,12 +85,13 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g.add_edge("execute_actions", "synthesize")
     g.add_edge("subtask_worker", "schedule")
     g.add_conditional_edges(
-        "escalation_gate", after_escalation, ["schedule", "finalize_rejected", END]
+        "escalation_gate", after_escalation, ["schedule", "finalize_rejected", "consolidate"]
     )
-    g.add_conditional_edges("synthesize", after_synthesize, ["final_review", END])
-    g.add_conditional_edges("final_review", after_final_review, ["escalation_gate", END])
-    g.add_edge("finalize_failed", END)
-    g.add_edge("finalize_rejected", END)
+    g.add_conditional_edges("synthesize", after_synthesize, ["final_review", "consolidate"])
+    g.add_conditional_edges("final_review", after_final_review, ["escalation_gate", "consolidate"])
+    g.add_edge("finalize_failed", "consolidate")
+    g.add_edge("finalize_rejected", "consolidate")
+    g.add_edge("consolidate", END)
     return g.compile(checkpointer=checkpointer)
 
 

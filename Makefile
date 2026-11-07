@@ -35,7 +35,7 @@ seed: ## Seed demo user + reviewer
 	$(UV) run python -m agentops.db.seed
 
 test: ## Unit + integration tests (fake model; needs `make up` for postgres)
-	$(UV) run pytest -m "not e2e and not eval"
+	$(UV) run pytest -m "not e2e and not eval and not model"
 
 test-unit: ## Fast tests, no services
 	$(UV) run pytest -m unit

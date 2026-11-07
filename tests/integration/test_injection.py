@@ -198,10 +198,9 @@ async def test_injected_page_causes_no_external_action_and_no_proposal(
             else:
                 # research's own (compromised) output, passed on as subtask context or a draft
                 before = m.text[: m.text.index(MARKER)]
-                assert (
-                    before.rfind("<context") > before.rfind("</context>")
-                    or before.rfind("<draft>") > before.rfind("</draft>")
-                    or before.rfind("<output") > before.rfind("</output>")
+                assert any(
+                    before.rfind(f"<{tag}") > before.rfind(f"</{tag}>")
+                    for tag in ("context", "draft", "output", "accepted_output", "deliverable")
                 ), (role, purpose, m.text[:300])
     assert hits >= 2  # the fetch result, and at least one downstream prompt
 

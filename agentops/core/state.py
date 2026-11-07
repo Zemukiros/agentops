@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 if TYPE_CHECKING:
+    from agentops.memory.service import MemoryService
     from agentops.models.client import ModelClient
     from agentops.tools.registry import ToolRegistry
 
@@ -62,6 +63,17 @@ class PlanConfidence(_Frozen):
     @property
     def needs_approval(self) -> bool:
         return self.effective < self.threshold
+
+
+class MemoryHit(_Frozen):
+    """A recalled memory as the planner sees it (ADR-038): past example, may not apply."""
+
+    id: str
+    kind: str
+    text: str
+    outcome: str | None
+    similarity: float
+    score: float
 
 
 class PlanRejection(_Frozen):
@@ -316,6 +328,8 @@ class TaskState(TypedDict, total=False):
     plan_confidence: PlanConfidence | None
     plan_decision: PlanDecision | None
     memory_similarity: float  # best recalled-memory similarity (set by recall; 0 if none)
+    memories: list[MemoryHit]
+    memories_written: int
     results: Annotated[dict[str, SubtaskResult], merge_results]
     reviews: Annotated[list[Review], operator.add]
     wave: int
@@ -382,12 +396,14 @@ class RunContext:
     engine: AsyncEngine
     model: ModelClient | None = None  # None only for the demo graph
     tools: ToolRegistry | None = None  # None only for the demo graph
+    memory: MemoryService | None = None  # None only for the demo graph
     owner_id: uuid.UUID | None = None  # rate-limit key; set by the worker
 
 
 CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     Subtask,
     Plan,
+    MemoryHit,
     PlanConfidence,
     PlanRejection,
     ReviewVerdict,

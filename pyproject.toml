@@ -29,6 +29,7 @@ dependencies = [
     "docker==7.2.0",
     "mcp==2.3.0",
     "jsonschema==4.26.0",
+    "fastembed==0.9.1",
 ]
 
 [dependency-groups]
@@ -64,6 +65,8 @@ ignore = ["PLR0913", "PLR2004", "S101"]
 "tests/integration/test_approvals_api.py" = ["S", "PLR", "E501"]
 "tests/integration/test_actions.py" = ["S", "PLR", "E501"]
 "tests/integration/test_main_graph.py" = ["S", "PLR", "E501"]
+"tests/integration/test_memory.py" = ["S", "PLR", "E501"]
+"tests/unit/test_memory_screen.py" = ["S", "PLR", "E501"]
 "migrations/**" = ["E501"]
 
 [tool.mypy]
@@ -101,9 +104,10 @@ markers = [
     "integration: needs Postgres (docker compose)",
     "e2e: real models / full stack; not run by default",
     "sandbox: needs a Docker daemon + the agentops-sandbox image (own CI job)",
+    "model: loads the real fastembed model (downloads it once); not run by default",
     "eval: scenario evaluation; not run by default",
 ]
-addopts = "-ra --strict-markers -m 'not e2e and not eval'"
+addopts = "-ra --strict-markers -m 'not e2e and not eval and not model'"
 
 [[tool.mypy.overrides]]
 # readability-lxml, lxml, docker and jsonschema ship no type information (no py.typed; stub packages not pinned).

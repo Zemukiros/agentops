@@ -66,8 +66,8 @@ async def plan_gate(state: TaskState, runtime: Runtime[RunContext]) -> dict[str,
     return out
 
 
-def after_plan_gate(state: TaskState) -> Literal["schedule", "finalize_rejected", "__end__"]:
+def after_plan_gate(state: TaskState) -> Literal["schedule", "finalize_rejected", "consolidate"]:
     d = state.get("plan_decision")
     if d is None or d.action in {"approve", "edit"}:
         return "schedule"
-    return "finalize_rejected" if d.action == "reject" else "__end__"
+    return "finalize_rejected" if d.action == "reject" else "consolidate"

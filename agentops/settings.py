@@ -139,6 +139,18 @@ class Settings(BaseSettings):
     # Embeddings (ADR-010: fastembed BAAI/bge-small-en-v1.5 = 384 dims; must match migration)
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384
+    # fastembed (real) or hash (deterministic bag-of-words; tests and offline dev)
+    embedding_mode: Literal["fastembed", "hash"] = "fastembed"
+    # FASTEMBED_CACHE_PATH is also the variable fastembed itself reads; the image sets it.
+    fastembed_cache_path: Path = Path("var/fastembed")
+    # Long-term memory (ADR-038): recall keeps memories with similarity >= the minimum, ranks
+    # them by alpha*sim + beta*importance + gamma*recency (half-life in days), keeps top_k.
+    memory_min_similarity: float = Field(default=0.6, ge=-1, le=1)
+    memory_top_k: int = Field(default=5, ge=1, le=20)
+    memory_alpha: float = 0.7
+    memory_beta: float = 0.2
+    memory_gamma: float = 0.1
+    memory_half_life_days: float = Field(default=30.0, gt=0)
 
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = "http://localhost:4318"

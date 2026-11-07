@@ -42,6 +42,7 @@ from agentops.core.state import RunContext
 from agentops.db.checkpointer import open_checkpointer
 from agentops.db.models import TERMINAL_TASK_STATUSES
 from agentops.db.session import get_sessionmaker, make_engine
+from agentops.memory.service import MemoryService
 from agentops.models.client import ChatFactory, ModelClient, fake_factory
 from agentops.models.scenarios import DEFAULT_SCENARIO, SCENARIOS
 from agentops.observability.events import emit_on
@@ -118,6 +119,7 @@ class Worker:
         self._chat_factory = chat_factory
         self._real_factory: ChatFactory | None = None
         self._tools = tools if tools is not None else build_registry(settings)
+        self._memory = MemoryService(settings, engine)
 
     def stop(self) -> None:
         self._stop.set()
@@ -279,6 +281,7 @@ class Worker:
             model=model,
             tools=self._tools if spec.needs_model else None,
             owner_id=owner_id,
+            memory=self._memory if spec.needs_model else None,
         )
         try:
             await graph.ainvoke(graph_input, config, context=ctx)
@@ -377,7 +380,9 @@ class Worker:
             )
             return
         status_, result, error = spec.result(state.values)
-        await self._finish(task_id, status_, result, error, spec.needs_model)
+        # the graph's consolidate node skips a run without an outcome: write its episode here
+        no_outcome = spec.needs_model and state.values.get("outcome") is None
+        await self._finish(task_id, status_, result, error, spec.needs_model, episode=no_outcome)
 
     async def _pause(self, task_id: uuid.UUID, *, kind: str, payload: dict[str, Any]) -> None:
         """Worker-level pause. The key counts only DECIDED approvals of this kind, so a crashed
@@ -447,7 +452,7 @@ class Worker:
             reason = "budget exhausted; raise " + (
                 "expired" if note == "approval expired" else "rejected"
             )
-            await self._finish(task_id, "budget_exceeded", {}, reason, with_budget)
+            await self._finish(task_id, "budget_exceeded", {}, reason, with_budget, episode=True)
             return True
         if kind == "recursion":
             if action == "approve":
@@ -457,12 +462,18 @@ class Worker:
                     task_id,
                     "completed",
                     {"final": decision["deliverable"], "taken_over": True},
-                    None,
+                    "taken over by a human after the recursion limit",
                     with_budget,
+                    episode=True,
                 )
                 return True
             await self._finish(
-                task_id, "failed", {}, "recursion limit reached; continuation rejected", with_budget
+                task_id,
+                "failed",
+                {},
+                "recursion limit reached; continuation rejected",
+                with_budget,
+                episode=True,
             )
             return True
         raise RuntimeError(f"unknown worker-level approval kind {kind!r}")
@@ -474,12 +485,41 @@ class Worker:
         result: dict[str, Any],
         error: str | None,
         with_budget: bool,
+        *,
+        episode: bool = False,
     ) -> None:
         if with_budget:
             result = {**result, "budget": (await self._ledger.snapshot(task_id)).model_dump()}
+        if episode and with_budget:
+            # Terminal reached outside the graph (budget / recursion decisions, or a graph that
+            # ended without an outcome): consolidate still runs, as an episode only (no LLM
+            # call, so it can't overshoot an exhausted budget). Phase 4 change 2.
+            await self._write_episode(task_id, status, error)
+        if status == "completed" and error is not None:
+            result = {**result, "note": error}
+            error = None
         await set_task_status(
             self.engine, task_id, status, result=result, error=error, terminal=True
         )
+
+    async def _write_episode(self, task_id: uuid.UUID, status: str, reason: str | None) -> None:
+        async with self.engine.connect() as c:
+            owner, request = (
+                await c.execute(
+                    text("SELECT owner_id, request FROM tasks WHERE id = :t"), {"t": task_id}
+                )
+            ).one()
+        written = await self._memory.write_episode(
+            task_id=task_id, user_id=owner, request=request, status=status, reason=reason
+        )
+        async with self.engine.begin() as c:
+            await emit_on(
+                c,
+                task_id,
+                "memory.consolidated",
+                payload={"written": len(written.ids), "llm_skipped": "worker-level terminal"},
+                dedupe_key="consolidate:worker",
+            )
 
 
 async def main(

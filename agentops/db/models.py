@@ -379,7 +379,7 @@ class Memory(Base):
     text: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
     task_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    outcome: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_task_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )

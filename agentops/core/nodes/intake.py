@@ -31,6 +31,8 @@ async def intake(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, An
         "plan_confidence": None,
         "plan_decision": None,
         "memory_similarity": 0.0,
+        "memories": [],
+        "memories_written": 0,
         "failure_reason": None,
         "final": None,
         "partial": False,

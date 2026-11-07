@@ -170,13 +170,14 @@ async def test_default_completes_with_final_output(
     t = await task_row(engine, tid)
     assert t["result"]["final"].startswith("Final deliverable")
     assert t["result"]["subtasks"]["draft"]["status"] == "accepted"
-    assert t["result"]["budget"]["llm_calls"] == 5  # plan, act, review, synthesize, final_review
+    assert t["result"]["budget"]["llm_calls"] == 6  # + consolidate
     assert await calls(engine, tid) == [
         ("supervisor", "plan", 1, True),
         ("writing", "act", 1, True),
         ("reviewer", "review", 1, True),
         ("supervisor", "synthesize", 1, True),
         ("reviewer", "final_review", 1, True),
+        ("supervisor", "consolidate", 1, True),
     ]
     ev = await event_types(engine, tid)
     for expected in ("plan.created", "subtask.dispatched", "review.verdict", "subtask.finished"):
@@ -190,7 +191,16 @@ async def test_revise_once_then_accept(engine: AsyncEngine, saver: Any, alice: S
     sub = (await task_row(engine, tid))["result"]["subtasks"]["draft"]
     assert (sub["status"], sub["revisions"]) == ("accepted", 1)
     purposes = [p for _, p, _, _ in await calls(engine, tid)]
-    assert purposes == ["plan", "act", "review", "act", "review", "synthesize", "final_review"]
+    assert purposes == [
+        "plan",
+        "act",
+        "review",
+        "act",
+        "review",
+        "synthesize",
+        "final_review",
+        "consolidate",
+    ]
     verdicts = await rows(
         engine,
         "SELECT payload->>'verdict', (payload->>'revision')::int FROM events "
@@ -241,7 +251,8 @@ async def test_two_invalid_plans_fail(engine: AsyncEngine, saver: Any, alice: Se
     t = await task_row(engine, tid)
     assert "no valid plan after 2 attempts" in t["error"]
     assert "unknown ids ['ghost']" in t["error"]  # the second plan's error
-    assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "plan"]  # no more spend
+    # no more work after two invalid plans; only the memory of the failure is consolidated
+    assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "plan", "consolidate"]
 
 
 async def test_specialist_error_fails_the_subtask_and_the_run(

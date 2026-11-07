@@ -53,6 +53,8 @@ def upgrade() -> None:
         ),
     )
 
+    # memories: outcome must fit every terminal status ("completed_partial" is 17 chars)
+    op.alter_column("memories", "outcome", type_=sa.String(length=32), existing_nullable=True)
     # memories: ranking weight
     op.add_column(
         "memories", sa.Column("importance", sa.Float(), server_default="0.5", nullable=False)
@@ -65,6 +67,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("tool_calls", "output_text")
     op.drop_column("memories", "importance")
+    op.alter_column("memories", "outcome", type_=sa.String(length=16), existing_nullable=True)
     for col in ("updated_at", "error", "args", "tool"):
         op.drop_column("side_effects", col)
     op.drop_index("ix_approvals_pending_expiry", table_name="approvals")

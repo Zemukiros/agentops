@@ -8,7 +8,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 
-from agentops.api.routes import approvals, health, tasks
+from agentops.api.routes import approvals, health, memories, tasks
 from agentops.api.sse import EventBroadcaster
 from agentops.db.checkpointer import open_checkpointer
 from agentops.db.session import get_sessionmaker, make_engine
@@ -41,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(tasks.router)
     app.include_router(approvals.router)
+    app.include_router(memories.router)
     return app
 
 

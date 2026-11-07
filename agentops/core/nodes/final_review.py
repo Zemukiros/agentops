@@ -55,5 +55,5 @@ async def final_review(state: TaskState, runtime: Runtime[RunContext]) -> dict[s
     return {"final_review": verdict, "final_review_failed": True}
 
 
-def after_final_review(state: TaskState) -> Literal["escalation_gate", "__end__"]:
-    return "escalation_gate" if state.get("final_review_failed") else "__end__"
+def after_final_review(state: TaskState) -> Literal["escalation_gate", "consolidate"]:
+    return "escalation_gate" if state.get("final_review_failed") else "consolidate"

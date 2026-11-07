@@ -111,7 +111,7 @@ def delivery_outcome(state: TaskState, *, note: str | None = None) -> Outcome:
     return Outcome(status="completed_partial", reason="; ".join(parts))
 
 
-def after_synthesize(state: TaskState) -> Literal["final_review", "__end__"]:
+def after_synthesize(state: TaskState) -> Literal["final_review", "consolidate"]:
     if state.get("outcome") is not None:
-        return "__end__"
+        return "consolidate"
     return "final_review"
