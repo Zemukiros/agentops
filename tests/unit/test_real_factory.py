@@ -15,6 +15,9 @@ A = {
     "supervisor": RoleModel(provider="anthropic", model="claude-sonnet-5-5", effort="low"),
     "reviewer": RoleModel(provider="anthropic", model="claude-sonnet-5-5"),
     "writing": RoleModel(provider="anthropic", model="claude-haiku-5-5", max_output_tokens=900),
+    "research": RoleModel(provider="anthropic", model="claude-haiku-5-5"),
+    "analysis": RoleModel(provider="anthropic", model="claude-sonnet-5-5"),
+    "code": RoleModel(provider="anthropic", model="claude-sonnet-5-5"),
 }
 
 

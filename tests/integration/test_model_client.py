@@ -57,6 +57,7 @@ async def test_records_tokens_cost_latency_and_settles_budget(
     assert snap.tokens_used == r["input_tokens"] + r["output_tokens"] == res.tokens
     [res_row] = await _rows(engine, "budget_reservations")
     assert res_row["status"] == "settled"
+    assert r["reservation_id"] == res_row["id"]  # each call row links to its own reservation
     # the reservation was the worst case: exact input + the output cap
     assert (
         res_row["tokens"] == r["input_tokens"] + Settings().model_for("research").max_output_tokens

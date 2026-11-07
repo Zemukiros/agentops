@@ -24,14 +24,16 @@
 ```bash
 uv sync                          # install deps (lockfile committed)
 cp .env.example .env             # first time only
-make up                          # docker compose: postgres(5433), mailpit, socket-proxy, migrate, api(8000), worker
+make up                          # docker compose: postgres(5433), mailpit, socket-proxy, mcp-notes, migrate, api(8000), worker
 make migrate                     # alembic upgrade head + checkpointer setup + seed users (tokens -> .agentops-tokens)
 make test                        # unit + integration (fake mode; needs postgres from `make up`)
 make test-unit                   # fast, no services
 make lint                        # ruff + ruff format --check + mypy
 make build-sandbox               # build agentops-sandbox image (never run as a service)
+make test-sandbox                # sandbox isolation tests (real Docker; own CI job)
+make sandbox-selfcheck           # worker container -> socket proxy -> sandbox, file round trip
 make eval                        # scenario suite (Phase 6; currently prints a notice)
-uv run pytest -m e2e tests/e2e -s   # REAL model run, costs money (<= $0.10 cap); needs ANTHROPIC_API_KEY in .env
+uv run pytest -m e2e tests/e2e/<file> -s   # REAL models, costs money: ledger caps $0.10 (test_real_slice), $0.40 (test_real_phase3); needs ANTHROPIC_API_KEY in .env and, for phase3, the sandbox image
 docker compose --profile observability up -d jaeger   # tracing UI on :16686
 ```
 

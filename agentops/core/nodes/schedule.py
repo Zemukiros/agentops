@@ -14,7 +14,7 @@ from langgraph.types import Send
 
 from agentops.core import scheduler
 from agentops.core.nodes.common import node_event
-from agentops.core.state import RunContext, SubtaskInput, TaskState
+from agentops.core.state import RunContext, SubtaskInput, SubtaskResult, TaskState
 
 
 async def schedule(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]:
@@ -25,6 +25,20 @@ async def schedule(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, 
     decision = scheduler.decide(plan, results, wave)
     rounds = len(state.get("escalations", []))
     out: dict[str, Any] = {"decision": decision}
+    if decision.blocked:
+        out["results"] = {
+            sid: SubtaskResult(subtask_id=sid, status="blocked", reason=reason)
+            for sid, reason in decision.blocked.items()
+        }
+        for sid, reason in sorted(decision.blocked.items()):
+            await node_event(
+                runtime,
+                "schedule",
+                "blocked",
+                sid,
+                type_="subtask.blocked",
+                payload={"subtask_id": sid, "reason": reason},
+            )
     if decision.kind == "dispatch":
         wave += 1
         out["wave"] = wave
@@ -87,4 +101,5 @@ def route_schedule(state: TaskState) -> list[Send] | str:
         "escalate": "escalation_gate",
         "fail": "finalize_failed",
         "all_accepted": "synthesize",
+        "partial": "synthesize",
     }[decision.kind]

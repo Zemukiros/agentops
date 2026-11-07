@@ -1,0 +1,6 @@
+<!doctype html><html><head><title>When to use pgvector vs a dedicated vector database</title></head>
+<body><article>
+<h1>pgvector or a dedicated vector database?</h1>
+<p>Choose pgvector when a team already runs PostgreSQL, the collection is modest (up to tens of millions of vectors), and queries mix similarity with relational filters. One database means one backup, one access-control model, and transactional consistency between rows and their embeddings.</p>
+<p>A dedicated vector database is a better fit for very large collections, strict low-latency requirements at high query volume, or when the vector workload must scale independently of the transactional database.</p>
+</article></body></html>

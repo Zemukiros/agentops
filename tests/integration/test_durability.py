@@ -223,12 +223,58 @@ async def test_main_graph_crash_inside_specialist_resumes_on_another_worker(
         purposes = [
             r[0]
             for r in await c.execute(
-                text("SELECT purpose FROM llm_calls WHERE task_id = :t ORDER BY id"), {"t": tid}
+                text(
+                    "SELECT split_part(purpose, '/', 1) FROM llm_calls "
+                    "WHERE task_id = :t ORDER BY id"
+                ),
+                {"t": tid},
             )
         ]
     # A died before its first draft call; B did not re-plan
-    assert purposes == ["plan", "draft", "review", "draft", "review", "synthesize"]
+    assert purposes == ["plan", "act", "review", "act", "review", "synthesize"]
     segments = [p for t, _, p in ev if t == "run.segment_started"]
     assert [s["worker"] for s in segments] == ["worker-A", "worker-B"]
     assert [s["resumed_from_checkpoint"] for s in segments] == [False, True]
     assert [t for t, _, _ in ev].count("task.finished") == 1
+
+
+async def test_rerun_after_crash_cannot_duplicate_a_proposal(
+    engine: AsyncEngine, alice: SeededUser, hook_dir: Path, spawn
+) -> None:
+    """Phase 3 change 2: A is SIGKILLed in the tools node after the registry recorded a
+    proposal but before the node returned; B re-runs the node. Exactly one proposal survives.
+    Note what this proves: a killed node's writes are never committed (LangGraph only persists
+    a node's update when it returns), so the re-run is the only write. Repeated proposals that
+    ARE each committed (across revisions, or parallel subtasks) rely on the hash-keyed reducer;
+    test_proposals.py::test_same_action_proposed_in_two_revisions_is_kept_once covers that."""
+    tid = await create_task(
+        engine, alice, "Summarize and share", graph="main", config={"scenario": "proposes_email"}
+    )
+    await jobs.enqueue(engine, "run", thread_id=tid)
+    hooked = {TEST_HOOK_NODES_ENV: "tools"}
+
+    a = spawn("worker-A", "--once", env_extra=hooked)
+    wait_for(hook_dir / f"{tid}.tools.started", a)
+    os.kill(a.pid, signal.SIGKILL)
+    a.wait(10)
+    (hook_dir / f"{tid}.release").write_text("go")
+    b = spawn("worker-B", "--once", "--exit-after", "30", env_extra=hooked)
+    finish(b, timeout=40)
+
+    async with engine.connect() as c:
+        status, result = (
+            await c.execute(text("SELECT status::text, result FROM tasks WHERE id=:t"), {"t": tid})
+        ).one()
+        attempts = (
+            await c.execute(
+                text(
+                    "SELECT count(*) FROM tool_calls WHERE task_id=:t AND tool='send_email' "
+                    "AND status='proposed'"
+                ),
+                {"t": tid},
+            )
+        ).scalar_one()
+    assert status == "completed"
+    assert attempts == 2  # both executions of the node are logged: nothing hidden
+    [proposal] = result["proposed_actions"]  # but state holds exactly one
+    assert proposal["tool"] == "send_email" and proposal["args"]["to"] == "team@example.com"

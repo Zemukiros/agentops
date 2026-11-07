@@ -67,10 +67,46 @@ services:
       SMTP_PORT: "1025"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
       DOCKER_HOST: tcp://docker-socket-proxy:2375
+      # Task workspaces (ADR-031): the worker sees them at /workspaces; the sandbox containers
+      # it creates through the proxy bind-mount them from the HOST path (the daemon resolves
+      # bind sources on the host, not inside this container).
+      WORKSPACE_ROOT: /workspaces
+      WORKSPACE_HOST_ROOT: ${AGENTOPS_WORKSPACES_HOST_DIR:-${PWD}/var/workspaces}
+      MCP_SERVERS: notes,notes_http
+      MCP_DATA_DIR: /var/lib/agentops/mcp
+    volumes:
+      - ${AGENTOPS_WORKSPACES_HOST_DIR:-${PWD}/var/workspaces}:/workspaces
+      - mcp-data:/var/lib/agentops/mcp
     depends_on:
       migrate: {condition: service_completed_successfully}
       docker-socket-proxy: {condition: service_started}
+      mcp-notes: {condition: service_started}
     networks: [default, docker-proxy]
+    restart: unless-stopped
+
+  # Our MCP "notes" server over streamable HTTP (ADR-032). Internal only: no host port.
+  # DNS-rebinding protection on; only the Host header the worker uses is accepted.
+  mcp-notes:
+    <<: *app
+    command:
+      - python
+      - -I
+      - -m
+      - mcp_servers.notes.server
+      - --transport
+      - streamable-http
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+      - --allowed-host
+      - mcp-notes:8765
+      - --db
+      - /var/lib/agentops/notes/notes.db
+    env_file: []
+    environment: {}
+    volumes:
+      - mcp-notes-data:/var/lib/agentops/notes
     restart: unless-stopped
 
   # The worker reaches Docker only through this proxy (ADR-011): containers API + POST only.
@@ -103,4 +139,6 @@ networks:
     internal: true
 
 volumes:
-  pgdata: {}
+  pgdata:
+  mcp-data:
+  mcp-notes-data: {}

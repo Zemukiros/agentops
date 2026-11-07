@@ -25,7 +25,10 @@ async def intake(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, An
         "wave": 0,
         "decision": None,
         "escalations": [],
+        "proposed_actions": {},
         "failure_reason": None,
         "final": None,
+        "partial": False,
+        "final_review": None,
         "outcome": None,
     }

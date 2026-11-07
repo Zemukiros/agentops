@@ -29,7 +29,11 @@ async def plan(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]
     )
     try:
         res = await model_of(runtime).invoke(
-            "supervisor", msgs, task_id=runtime.context.task_id, purpose="plan", schema=Plan
+            "supervisor",
+            msgs,
+            task_id=runtime.context.task_id,
+            purpose=f"plan/p{attempt}",
+            schema=Plan,
         )
     except ModelCallError as exc:
         return {"plan_attempts": attempt, "failure_reason": f"planning failed: {exc}"}

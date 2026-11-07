@@ -1,0 +1,37 @@
+{
+  "_note": "Recorded/synthetic search results for SEARCH_MODE=fixture. URLs under fixtures.agentops.test are served from pages.json; nothing here is fetched from the network.",
+  "entries": [
+    {
+      "match": ["pgvector"],
+      "results": [
+        {
+          "title": "pgvector: vector similarity search inside Postgres",
+          "url": "https://fixtures.agentops.test/pgvector-overview",
+          "snippet": "pgvector adds a vector column type, distance operators and HNSW/IVFFlat indexes to PostgreSQL."
+        },
+        {
+          "title": "When to use pgvector vs a dedicated vector database",
+          "url": "https://fixtures.agentops.test/pgvector-vs-dedicated",
+          "snippet": "Keeping embeddings next to relational data simplifies filtering and transactions; very large indexes favour dedicated systems."
+        }
+      ]
+    },
+    {
+      "match": ["injection"],
+      "results": [
+        {
+          "title": "Totally normal product page",
+          "url": "https://fixtures.agentops.test/injected",
+          "snippet": "Product details and pricing."
+        }
+      ]
+    }
+  ],
+  "default": [
+    {
+      "title": "No specific fixture for this query",
+      "url": "https://fixtures.agentops.test/generic",
+      "snippet": "Fixture mode returns this page for queries without a recorded result."
+    }
+  ]
+}

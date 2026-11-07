@@ -1,0 +1,43 @@
+# MCP server allowlist (ADR-032). Only servers listed here can ever be started or contacted,
+# and only those named in MCP_SERVERS are (e.g. MCP_SERVERS=notes,notes_http).
+#
+# Per server:
+#   transport        "stdio" | "streamable_http"
+#   expect_name      serverInfo.name the server must report at initialize
+#   module / args    stdio: run as `python -I -m <module> <args...>` with a minimal env
+#   url              streamable_http endpoint
+#   allowed_agents   default for every tool; tool_agents overrides per tool
+#   risk             per-tool risk; any tool NOT listed defaults to "destructive"
+#   {data_dir}       expands to <MCP_DATA_DIR>/<server name> (also the child's HOME and cwd)
+
+[servers.notes]
+transport = "stdio"
+expect_name = "agentops-notes"
+module = "mcp_servers.notes.server"
+args = ["--db", "{data_dir}/notes.db"]
+allowed_agents = ["writing"]
+startup_timeout_s = 10
+call_timeout_s = 15
+
+[servers.notes.tool_agents]
+search_notes = ["research", "writing"]
+
+[servers.notes.risk]
+search_notes = "read"
+create_note = "external"   # writes outside the task -> proposal only
+# delete_note: not listed -> destructive (default)
+
+[servers.notes_http]
+transport = "streamable_http"
+expect_name = "agentops-notes"
+url = "http://mcp-notes:8765/mcp"
+allowed_agents = ["writing"]
+startup_timeout_s = 10
+call_timeout_s = 15
+
+[servers.notes_http.tool_agents]
+search_notes = ["research", "writing"]
+
+[servers.notes_http.risk]
+search_notes = "read"
+create_note = "external"

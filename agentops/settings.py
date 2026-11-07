@@ -7,16 +7,18 @@ from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
-from typing import Literal
+from pathlib import Path
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Role = Literal["supervisor", "research", "analysis", "writing", "code", "reviewer"]
 ROLES: tuple[Role, ...] = ("supervisor", "research", "analysis", "writing", "code", "reviewer")
 
 
 _DEV_PEPPER = "dev-only-pepper-change-me"  # pragma: allowlist secret
+_DEV_SQL_PASSWORD = "dev-only-readonly-change-me"  # noqa: S105  # pragma: allowlist secret
 
 
 class LLMMode(StrEnum):
@@ -71,6 +73,8 @@ class Settings(BaseSettings):
         default_factory=lambda: {str(r): RoleModel() for r in ROLES}
     )
     anthropic_api_key: SecretStr | None = None
+    # SEARCH_MODE=live only (free tier needs an account); tests never use it.
+    tavily_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
 
     budget: Budget = Field(default_factory=Budget)
@@ -94,11 +98,32 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_retry_base_seconds: float = 0.5
     llm_timeout_seconds: float = 120.0
+    # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
+    # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
+    final_review_min_score: int = Field(default=3, ge=1, le=5)
     # Real-mode input estimate margin (ADR-024): count_tokens can't see the structured-output
     # schema (sent as output_config.format) or the thinking config, so the reserved input is
     # ceil(counted * ratio) + tokens. Each llm.call event records estimate vs actual.
     llm_input_margin_ratio: float = 1.15
     llm_input_margin_tokens: int = 512
+
+    # Per-task workspaces (ADR-008/011). WORKSPACE_ROOT is the path as this process sees it;
+    # WORKSPACE_HOST_ROOT is the same directory as the Docker host sees it (the sandbox's bind
+    # mount source). They differ when the worker runs in a container.
+    workspace_root: Path = Path("var/workspaces")
+    workspace_host_root: Path | None = None
+
+    # SQL tools (ADR-033): a separate LOGIN role with SELECT on the `demo` schema only, read-only
+    # transactions and a statement timeout. Same host/database as DATABASE_URL.
+    sql_tool_role: str = "agentops_readonly"
+    sql_tool_password: SecretStr = SecretStr(_DEV_SQL_PASSWORD)
+    sql_tool_statement_timeout_ms: int = 3000
+
+    # MCP (ADR-032): config/mcp_servers.toml is the allowlist; MCP_SERVERS picks which of its
+    # servers this worker starts (comma-separated, e.g. "notes,notes_http"). Empty = none.
+    mcp_config_path: Path = Path("config/mcp_servers.toml")
+    mcp_servers: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    mcp_data_dir: Path = Path("var/mcp")
 
     # Mail (Mailpit in dev: captures, sends nothing out)
     smtp_host: str = "localhost"
@@ -111,6 +136,13 @@ class Settings(BaseSettings):
 
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = "http://localhost:4318"
+
+    @field_validator("mcp_servers", mode="before")
+    @classmethod
+    def _split_csv(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return v
 
     @field_validator("api_token_pepper", mode="before")
     @classmethod
@@ -128,6 +160,8 @@ class Settings(BaseSettings):
             )
         if self.env == "prod" and self.api_token_pepper.get_secret_value() == _DEV_PEPPER:
             raise ValueError("API_TOKEN_PEPPER must be set in prod")
+        if self.env == "prod" and self.sql_tool_password.get_secret_value() == _DEV_SQL_PASSWORD:
+            raise ValueError("SQL_TOOL_PASSWORD must be set in prod")
         return self
 
     def model_for(self, role: str) -> RoleModel:
@@ -145,6 +179,16 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 return "postgresql://" + url[len(prefix) :]
         return url
+
+    @property
+    def sql_tool_dsn(self) -> str:
+        """libpq DSN for the read-only SQL-tool role (same host and database)."""
+        from sqlalchemy.engine import make_url  # noqa: PLC0415
+
+        url = make_url(self.libpq_dsn).set(
+            username=self.sql_tool_role, password=self.sql_tool_password.get_secret_value()
+        )
+        return url.render_as_string(hide_password=False)
 
 
 EMBEDDING_DIM = 384  # schema constant; migration 0001 uses it. Settings must agree.

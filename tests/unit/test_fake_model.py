@@ -1,8 +1,15 @@
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from pydantic import BaseModel
 
-from agentops.models.fake import FakeProviderError, FakeScript, ScriptedChatModel, ScriptedTurn
+from agentops.models.fake import (
+    REASK,
+    FakeProviderError,
+    FakeScript,
+    ScriptedChatModel,
+    ScriptedTurn,
+    purpose_candidates,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -34,7 +41,9 @@ async def test_deterministic_across_instances() -> None:
     assert a.usage_metadata == b.usage_metadata
 
 
-async def test_turn_index_follows_conversation() -> None:
+async def test_turn_index_counts_answers_since_last_human_message() -> None:
+    """A ReAct loop (AI tool call -> tool result -> AI ...) advances the turn; a new human
+    message (a new attempt) restarts at 0; a re-ask continues the attempt."""
     m = ScriptedChatModel(role="research", scenario="s1", script=_script())
 
     def search(query: str) -> str:
@@ -45,9 +54,21 @@ async def test_turn_index_follows_conversation() -> None:
     assert first.tool_calls[0]["name"] == "web_search"
     assert first.tool_calls[0]["args"] == {"query": "pgvector"}
     assert first.tool_calls[0]["id"]
-    second = await m.ainvoke([HumanMessage("go"), first, HumanMessage("result")])
+    tool_result = ToolMessage("results", tool_call_id=first.tool_calls[0]["id"])
+    second = await m.ainvoke([HumanMessage("go"), first, tool_result])
     assert second.content == "final answer"
     assert second.usage_metadata and second.usage_metadata["input_tokens"] > 0
+    new_attempt = await m.ainvoke(
+        [HumanMessage("go"), first, tool_result, second, HumanMessage("again")]
+    )
+    assert new_attempt.tool_calls  # turn 0 again
+    reask = HumanMessage("invalid, answer again", name=REASK)
+    assert (await m.ainvoke([HumanMessage("go"), first, reask])).content == "final answer"
+
+
+def test_purpose_candidates_most_specific_first() -> None:
+    assert purpose_candidates("act/r1/x") == ["act/r1/x", "act/r1", "act/x", "act", "*"]
+    assert purpose_candidates("synthesize") == ["synthesize", "*"]
 
 
 async def test_structured_output_via_with_structured_output() -> None:

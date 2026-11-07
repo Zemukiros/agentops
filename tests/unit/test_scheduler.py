@@ -38,13 +38,13 @@ def test_valid_plan_has_no_errors() -> None:
         (plan(st("a"), st("b", "c"), st("c", "b")), "dependency cycle among ['b', 'c']"),
         (plan(st("a", "zzz")), "unknown ids ['zzz']"),
         (plan(st("a"), st("a")), "duplicate subtask ids: ['a']"),
-        (plan(st("a", specialist="research")), "specialist 'research' is not available"),
+        (plan(st("a", specialist="code")), "specialist 'code' is not available"),
         (plan(*(st(f"s{i}") for i in range(7))), "too many subtasks: 7 > 6"),
         (plan(st("a", "a")), "depends on itself"),
     ],
 )
 def test_invalid_plans(p: Plan, needle: str) -> None:
-    errors = validate_plan(p)
+    errors = validate_plan(p, enabled=frozenset({"writing", "research", "analysis"}))
     assert any(needle in e for e in errors), errors
 
 
@@ -85,22 +85,45 @@ def test_ready_work_runs_before_escalation() -> None:
     assert (d.kind, d.subtask_ids) == ("escalate", ["a"])
 
 
-def test_failed_dependency_fails_with_blocked_dependents() -> None:
+def test_failure_blocks_only_its_dependents() -> None:
+    """ADR-029: a failure marks transitive dependents blocked; nothing else is affected."""
     d = decide(CHAIN, {"a": res("a", "failed")}, wave=1)
-    assert d.kind == "fail"
-    assert d.reason == "subtask(s) ['a'] failed; blocked dependents: ['b', 'c']"
+    assert d.blocked == {
+        "b": "depends on failed or blocked subtask(s) ['a']",
+        "c": "depends on failed or blocked subtask(s) ['a']",
+    }
+    # everything terminal now (a failed, b/c blocked), nothing accepted -> fail
+    assert d.kind == "fail" and "no subtask was accepted" in (d.reason or "")
 
 
-def test_failure_wins_over_ready_and_needs_human() -> None:
-    """Once a subtask failed there is no path to all-accepted; stop spending."""
-    d = decide(FORK, {"a": res("a", "failed"), "b": res("b", "needs_human")}, wave=1)
-    assert d.kind == "fail"
+def test_independent_sibling_still_runs_after_a_failure() -> None:
+    d = decide(FORK, {"a": res("a", "failed")}, wave=1)
+    assert (d.kind, d.subtask_ids) == ("dispatch", ["b"])
+    assert list(d.blocked) == ["c"]
 
 
-def test_failed_leaf_still_fails() -> None:
+def test_partial_when_something_was_accepted() -> None:
+    results = {"a": res("a", "failed"), "b": res("b", "accepted"), "c": res("c", "blocked")}
+    d = decide(FORK, results, wave=2)
+    assert d.kind == "partial" and d.subtask_ids == ["a", "c"] and d.blocked == {}
+
+
+def test_failed_leaf_with_accepted_siblings_is_partial() -> None:
     results = {"a": res("a", "accepted"), "b": res("b", "accepted"), "c": res("c", "failed")}
     d = decide(FORK, results, wave=2)
-    assert d.kind == "fail" and "blocked" not in (d.reason or "")
+    assert d.kind == "partial" and d.subtask_ids == ["c"]
+
+
+def test_escalation_still_happens_alongside_a_failure() -> None:
+    d = decide(FORK, {"a": res("a", "failed"), "b": res("b", "needs_human")}, wave=1)
+    assert (d.kind, d.subtask_ids) == ("escalate", ["b"])
+    assert list(d.blocked) == ["c"]
+
+
+def test_blocked_propagates_through_blocked() -> None:
+    p = plan(st("a"), st("b", "a"), st("c", "b"), st("d"))
+    d = decide(p, {"a": res("a", "failed"), "b": res("b", "blocked")}, wave=1)
+    assert list(d.blocked) == ["c"] and (d.kind, d.subtask_ids) == ("dispatch", ["d"])
 
 
 def test_wave_cap() -> None:
@@ -117,7 +140,9 @@ def test_stall_never_falls_through() -> None:
     assert d.kind == "fail" and "stalled" in (d.reason or "")
 
 
-@pytest.mark.parametrize("statuses", [("accepted",), ("needs_human",), ("failed",), ()])
+@pytest.mark.parametrize(
+    "statuses", [("accepted",), ("needs_human",), ("failed",), ("blocked",), ()]
+)
 def test_every_combination_yields_exactly_one_decision(statuses: tuple[str, ...]) -> None:
     import itertools  # noqa: PLC0415
 
@@ -125,6 +150,11 @@ def test_every_combination_yields_exactly_one_decision(statuses: tuple[str, ...]
         results = {sid: res(sid, s) for sid, s in zip("abc", combo, strict=True) if s}
         for p in (CHAIN, FORK):
             d = decide(p, results, wave=1)
-            assert d.kind in {"dispatch", "escalate", "fail", "all_accepted"}
-            if d.kind == "fail":
+            assert d.kind in {"dispatch", "escalate", "fail", "all_accepted", "partial"}
+            if d.kind in {"fail", "partial"}:
                 assert d.reason
+            # never dispatch or keep pending anything that depends on a dead subtask
+            dead = {k for k, r in results.items() if r.status in {"failed", "blocked"}}
+            for sid in d.subtask_ids if d.kind == "dispatch" else []:
+                deps = {x.id: x for x in p.subtasks}[sid].depends_on
+                assert not set(deps) & dead

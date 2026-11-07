@@ -10,19 +10,21 @@ from __future__ import annotations
 import operator
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
 
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 if TYPE_CHECKING:
     from agentops.models.client import ModelClient
+    from agentops.tools.registry import ToolRegistry
 
 Specialist = Literal["research", "analysis", "writing", "code"]
 TerminalStatus = Literal[
     "completed", "completed_partial", "failed", "rejected", "cancelled", "budget_exceeded"
 ]
-SubtaskStatus = Literal["accepted", "failed", "needs_human"]
+SubtaskStatus = Literal["accepted", "failed", "needs_human", "blocked"]
 
 
 class _Frozen(BaseModel):
@@ -72,7 +74,9 @@ class Review(_Frozen):
 
 # ---- terminal results and outcomes ---------------------------------------------------------
 class SubtaskResult(_Frozen):
-    """Only terminal statuses (ADR-002). Retries live in the subgraph's own state."""
+    """Only terminal statuses (ADR-002). Retries live in the subgraph's own state.
+    `blocked` is set by the scheduler (never by a subtask_worker) for subtasks that depend,
+    directly or transitively, on a failed or blocked subtask (ADR-029)."""
 
     subtask_id: str
     status: SubtaskStatus
@@ -82,9 +86,31 @@ class SubtaskResult(_Frozen):
     human_override: bool = False
 
 
+class ToolLogEntry(_Frozen):
+    """One tool call in a specialist attempt, as the reviewer sees it (truncated)."""
+
+    step: int
+    tool: str
+    status: str
+    args: dict[str, Any]
+    preview: str
+
+
+class AttemptRecord(_Frozen):
+    """How one specialist attempt ended. Each one counts toward MAX_REVISIONS."""
+
+    revision: int
+    outcome: Literal["reviewed", "step_cap"]
+    draft: str | None = None
+    verdict: ReviewVerdict | None = None
+    note: str | None = None  # what the specialist is told before its next attempt
+
+
 class ScheduleDecision(_Frozen):
-    kind: Literal["dispatch", "escalate", "fail", "all_accepted"]
+    kind: Literal["dispatch", "escalate", "fail", "all_accepted", "partial"]
     subtask_ids: list[str] = Field(default_factory=list)
+    # subtasks newly marked blocked by this decision (written into results by `schedule`)
+    blocked: dict[str, str] = Field(default_factory=dict)  # id -> reason
     reason: str | None = None
 
 
@@ -101,6 +127,34 @@ class Escalation(_Frozen):
     round: int
     subtask_ids: list[str]
     decision: EscalationDecision
+
+
+class ProposedAction(_Frozen):
+    """A write/external/destructive tool call outside the task workspace. Never executed by a
+    specialist (ADR-003); stored for approval and execution in Phase 4.
+
+    `hash` covers task, tool and canonical args only, so a node re-run after a crash, or a
+    later revision proposing the same thing, yields the same hash and the reducer keeps one.
+    """
+
+    hash: str
+    tool: str
+    args: dict[str, Any]
+    risk: Literal["write", "external", "destructive"]
+    agent: str
+    subtask_id: str
+    revision: int
+    rationale: str | None = None
+
+
+def merge_proposals(
+    left: dict[str, ProposedAction] | None, right: dict[str, ProposedAction] | None
+) -> dict[str, ProposedAction]:
+    """Reducer keyed by action hash; the first proposal of an action wins (ADR-030)."""
+    out = dict(left or {})
+    for h, action in (right or {}).items():
+        out.setdefault(h, action)
+    return out
 
 
 class Outcome(_Frozen):
@@ -127,8 +181,11 @@ class TaskState(TypedDict, total=False):
     wave: int
     decision: ScheduleDecision | None
     escalations: Annotated[list[Escalation], operator.add]
+    proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
     failure_reason: str | None
     final: str | None
+    partial: bool
+    final_review: ReviewVerdict | None
     outcome: Outcome | None
 
 
@@ -147,14 +204,22 @@ class SubtaskOutput(TypedDict):
 
     results: dict[str, SubtaskResult]
     reviews: list[Review]
+    proposed_actions: dict[str, ProposedAction]
 
 
 class SubtaskState(SubtaskInput, total=False):
     results: dict[str, SubtaskResult]
     reviews: list[Review]
-    drafts: list[str]
+    proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
     revision: int
+    history: list[AttemptRecord]  # finished attempts, oldest first
     local_reviews: list[Review]
+    # the current attempt (reset when a new attempt starts)
+    messages: list[BaseMessage]
+    step: int  # tool calls made in this attempt
+    tool_log: list[ToolLogEntry]
+    draft: str | None
+    attempt_outcome: Literal["reviewed", "step_cap"] | None
     failed_reason: str | None
 
 
@@ -171,6 +236,8 @@ class RunContext:
     task_id: uuid.UUID
     engine: AsyncEngine
     model: ModelClient | None = None  # None only for the demo graph
+    tools: ToolRegistry | None = None  # None only for the demo graph
+    owner_id: uuid.UUID | None = None  # rate-limit key; set by the worker
 
 
 CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
@@ -183,5 +250,8 @@ CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     ScheduleDecision,
     EscalationDecision,
     Escalation,
+    ProposedAction,
+    ToolLogEntry,
+    AttemptRecord,
     Outcome,
 )

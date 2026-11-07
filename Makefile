@@ -2,13 +2,20 @@ SHELL := /bin/bash
 UV ?= uv
 COMPOSE ?= docker compose
 
-.PHONY: help up down logs ps migrate seed test test-unit test-integration lint fmt eval build-sandbox clean-db
+.PHONY: help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
+
+# Task workspaces live on the host so sandbox containers can bind-mount them (ADR-031).
+export AGENTOPS_WORKSPACES_HOST_DIR ?= $(CURDIR)/var/workspaces
 
 help:
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-18s %s\n", $$1, $$2}'
 
-up: ## Start postgres, mailpit, socket proxy, api, worker (runs migrations first)
-	$(COMPOSE) up -d --build --wait postgres mailpit docker-socket-proxy api worker
+workspaces: ## Create the host workspace dir (worker uid 10000 and sandbox uid 10001 both write)
+	mkdir -p $(AGENTOPS_WORKSPACES_HOST_DIR)
+	chmod 777 $(AGENTOPS_WORKSPACES_HOST_DIR)
+
+up: workspaces ## Start postgres, mailpit, socket proxy, mcp-notes, api, worker (runs migrations first)
+	$(COMPOSE) up -d --build --wait postgres mailpit docker-socket-proxy mcp-notes api worker
 
 down: ## Stop the stack (keeps data)
 	$(COMPOSE) down
@@ -50,3 +57,9 @@ eval: ## Scenario suite (Phase 6; not implemented yet)
 
 build-sandbox: ## Build the agentops-sandbox image (never run as a service)
 	$(COMPOSE) --profile build-only build sandbox
+
+test-sandbox: ## Sandbox isolation tests against the local Docker daemon (needs build-sandbox)
+	AGENTOPS_REQUIRE_SANDBOX=1 $(UV) run pytest -m sandbox
+
+sandbox-selfcheck: ## Through-proxy check: worker container -> socket proxy -> sandbox, file round trip
+	$(COMPOSE) exec worker python -m agentops.tools.sandbox --selfcheck
