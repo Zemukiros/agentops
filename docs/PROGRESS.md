@@ -4,7 +4,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 
 ## Current status
 - **Phase:** 4 — **complete, awaiting review** (2026-11-07). Phase 3 approved and merged (PR #2). Phase 5 not started.
-- **Branch:** `phase-4` (not pushed yet at the time of writing; see the summary).
+- **Branch:** `phase-4` (pushed; no PR yet).
 - **Last updated:** 2026-11-07
 - **Test status:** 561 passed, 0 failed on `make test` (fake mode): 402 unit, 150 integration, 9 sandbox (real Docker). Lint, ruff format, mypy clean. Not in `make test`: 1 `model` test (real fastembed; passed), 4 `e2e` tests (real models).
 - **Real-model spend this phase:** $0.083560 (one run, two tasks). Cumulative AgentOps: **$0.278175**.
