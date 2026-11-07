@@ -101,6 +101,8 @@ class Settings(BaseSettings):
     # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
     # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
     final_review_min_score: int = Field(default=3, ge=1, le=5)
+    # plan_gate (ADR-036): effective plan confidence below this -> human approves the plan.
+    plan_confidence_threshold: float = Field(default=0.6, ge=0, le=1)
     # Approvals (ADR-035): a blocking approval left pending this long resolves as reject.
     approval_ttl_seconds: int = Field(default=86_400, ge=1)
     # Highest per-task max_usd a reviewer may approve when a run hits its budget.

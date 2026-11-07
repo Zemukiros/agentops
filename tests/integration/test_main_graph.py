@@ -555,3 +555,89 @@ async def test_failure_plus_escalation_then_approve_is_partial(
     await assert_single_terminal(engine, tid, "completed_partial")
     subs = (await task_row(engine, tid))["result"]["subtasks"]
     assert subs["intro"]["human_override"] is True and subs["summary"]["status"] == "blocked"
+
+
+# ---- plan_gate (ADR-036) -------------------------------------------------------------------
+async def test_confident_plans_pass_without_approval(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default")
+    await run_job(engine, saver, tid)
+    await assert_single_terminal(engine, tid, "completed")
+    async with engine.connect() as c:
+        n = (
+            await c.execute(text("SELECT count(*) FROM approvals WHERE task_id=:t"), {"t": tid})
+        ).scalar_one()
+        conf = (
+            await c.execute(
+                text("SELECT payload FROM events WHERE task_id=:t AND type='plan.confidence'"),
+                {"t": tid},
+            )
+        ).scalar_one()
+    assert n == 0 and conf["needs_approval"] is False and conf["effective"] == 0.8
+
+
+async def _low_plan(engine: AsyncEngine, saver: Any, user: SeededUser) -> uuid.UUID:
+    tid = await new_task(engine, user, "low_confidence_plan")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    [intr] = t["result"]["interrupts"]
+    assert intr["value"]["kind"] == "approve_plan" and intr["value"]["key"] == "plan:p1"
+    assert intr["value"]["confidence"]["effective"] == 0.3
+    return tid
+
+
+async def test_plan_gate_approve(engine: AsyncEngine, saver: Any, alice: SeededUser) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    await decide_pending(engine, tid, "approve_plan", {"action": "approve"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    assert [p for _, p, _, _ in await calls(engine, tid)].count("act") == 1
+
+
+async def test_plan_gate_edit_runs_the_edited_plan(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    sub = {"description": "d", "specialist": "writing", "expected_output": "e", "complexity": "low"}
+    edited = {
+        "subtasks": [{"id": "one", **sub}, {"id": "two", "depends_on": ["one"], **sub}],
+        "confidence": 0.9,
+        "rationale": "human edit",
+    }
+    with pytest.raises(approvals.DecisionError, match="cycle"):
+        cyclic = {
+            **edited,
+            "subtasks": [
+                {"id": "one", "depends_on": ["two"], **sub},
+                {"id": "two", "depends_on": ["one"], **sub},
+            ],
+        }
+        approvals.validate_decision(
+            "approve_plan", {"action": "edit", "plan": cyclic}, {}, get_settings()
+        )
+    await decide_pending(engine, tid, "approve_plan", {"action": "edit", "plan": edited})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    assert set((await task_row(engine, tid))["result"]["subtasks"]) == {"one", "two"}
+
+
+async def test_plan_gate_reject(engine: AsyncEngine, saver: Any, alice: SeededUser) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    await decide_pending(engine, tid, "approve_plan", {"action": "reject", "note": "too vague"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "rejected")
+    assert (await task_row(engine, tid))["error"] == "too vague"
+    assert "act" not in [p for _, p, _, _ in await calls(engine, tid)]
+
+
+async def test_plan_gate_take_over(engine: AsyncEngine, saver: Any, alice: SeededUser) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    await decide_pending(
+        engine, tid, "approve_plan", {"action": "take_over", "deliverable": "I wrote it myself."}
+    )
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    t = await task_row(engine, tid)
+    assert t["result"]["final"] == "I wrote it myself."

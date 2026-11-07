@@ -112,6 +112,9 @@ def build_scenarios() -> FakeScript:
     s.add("reviewer", "partial_low_score", _verdict("escalate", 2), purpose="final_review")
     # intro also needs a human; after approval the run can still end completed_partial
     s.add("reviewer", "partial_with_escalation", REVISE, purpose="review/intro")
+    # self-reported confidence below PLAN_CONFIDENCE_THRESHOLD -> plan_gate asks a human
+    low = _plan(_subtask("draft"), confidence=0.3)
+    s.add("supervisor", "low_confidence_plan", low, purpose="plan")
     # writing proposes an email (external -> never sent; recorded as a ProposedAction)
     s.add(
         "writing",
@@ -149,5 +152,6 @@ SCENARIO_NAMES = frozenset(
         "partial_low_score",
         "partial_with_escalation",
         "proposes_email",
+        "low_confidence_plan",
     }
 )

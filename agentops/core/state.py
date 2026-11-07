@@ -47,6 +47,23 @@ class Plan(_Frozen):
     rationale: str = Field(max_length=2000)
 
 
+class PlanConfidence(_Frozen):
+    """effective = min(self_reported, structural) (case study 5.3; ADR-036)."""
+
+    self_reported: float
+    structural: float
+    effective: float
+    high: int
+    medium: int
+    depth: int
+    memory_similarity: float
+    threshold: float
+
+    @property
+    def needs_approval(self) -> bool:
+        return self.effective < self.threshold
+
+
 class PlanRejection(_Frozen):
     """A plan that failed validation, kept so the re-plan prompt can show it."""
 
@@ -276,6 +293,9 @@ class TaskState(TypedDict, total=False):
     plan: Plan | None
     plan_attempts: int
     plan_rejections: list[PlanRejection]
+    plan_confidence: PlanConfidence | None
+    plan_decision: PlanDecision | None
+    memory_similarity: float  # best recalled-memory similarity (set by recall; 0 if none)
     results: Annotated[dict[str, SubtaskResult], merge_results]
     reviews: Annotated[list[Review], operator.add]
     wave: int
@@ -343,6 +363,7 @@ class RunContext:
 CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     Subtask,
     Plan,
+    PlanConfidence,
     PlanRejection,
     ReviewVerdict,
     Review,

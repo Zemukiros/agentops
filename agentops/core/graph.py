@@ -41,6 +41,7 @@ from agentops.core.nodes.final_review import final_review
 from agentops.core.nodes.finalize import finalize_failed, finalize_rejected
 from agentops.core.nodes.intake import intake
 from agentops.core.nodes.plan import after_plan, plan
+from agentops.core.nodes.plan_gate import after_plan_gate, plan_gate
 from agentops.core.nodes.schedule import route_schedule, schedule
 from agentops.core.nodes.subtask import build_subtask_graph
 from agentops.core.nodes.synthesize import after_synthesize, synthesize
@@ -58,6 +59,7 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g = StateGraph(TaskState, context_schema=RunContext)
     g.add_node("intake", intake)
     g.add_node("plan", plan)
+    g.add_node("plan_gate", plan_gate)
     g.add_node("schedule", schedule)
     g.add_node("subtask_worker", build_subtask_graph())
     g.add_node("escalation_gate", escalation_gate)
@@ -68,7 +70,8 @@ def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
 
     g.add_edge(START, "intake")
     g.add_edge("intake", "plan")
-    g.add_conditional_edges("plan", after_plan, ["plan", "schedule", "finalize_failed"])
+    g.add_conditional_edges("plan", after_plan, ["plan", "plan_gate", "finalize_failed"])
+    g.add_conditional_edges("plan_gate", after_plan_gate, ["schedule", "finalize_rejected", END])
     g.add_conditional_edges(
         "schedule",
         route_schedule,

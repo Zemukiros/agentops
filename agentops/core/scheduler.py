@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Mapping
 
-from agentops.core.state import Plan, ScheduleDecision, Subtask, SubtaskResult
+from agentops.core.state import Plan, PlanConfidence, ScheduleDecision, Subtask, SubtaskResult
 
 MAX_SUBTASKS = 6
 ENABLED_SPECIALISTS: frozenset[str] = frozenset({"research", "analysis", "writing", "code"})
@@ -169,3 +169,45 @@ def _depends_on_any(s: Subtask, targets: list[str] | set[str], plan: Plan) -> bo
         seen.add(d)
         stack.extend(by_id[d].depends_on)
     return False
+
+
+# ---- plan confidence (ADR-036) -------------------------------------------------------------
+W_HIGH, W_MEDIUM, W_DEPTH, W_UNFAMILIAR = 0.15, 0.05, 0.10, 0.10
+
+
+def plan_depth(plan: Plan) -> int:
+    """Length of the longest dependency chain (1 = no dependencies)."""
+    by_id = {s.id: s for s in plan.subtasks}
+    memo: dict[str, int] = {}
+
+    def depth(sid: str) -> int:
+        if sid not in memo:
+            deps = [d for d in by_id[sid].depends_on if d in by_id]
+            memo[sid] = 1 + max((depth(d) for d in deps), default=0)
+        return memo[sid]
+
+    return max(depth(s.id) for s in plan.subtasks)
+
+
+def plan_confidence(plan: Plan, *, memory_similarity: float, threshold: float) -> PlanConfidence:
+    """Self-reported confidence is poorly calibrated, so it's capped by a structural score:
+    penalties for high/medium complexity, dependency depth beyond 2, and unfamiliarity (no
+    similar past memory). The unfamiliarity penalty is at most 0.1, so a new user's simple plan
+    still passes the default threshold."""
+    high = sum(1 for s in plan.subtasks if s.complexity == "high")
+    medium = sum(1 for s in plan.subtasks if s.complexity == "medium")
+    depth = plan_depth(plan)
+    sim = min(1.0, max(0.0, memory_similarity))
+    structural = 1.0 - W_HIGH * high - W_MEDIUM * medium - W_DEPTH * max(0, depth - 2)
+    structural -= W_UNFAMILIAR * (1.0 - sim)
+    structural = round(min(1.0, max(0.0, structural)), 4)
+    return PlanConfidence(
+        self_reported=plan.confidence,
+        structural=structural,
+        effective=round(min(plan.confidence, structural), 4),
+        high=high,
+        medium=medium,
+        depth=depth,
+        memory_similarity=round(sim, 4),
+        threshold=threshold,
+    )
