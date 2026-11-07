@@ -112,6 +112,25 @@ def build_scenarios() -> FakeScript:
     s.add("reviewer", "partial_low_score", _verdict("escalate", 2), purpose="final_review")
     # intro also needs a human; after approval the run can still end completed_partial
     s.add("reviewer", "partial_with_escalation", REVISE, purpose="review/intro")
+    # writing proposes an email (external -> never sent; recorded as a ProposedAction)
+    s.add(
+        "writing",
+        "proposes_email",
+        ScriptedTurn(
+            tool_calls=[
+                {
+                    "name": "send_email",
+                    "args": {
+                        "to": "team@example.com",
+                        "subject": "Summary ready",
+                        "body": "The summary is attached.",
+                    },
+                }
+            ]
+        ),
+        ScriptedTurn(content="Draft: the summary (an email to the team is proposed)."),
+        purpose="act",
+    )
     return s
 
 
@@ -129,5 +148,6 @@ SCENARIO_NAMES = frozenset(
         "partial_ok",
         "partial_low_score",
         "partial_with_escalation",
+        "proposes_email",
     }
 )

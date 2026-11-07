@@ -100,6 +100,10 @@ def main_result(values: Mapping[str, Any]) -> tuple[str, dict[str, Any], str | N
             sid: r.model_dump(mode="json", exclude={"output"}) for sid, r in results.items()
         },
         "partial": bool(values.get("partial")),
+        # never executed in Phase 3; approval + execution is Phase 4 (ADR-003)
+        "proposed_actions": [
+            a.model_dump(mode="json") for a in (values.get("proposed_actions") or {}).values()
+        ],
         "final_review": (
             values["final_review"].model_dump(mode="json") if values.get("final_review") else None
         ),

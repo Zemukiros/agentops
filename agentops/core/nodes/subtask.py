@@ -175,6 +175,9 @@ async def tools(state: SubtaskState, runtime: Runtime[RunContext]) -> dict[str, 
         )
         if inv.proposal is not None:
             proposals[inv.proposal.hash] = inv.proposal
+    # test hook: lets the crash test kill the worker after the tools ran, before the
+    # checkpoint (the re-run must not duplicate proposals)
+    await block_if_hooked(str(ctx_base.task_id), "tools")
     out: dict[str, Any] = {
         "messages": [*state["messages"], *new_messages],
         "step": step + len(calls),
