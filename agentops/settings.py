@@ -8,10 +8,10 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Role = Literal["supervisor", "research", "analysis", "writing", "code", "reviewer"]
 ROLES: tuple[Role, ...] = ("supervisor", "research", "analysis", "writing", "code", "reviewer")
@@ -119,6 +119,12 @@ class Settings(BaseSettings):
     sql_tool_password: SecretStr = SecretStr(_DEV_SQL_PASSWORD)
     sql_tool_statement_timeout_ms: int = 3000
 
+    # MCP (ADR-032): config/mcp_servers.toml is the allowlist; MCP_SERVERS picks which of its
+    # servers this worker starts (comma-separated, e.g. "notes,notes_http"). Empty = none.
+    mcp_config_path: Path = Path("config/mcp_servers.toml")
+    mcp_servers: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    mcp_data_dir: Path = Path("var/mcp")
+
     # Mail (Mailpit in dev: captures, sends nothing out)
     smtp_host: str = "localhost"
     smtp_port: int = 1025
@@ -130,6 +136,13 @@ class Settings(BaseSettings):
 
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = "http://localhost:4318"
+
+    @field_validator("mcp_servers", mode="before")
+    @classmethod
+    def _split_csv(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return v
 
     @field_validator("api_token_pepper", mode="before")
     @classmethod

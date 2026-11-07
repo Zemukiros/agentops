@@ -47,7 +47,8 @@ from agentops.observability.events import emit_on
 from agentops.queue import jobs
 from agentops.queue.locks import thread_lock
 from agentops.settings import LLMMode, Settings, get_settings
-from agentops.tools.catalog import build_registry
+from agentops.tools.catalog import build_registry, build_registry_with_mcp
+from agentops.tools.mcp import manager_from_settings
 from agentops.tools.registry import ToolRegistry
 
 log = logging.getLogger("agentops.worker")
@@ -335,7 +336,12 @@ async def main(
             from agentops.models.anthropic import real_factory  # noqa: PLC0415
 
             factory = real_factory(settings)  # fail fast on misconfiguration
-        worker = Worker(settings, engine, saver, wid, chat_factory=factory)
+        mcp = manager_from_settings(settings)  # unknown server names fail fast here
+        tools = await build_registry_with_mcp(settings, mcp)
+        log.info("tools loaded: %s", ", ".join(sorted(tools.specs)))
+        if mcp is not None and mcp.skipped:
+            log.warning("MCP tools/servers skipped: %s", mcp.skipped)
+        worker = Worker(settings, engine, saver, wid, chat_factory=factory, tools=tools)
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, worker.stop)
@@ -344,6 +350,8 @@ async def main(
                 loop.call_later(exit_after, worker.stop)
             await worker.run_forever(once=once)
         finally:
+            if mcp is not None:
+                await mcp.close()
             await engine.dispose()
 
 

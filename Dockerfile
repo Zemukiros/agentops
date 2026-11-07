@@ -11,6 +11,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY agentops ./agentops
+COPY mcp_servers ./mcp_servers
+COPY config ./config
 COPY migrations ./migrations
 COPY alembic.ini ./
 RUN uv sync --frozen --no-dev
