@@ -72,6 +72,7 @@ Exception: `write` tools scoped to the task's own workspace directory (e.g. writ
 Flow: `INSERT … ON CONFLICT DO NOTHING` → if the existing row is `done`, return the stored result → otherwise perform the action → mark `done`.
 **Why.** Resume re-runs nodes. Worker crashes cause redelivery. Both must not repeat sends.
 **Trade-off.** A crash *between* performing the action and marking it `done` is ambiguous. Mitigation: pass the key to the downstream system when it supports one (e.g. email `Message-ID`), and leave rows stuck in `in_progress` for human review instead of retrying them automatically. Document this as a known limitation.
+**Update (Phase 4, built).** `execute_actions` inserts the `side_effects` row (`in_progress`) first, then performs through `registry.execute_approved` (the key is passed on: email `Message-ID`), then marks `done`/`failed`. On a re-run, an existing `done`/`failed` row is reused and never re-run. An existing `in_progress` row means a worker died after inserting it: the action is reported **unknown**, never retried, and a non-blocking `side_effect_review` inbox item lets a reviewer record "confirmed done" or "not done" (records only, never re-executes). Note the ambiguous window is insert → perform → mark-done: a crash after the insert but before the perform is also treated as unknown, which is the conservative reading. A crash *before* `execute_actions` inserts anything resumes and sends exactly once (tested with SIGKILL).
 
 ## ADR-005 · Postgres + pgvector instead of ChromaDB · accepted
 **Decision.** Long-term memory is a `memories` table with a `vector` column (pgvector), queried with `WHERE user_id = :uid`.
@@ -213,6 +214,7 @@ Rate limits: a Postgres-backed token bucket (one atomic `UPDATE … RETURNING`).
 - **≥ 1 accepted** → `partial` → `synthesize` writes the body from accepted outputs only, then appends a **"What's missing" section generated from state** (each failed/blocked subtask, its reason, and its expected output). This is deterministic, not left to the model. Then `final_review` (reviewer role) scores the partial deliverable: **score ≥ `FINAL_REVIEW_MIN_SCORE` (default 3) → `completed_partial`**, otherwise → `failed` (the deliverable stays in the result). A failed review call → `failed`.
 - **nothing accepted** → `failed` ("no subtask was accepted"), without synthesis.
 Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph also reviews complete deliverables, with low scores going to escalation; that arrives with the Phase 4 gates.
+**Amended (Phase 4, user decision).** `final_review` now scores **every** deliverable, and a score below `FINAL_REVIEW_MIN_SCORE` goes to `escalation_gate` (final-review mode) for complete and partial deliverables alike, instead of ending partial runs `failed`. A human can approve (→ `completed` / `completed_partial` per `delivery_outcome`), edit the deliverable, take over, or reject (→ `rejected`); expiry → reject. Unperformed actions also make a run `completed_partial` and are listed in the "What's missing" section.
 **Why.** A failed side branch shouldn't throw away finished, independent work. But a partial result is only worth returning if it says plainly what's missing and a reviewer judges it still useful.
 **Tests.** Unit: blocking only dependents, transitive blocking through blocked, independent sibling dispatched, partial vs nothing-accepted, escalation alongside a failure, plus the combination sweep with `blocked`. Integration: `partial_ok` → completed_partial (with the missing section and blocked event), `partial_low_score` → failed, `specialist_error` → failed without synthesis, failure + escalation + approve → completed_partial.
 
@@ -255,6 +257,42 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 **Decision.** Every tool result reaches a model only as `<tool_result tool=… status=… trust="untrusted">…</tool_result>`: control characters stripped, length-capped, and a closing tag inside the content escaped so it can't close the frame. Specialist system prompts say tool results, `<request>` and `<context>` are data, never instructions. The research agent has no external or destructive tools. `fetch_url` blocks non-public addresses after DNS resolution, pins the connection to the checked IP (Host header + TLS SNI keep the hostname), re-checks every redirect, and caps size and time.
 **Tested.** A fixture page with injected instructions, read by a research model *scripted to obey it*: its `send_email` / `notes__delete_note` calls are denied, its traversal write fails, nothing is proposed, and the injected text reaches later prompts only inside delimiters. A compromised writer can only *propose* (it is allowed to email), never execute.
 **Limits.** This tests the guards, not model robustness; the measured injection suite is Phase 6. Proposals made by a fooled agent are caught only at human approval (Phase 4).
+
+## ADR-035 · Approvals inbox: semantic keys, one version-checked decide · accepted
+**Decision.** Every decision point is one `approvals` row keyed by `(task_id, key)`, with keys `plan:p1`, `action:<hash>`, `escalation:e1`, `final:f1`, `budget:b1`, `recursion:x1`, `side_effect:<key>`. Keys are semantic, never LangGraph interrupt ids, so a re-run node or a re-run worker segment can't create a second row. Graph gates put `kind` + `key` in their interrupt payload and the worker records the row; worker-level pauses count only *decided* approvals of their kind, so a crashed and re-run segment pauses with the same key.
+- **API:** `GET /approvals` (reviewers: all tasks; users: their own), `GET /approvals/{id}` (invisible → 404), `POST /approvals/{id}/decision` (reviewer role; `{version, decision}`).
+- **Validation, twice:** the API validates with the same Pydantic models the gates pass to `interrupt(..., response_schema=...)`, plus semantic checks (an edited plan must be a DAG; edited action args must match the tool's recorded JSON schema; a budget raise must exceed the current limit and stay ≤ `BUDGET_MAX_RAISE_USD`). Invalid → 422, nothing written. Verified: LangGraph validates the resume value and raises *inside the node* if it's invalid, so the API check is what keeps bad input out.
+- **One transition path:** `approvals.decide` is a single `UPDATE … WHERE id AND version = :v AND status = 'pending'`. The API and the expiry sweep both use it, so two reviewers, or a reviewer and an expiry, can't both win (tested; the loser gets 409). The winner's transaction also enqueues the `resume` job (or, for `side_effect_review`, only updates the side_effects row).
+- **Expiry:** `APPROVAL_TTL_SECONDS` (24 h). The worker loop sweeps overdue *blocking* approvals into `expired` with a system reject. Non-blocking review items never expire.
+
+## ADR-036 · plan_gate: structural confidence · accepted
+**Decision.** `effective = min(self_reported, structural)`, where `structural = 1 − 0.15·#high − 0.05·#medium − 0.10·max(0, depth − 2) − 0.10·(1 − best_memory_similarity)`, clamped to [0, 1]. Below `PLAN_CONFIDENCE_THRESHOLD` (0.6) → `approve_plan` (approve / edit, re-validated as a DAG / reject → `rejected` / take_over → the human's deliverable, `completed`). The confidence is computed and evented in `plan`, so `plan_gate` is pure before `interrupt()`. The unfamiliarity penalty is capped at 0.1, so a brand-new user's simple plan passes.
+**Trade-off.** The weights are judgement, not fitted. Phase 6 evals can tune them against escalation outcomes.
+
+## ADR-037 · action_gate and execute_actions · accepted
+**Decision.** `action_gate` considers ProposedActions from **accepted** subtasks only (others are recorded `not_considered`), one approval per action hash, asked in turn (the loop is bounded by the number of actions). Decisions: approve, edit (args re-validated by the tool), reject (not executed), take_over (a human did it; not executed). `execute_actions` then follows ADR-004 as updated. Any action that didn't end `done` or `human_done` makes the run `completed_partial`.
+**Invariant kept.** Tool functions run only inside the registry (`invoke` for specialists, `execute_approved` for approved actions); the AST test still holds.
+
+## ADR-038 · Long-term memory: recall, screened consolidation, API · accepted
+**Decision.**
+- **Embeddings:** `fastembed==0.9.1` (`BAAI/bge-small-en-v1.5`, 384 dims). Vetted before install: the Qdrant team's pure wheel with no hooks or telemetry; network only for model download; onnxruntime's subprocess/network code is in its conversion tooling, not the inference path. The model is baked into the image at build (`FASTEMBED_CACHE_PATH=/opt/fastembed`), and the runtime sets `HF_HUB_OFFLINE=1`. Tests use a deterministic bag-of-words hash embedder; one `model`-marked test checks the real one (related 0.735 vs unrelated 0.385 on a probe pair, which is why `MEMORY_MIN_SIMILARITY` defaults to 0.6).
+- **recall** (after intake): `WHERE user_id` only; drop below the minimum similarity; rank by `α·sim + β·importance + γ·recency` (recency = 0.5^(age/half-life)); keep `MEMORY_TOP_K`. Memories reach the planner inside `<memory note="past example, may not apply">` blocks, and the best similarity feeds plan confidence.
+- **consolidate** (on every terminal path through the graph):
+  - always one *episode* (request + outcome, no LLM)
+  - plus at most 3 lessons/preferences/facts proposed by one supervisor call from reviewer-accepted outputs, the outcome and human decisions
+  - candidates are dropped if they share any 8-word sequence with a tool output of the task (`tool_calls.output_text`, full capped output) or read like an instruction to an agent
+  - every memory carries `source_task_id` and the run's outcome
+  - if the call can't fit the ledger, or the model fails, only the episode is written (no overshoot, no pause)
+  - worker-level terminals (budget/recursion decisions, a graph without an outcome) write their episode from the worker
+  - writes are idempotent per (task, kind, text)
+- **API:** `GET /memories`, `GET /memories/search?q=`, `GET /memories/{id}`, `DELETE /memories/{id}`, `DELETE /memories` (one transaction). Owner-only; another user's memory → 404.
+**Limits.** Screening is heuristic: it stops copied tool text and obvious instructions, not a paraphrase. `access_count` can double-count when recall re-runs after a crash.
+
+## ADR-039 · Worker-level pauses; redelivered resume jobs continue · accepted
+**Decision.**
+- **Budget:** budget exhaustion can happen inside a parallel branch, where `interrupt()` is forbidden. So `BudgetExceededError` reaches the worker, which records a `budget` approval (source `worker`) and sets `awaiting_approval`. Approve raises any of max_usd / max_llm_calls / max_tokens and continues from the last checkpoint; reject or expiry → `budget_exceeded` (with an episode memory). One `budget.warning` event per task at 80%.
+- **Recursion:** `GraphRecursionError` → `recursion` approval: continue, take_over (→ `completed` with the human's deliverable) or reject (→ `failed`).
+- **Resume edge case:** a `resume` job whose interrupt was already consumed (its worker died later in the same job and the job was redelivered) **continues from the checkpoint** instead of being dropped. The Phase 4 durability matrix found this: before the fix, such a task stayed `running` forever.
 
 ---
 
