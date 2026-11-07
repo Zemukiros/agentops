@@ -4,6 +4,7 @@ from tests.integration.conftest import (  # noqa: F401
     alice,
     clean_db,
     engine,
+    reviewer,
     sessionmaker,
     test_db,
 )
