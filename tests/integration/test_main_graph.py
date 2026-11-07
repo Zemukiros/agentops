@@ -709,3 +709,24 @@ async def test_plan_gate_take_over(engine: AsyncEngine, saver: Any, alice: Seede
     await assert_single_terminal(engine, tid, "completed")
     t = await task_row(engine, tid)
     assert t["result"]["final"] == "I wrote it myself."
+
+
+async def test_budget_warning_fires_once_at_80_percent(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default", budget=Budget(max_llm_calls=5))
+    await run_job(engine, saver, tid)  # 5 calls: plan, act, review, synthesize, final_review
+    await assert_single_terminal(engine, tid, "completed")
+    async with engine.connect() as c:
+        warnings = (
+            (
+                await c.execute(
+                    text("SELECT payload FROM events WHERE task_id=:t AND type='budget.warning'"),
+                    {"t": tid},
+                )
+            )
+            .scalars()
+            .all()
+        )
+    [w] = warnings  # once, although calls 4 and 5 are both >= 80%
+    assert w["llm_calls"] == 4 and w["fraction_used"] == 0.8
