@@ -201,15 +201,86 @@ async def test_notes_over_both_transports(
 
 
 async def test_http_server_rejects_foreign_host_headers(http_notes: tuple[str, Path]) -> None:
+    """Same valid initialize request, two Host headers: the default allowed host is served (200),
+    a foreign one gets 421 Misdirected Request from the DNS-rebinding check. (An earlier version
+    sent a bare `ping` and accepted any 4xx, which also passed with the protection OFF.)"""
     url, _ = http_notes
-    body = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
+    port = url.split(":")[2].split("/")[0]
+    init = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "t", "version": "0"},
+        },
+    }
+    accept = {"Accept": "application/json, text/event-stream"}
     async with httpx.AsyncClient() as c:
-        r = await c.post(
-            url,
-            json=body,
-            headers={"Host": "evil.example", "Accept": "application/json, text/event-stream"},
-        )
-    assert r.status_code in {400, 403, 421}
+        ok = await c.post(url, json=init, headers={**accept, "Host": f"127.0.0.1:{port}"})
+        bad = await c.post(url, json=init, headers={**accept, "Host": "evil.example"})
+    assert (ok.status_code, bad.status_code) == (200, 421)
+
+
+async def test_http_host_allowlist_matches_the_compose_configuration(tmp_path: Path) -> None:
+    """DNS-rebinding protection, configured as in docker-compose.yml (only the service name is
+    allowed): that Host is served; the defaults and a foreign Host are refused. A server that
+    rejected everything would fail the first assertion."""
+    port = free_port()
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-I",
+            "-m",
+            "mcp_servers.notes.server",
+            "--transport",
+            "streamable-http",
+            "--port",
+            str(port),
+            "--allowed-host",
+            f"mcp-notes:{port}",
+            "--db",
+            str(tmp_path / "n.db"),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            with socket.socket() as sock:
+                if sock.connect_ex(("127.0.0.1", port)) == 0:
+                    break
+            await asyncio.sleep(0.1)
+        init = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "t", "version": "0"},
+            },
+        }
+        accept = "application/json, text/event-stream"
+
+        async def status_for(host: str) -> int:
+            async with httpx.AsyncClient() as c:
+                r = await c.post(
+                    f"http://127.0.0.1:{port}/mcp",
+                    json=init,
+                    headers={"Host": host, "Accept": accept},
+                )
+            return r.status_code
+
+        assert await status_for(f"mcp-notes:{port}") == 200  # the configured host is served
+        for host in (f"127.0.0.1:{port}", f"localhost:{port}", "evil.example", "mcp-notes"):
+            assert await status_for(host) == 421, host  # everything else: Misdirected Request
+    finally:
+        proc.terminate()
+        proc.wait(10)
 
 
 # ---- allowlist -----------------------------------------------------------------------------

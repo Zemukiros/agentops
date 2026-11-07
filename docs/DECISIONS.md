@@ -243,7 +243,7 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 - **Untrusted descriptions:** control characters stripped, capped at 300 characters, prefixed "[external MCP tool …; description not verified]".
 - **Schemas:** JSON Schema → Pydantic (`extra="forbid"`) for a supported subset; any other tool is skipped with a warning, never loaded half-validated.
 - **stdio hygiene (user change 3):** the SDK's `stdio_client` always merges six parent variables (HOME, LOGNAME, PATH, SHELL, TERM, USER), and its `env` can only override. We pass our own value for all six (plus LANG), so the child sees only values chosen here; a canary test proves no worker secrets or variables reach it. Startup timeout (spawn + handshake); per-call timeout (the SDK's `REQUEST_TIMEOUT` keeps the session); restart on crash (`CONNECTION_CLOSED` or a broken transport), with one retry for read tools, giving up after 3 consecutive restarts. A server that can't start is skipped at worker start and reported; config errors fail fast.
-- **HTTP server:** DNS-rebinding protection on (the SDK default is off), and only `--allowed-host` values are accepted (tested with a foreign Host header).
+- **HTTP server:** DNS-rebinding protection on (the SDK default is off), and only `--allowed-host` values are accepted. Tested with the compose configuration: the configured host gets 200, the defaults and foreign hosts get 421; both tests fail with the protection turned off (mutation-checked; the first version of the test accepted any 4xx and passed even with it off).
 - **Compose:** `mcp-notes` runs on the internal network with no host port and no env file.
 **Why.** The adapters held us on mcp 1.x; the registry already does the wrapping, validation and policy.
 
