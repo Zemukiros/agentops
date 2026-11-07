@@ -13,10 +13,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
 
 from langchain_core.messages import BaseMessage
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 if TYPE_CHECKING:
+    from agentops.memory.service import MemoryService
     from agentops.models.client import ModelClient
     from agentops.tools.registry import ToolRegistry
 
@@ -45,6 +46,34 @@ class Plan(_Frozen):
     subtasks: list[Subtask] = Field(min_length=1)
     confidence: float = Field(ge=0, le=1)
     rationale: str = Field(max_length=2000)
+
+
+class PlanConfidence(_Frozen):
+    """effective = min(self_reported, structural) (case study 5.3; ADR-036)."""
+
+    self_reported: float
+    structural: float
+    effective: float
+    high: int
+    medium: int
+    depth: int
+    memory_similarity: float
+    threshold: float
+
+    @property
+    def needs_approval(self) -> bool:
+        return self.effective < self.threshold
+
+
+class MemoryHit(_Frozen):
+    """A recalled memory as the planner sees it (ADR-038): past example, may not apply."""
+
+    id: str
+    kind: str
+    text: str
+    outcome: str | None
+    similarity: float
+    score: float
 
 
 class PlanRejection(_Frozen):
@@ -114,13 +143,113 @@ class ScheduleDecision(_Frozen):
     reason: str | None = None
 
 
-class EscalationDecision(_Frozen):
-    """Human answer to an escalation (resume value of escalation_gate's interrupt)."""
+# ---- human decisions (resume values; validated by interrupt(response_schema=...) and the API)
+DecisionAction = Literal["approve", "edit", "reject", "take_over"]
 
-    action: Literal["approve", "edit", "reject"]
-    # edit: subtask_id -> replacement output
-    edits: dict[str, str] = Field(default_factory=dict)
-    note: str | None = None
+
+class _Decision(_Frozen):
+    note: str | None = Field(default=None, max_length=2000)
+
+
+def _needs(cond: bool, msg: str) -> None:
+    if not cond:
+        raise ValueError(msg)
+
+
+class EscalationDecision(_Decision):
+    """escalation_gate for needs_human subtasks."""
+
+    action: DecisionAction
+    edits: dict[str, str] = Field(default_factory=dict)  # edit: subtask_id -> replacement output
+    deliverable: str | None = Field(default=None, max_length=50_000)  # take_over
+
+    @model_validator(mode="after")
+    def _check(self) -> EscalationDecision:
+        if self.action == "edit":
+            _needs(bool(self.edits), "edit needs `edits`")
+        if self.action == "take_over":
+            _needs(bool(self.deliverable), "take_over needs `deliverable`")
+        return self
+
+
+class PlanDecision(_Decision):
+    """plan_gate (approve_plan)."""
+
+    action: DecisionAction
+    plan: Plan | None = None  # edit: the replacement plan (re-validated as a DAG)
+    deliverable: str | None = Field(default=None, max_length=50_000)  # take_over
+
+    @model_validator(mode="after")
+    def _check(self) -> PlanDecision:
+        if self.action == "edit":
+            _needs(self.plan is not None, "edit needs `plan`")
+        if self.action == "take_over":
+            _needs(bool(self.deliverable), "take_over needs `deliverable`")
+        return self
+
+
+class ActionDecision(_Decision):
+    """action_gate (approve_action). take_over = a human did it themselves (not executed)."""
+
+    action: DecisionAction
+    args: dict[str, Any] | None = None  # edit: replacement args (re-validated by the tool)
+
+    @model_validator(mode="after")
+    def _check(self) -> ActionDecision:
+        if self.action == "edit":
+            _needs(self.args is not None, "edit needs `args`")
+        return self
+
+
+class FinalDecision(_Decision):
+    """escalation_gate for a deliverable whose final review scored below threshold."""
+
+    action: DecisionAction
+    deliverable: str | None = Field(default=None, max_length=50_000)  # edit / take_over
+
+    @model_validator(mode="after")
+    def _check(self) -> FinalDecision:
+        if self.action in {"edit", "take_over"}:
+            _needs(bool(self.deliverable), f"{self.action} needs `deliverable`")
+        return self
+
+
+class BudgetDecision(_Decision):
+    """Worker-level pause when the ledger refuses a call (not a graph interrupt). approve raises
+    one or more limits; each given limit must be above the current one."""
+
+    action: Literal["approve", "reject"]
+    max_usd: float | None = Field(default=None, gt=0)
+    max_llm_calls: int | None = Field(default=None, gt=0)
+    max_tokens: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def _check(self) -> BudgetDecision:
+        if self.action == "approve":
+            _needs(
+                any(v is not None for v in (self.max_usd, self.max_llm_calls, self.max_tokens)),
+                "approve needs at least one raised limit (max_usd, max_llm_calls, max_tokens)",
+            )
+        return self
+
+
+class RecursionDecision(_Decision):
+    """Worker-level pause when the graph hits its recursion limit."""
+
+    action: Literal["approve", "reject", "take_over"]
+    deliverable: str | None = Field(default=None, max_length=50_000)
+
+    @model_validator(mode="after")
+    def _check(self) -> RecursionDecision:
+        if self.action == "take_over":
+            _needs(bool(self.deliverable), "take_over needs `deliverable`")
+        return self
+
+
+class SideEffectResolution(_Decision):
+    """Non-blocking inbox item for an action whose outcome is unknown. Records only."""
+
+    action: Literal["confirmed_done", "not_done"]
 
 
 class Escalation(_Frozen):
@@ -157,6 +286,26 @@ def merge_proposals(
     return out
 
 
+class ActionDecisionRecord(_Frozen):
+    hash: str
+    key: str  # approval key
+    decision: ActionDecision
+
+
+class ActionOutcome(_Frozen):
+    """What happened to one proposed action (ADR-004, ADR-037)."""
+
+    hash: str
+    tool: str
+    status: Literal["done", "failed", "unknown", "rejected", "human_done", "not_considered"]
+    idempotency_key: str | None = None
+    detail: str | None = None
+
+
+def merge_by_key(left: dict[str, Any] | None, right: dict[str, Any] | None) -> dict[str, Any]:
+    return {**(left or {}), **(right or {})}
+
+
 class Outcome(_Frozen):
     status: TerminalStatus
     reason: str | None = None
@@ -176,16 +325,26 @@ class TaskState(TypedDict, total=False):
     plan: Plan | None
     plan_attempts: int
     plan_rejections: list[PlanRejection]
+    plan_confidence: PlanConfidence | None
+    plan_decision: PlanDecision | None
+    memory_similarity: float  # best recalled-memory similarity (set by recall; 0 if none)
+    memories: list[MemoryHit]
+    memories_written: int
     results: Annotated[dict[str, SubtaskResult], merge_results]
     reviews: Annotated[list[Review], operator.add]
     wave: int
     decision: ScheduleDecision | None
     escalations: Annotated[list[Escalation], operator.add]
     proposed_actions: Annotated[dict[str, ProposedAction], merge_proposals]
+    action_decisions: Annotated[dict[str, ActionDecisionRecord], merge_by_key]
+    action_outcomes: Annotated[dict[str, ActionOutcome], merge_by_key]
     failure_reason: str | None
     final: str | None
     partial: bool
     final_review: ReviewVerdict | None
+    final_review_failed: bool
+    last_gate_action: str | None
+    final_decisions: Annotated[list[FinalDecision], operator.add]
     outcome: Outcome | None
 
 
@@ -237,20 +396,31 @@ class RunContext:
     engine: AsyncEngine
     model: ModelClient | None = None  # None only for the demo graph
     tools: ToolRegistry | None = None  # None only for the demo graph
+    memory: MemoryService | None = None  # None only for the demo graph
     owner_id: uuid.UUID | None = None  # rate-limit key; set by the worker
 
 
 CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (
     Subtask,
     Plan,
+    MemoryHit,
+    PlanConfidence,
     PlanRejection,
     ReviewVerdict,
     Review,
     SubtaskResult,
     ScheduleDecision,
     EscalationDecision,
+    PlanDecision,
+    ActionDecision,
+    FinalDecision,
+    BudgetDecision,
+    RecursionDecision,
+    SideEffectResolution,
     Escalation,
     ProposedAction,
+    ActionDecisionRecord,
+    ActionOutcome,
     ToolLogEntry,
     AttemptRecord,
     Outcome,

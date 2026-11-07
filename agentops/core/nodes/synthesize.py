@@ -15,25 +15,48 @@ from langgraph.runtime import Runtime
 
 from agentops.core import prompts
 from agentops.core.nodes.common import model_of, node_event
-from agentops.core.state import Outcome, Plan, RunContext, SubtaskResult, TaskState
+from agentops.core.state import (
+    ActionOutcome,
+    Outcome,
+    Plan,
+    RunContext,
+    SubtaskResult,
+    TaskState,
+)
 from agentops.models.client import ModelCallError
 
+OK_ACTION = frozenset({"done", "human_done"})
 
-def missing_section(plan: Plan, results: dict[str, SubtaskResult]) -> str:
+
+def unperformed_actions(state: TaskState) -> list[ActionOutcome]:
+    """Approved-or-not actions that did not end done (by us or by a human)."""
+    outcomes = state.get("action_outcomes", {}) or {}
+    return [o for _, o in sorted(outcomes.items()) if o.status not in OK_ACTION]
+
+
+def missing_section(
+    plan: Plan, results: dict[str, SubtaskResult], actions: list[ActionOutcome] | None = None
+) -> str:
     lines = ["## What's missing", ""]
-    lines.append(
-        "This is a partial deliverable. These subtasks did not complete, so their parts "
-        "are not included:"
-    )
-    lines.append("")
-    for s in plan.subtasks:
-        r = results.get(s.id)
-        if r is None or r.status == "accepted":
-            continue
+    gaps = [s for s in plan.subtasks if (r := results.get(s.id)) is None or r.status != "accepted"]
+    if gaps:
         lines.append(
-            f"- **{s.id}** ({r.status}): {r.reason or 'no reason recorded'}. "
-            f"Missing: {s.expected_output}"
+            "This is a partial deliverable. These subtasks did not complete, so their parts "
+            "are not included:"
         )
+        lines.append("")
+        for s in gaps:
+            r = results.get(s.id)
+            status = r.status if r else "not run"
+            reason = (r.reason if r else None) or "no reason recorded"
+            lines.append(f"- **{s.id}** ({status}): {reason}. Missing: {s.expected_output}")
+    if actions:
+        if gaps:
+            lines.append("")
+        lines.append("These proposed actions were not performed:")
+        lines.append("")
+        for o in actions:
+            lines.append(f"- `{o.tool}` ({o.status}): {o.detail or 'no detail'}")
     return "\n".join(lines)
 
 
@@ -41,8 +64,11 @@ async def synthesize(state: TaskState, runtime: Runtime[RunContext]) -> dict[str
     plan = state.get("plan")
     assert plan is not None
     results = state.get("results", {})
-    partial = any(r.status != "accepted" for r in results.values()) or len(results) < len(
-        plan.subtasks
+    actions = unperformed_actions(state)
+    partial = (
+        any(r.status != "accepted" for r in results.values())
+        or len(results) < len(plan.subtasks)
+        or bool(actions)
     )
     await node_event(runtime, "synthesize", "started", payload={"partial": partial})
     outputs = {sid: r.output or "" for sid, r in results.items() if r.status == "accepted"}
@@ -55,16 +81,37 @@ async def synthesize(state: TaskState, runtime: Runtime[RunContext]) -> dict[str
         reason = f"synthesis failed: {exc}"
         return {"failure_reason": reason, "outcome": Outcome(status="failed", reason=reason)}
     body: str = str(res.message.text)
-    final = f"{body.rstrip()}\n\n{missing_section(plan, results)}\n" if partial else body
+    final = f"{body.rstrip()}\n\n{missing_section(plan, results, actions)}\n" if partial else body
     await node_event(
         runtime, "synthesize", "completed", payload={"chars": len(final), "partial": partial}
     )
-    if partial:
-        return {"final": final, "partial": True}
-    return {"final": final, "partial": False, "outcome": Outcome(status="completed")}
+    return {"final": final, "partial": partial}
 
 
-def after_synthesize(state: TaskState) -> Literal["final_review", "__end__"]:
+def delivery_outcome(state: TaskState, *, note: str | None = None) -> Outcome:
+    """completed if every subtask was accepted and every action done; otherwise
+    completed_partial with what's missing (ADR-029, ADR-037)."""
+    plan = state.get("plan")
+    results = state.get("results", {})
+    gaps = [
+        sid
+        for sid in ([s.id for s in plan.subtasks] if plan else [])
+        if (r := results.get(sid)) is None or r.status != "accepted"
+    ]
+    actions = unperformed_actions(state)
+    if not gaps and not actions:
+        return Outcome(status="completed", reason=note)
+    parts = []
+    if gaps:
+        parts.append(f"subtask(s) {gaps} did not complete")
+    if actions:
+        parts.append(f"actions not performed: {[f'{a.tool} ({a.status})' for a in actions]}")
+    if note:
+        parts.append(note)
+    return Outcome(status="completed_partial", reason="; ".join(parts))
+
+
+def after_synthesize(state: TaskState) -> Literal["final_review", "consolidate"]:
     if state.get("outcome") is not None:
-        return "__end__"
+        return "consolidate"
     return "final_review"

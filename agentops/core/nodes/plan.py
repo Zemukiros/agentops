@@ -26,6 +26,7 @@ async def plan(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]
         specialists=sorted(scheduler.ENABLED_SPECIALISTS),
         max_subtasks=scheduler.MAX_SUBTASKS,
         previous=previous,
+        memories=state.get("memories") or [],
     )
     try:
         res = await model_of(runtime).invoke(
@@ -70,12 +71,26 @@ async def plan(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]
         type_="plan.created",
         payload={"attempt": attempt, "plan": candidate.model_dump()},
     )
-    return {"plan_attempts": attempt, "plan": candidate}
+    confidence = scheduler.plan_confidence(
+        candidate,
+        memory_similarity=state.get("memory_similarity") or 0.0,
+        threshold=model_of(runtime).settings.plan_confidence_threshold,
+    )
+    # Computed (and evented) here, so plan_gate does only pure work before interrupt().
+    await node_event(
+        runtime,
+        "plan",
+        "confidence",
+        f"p{attempt}",
+        type_="plan.confidence",
+        payload={**confidence.model_dump(), "needs_approval": confidence.needs_approval},
+    )
+    return {"plan_attempts": attempt, "plan": candidate, "plan_confidence": confidence}
 
 
-def after_plan(state: TaskState) -> Literal["plan", "schedule", "finalize_failed"]:
+def after_plan(state: TaskState) -> Literal["plan", "plan_gate", "finalize_failed"]:
     if state.get("plan") is not None:
-        return "schedule"
+        return "plan_gate"
     if state.get("failure_reason") or state.get("plan_attempts", 0) >= MAX_PLAN_ATTEMPTS:
         return "finalize_failed"
     return "plan"

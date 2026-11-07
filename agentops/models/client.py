@@ -34,6 +34,8 @@ from agentops.models.fake import REASK, FakeScript, ScriptedChatModel
 from agentops.observability.events import emit_on
 from agentops.settings import LLMMode, RoleModel, Settings
 
+BUDGET_WARNING_FRACTION = 0.8
+
 
 class ChatFactory(Protocol):
     def __call__(self, role: str, purpose: str, cfg: RoleModel) -> BaseChatModel: ...
@@ -247,7 +249,30 @@ class ModelClient:
             response=raw,
         )
         await self._ledger.settle(reservation, usd=cost, tokens=in_tok + out_tok)
+        await self._warn_if_near_limit(task_id)
         return _Attempt(raw=raw, parsed=parsed, error=error, tokens=in_tok + out_tok, usd=cost)
+
+    async def _warn_if_near_limit(self, task_id: uuid.UUID) -> None:
+        """One `budget.warning` event per task when spend first reaches 80% of any limit."""
+        snap = await self._ledger.snapshot(task_id)
+        if snap.fraction_used < BUDGET_WARNING_FRACTION:
+            return
+        async with self._sessionmaker() as s, s.begin():
+            await emit_on(
+                await s.connection(),
+                task_id,
+                "budget.warning",
+                payload={
+                    "fraction_used": round(snap.fraction_used, 4),
+                    "usd_used": snap.usd_used,
+                    "max_usd": snap.max_usd,
+                    "llm_calls": snap.llm_calls,
+                    "max_llm_calls": snap.max_llm_calls,
+                    "tokens_used": snap.tokens_used,
+                    "max_tokens": snap.max_tokens,
+                },
+                dedupe_key="budget:warning:80",
+            )
 
     async def _record(
         self,

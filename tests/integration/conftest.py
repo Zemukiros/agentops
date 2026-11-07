@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from agentops.api.auth import hash_token
 from agentops.api.main import create_app
 from agentops.core.budget import open_budget_on
+from agentops.core.testhooks import TEST_HOOK_ENV
 from agentops.db.session import get_sessionmaker, make_engine
 from agentops.settings import Budget, get_settings
 
@@ -161,3 +163,134 @@ def parse_sse(body: str) -> list[dict]:
         if data:
             events.append(json.loads("".join(data)))
     return events
+
+
+async def graph_state_values(tid: uuid.UUID) -> dict:
+    """The main graph's current state for a task (e.g. proposals while paused at action_gate)."""
+    from agentops.core.graph import build_main_graph  # noqa: PLC0415
+    from agentops.db.checkpointer import open_checkpointer  # noqa: PLC0415
+
+    async with open_checkpointer(get_settings().libpq_dsn, max_size=1) as saver:
+        snap = await build_main_graph(saver).aget_state({"configurable": {"thread_id": str(tid)}})
+    return dict(snap.values)
+
+
+async def pending_approvals(engine: AsyncEngine, tid: uuid.UUID) -> list[tuple[str, str]]:
+    async with engine.connect() as c:
+        rows = await c.execute(
+            text(
+                "SELECT level, key FROM approvals WHERE task_id=:t AND status='pending' "
+                "ORDER BY key"
+            ),
+            {"t": tid},
+        )
+        return [(r[0], r[1]) for r in rows]
+
+
+async def work(
+    engine: AsyncEngine,
+    saver: object,
+    *,
+    settings: object | None = None,
+    chat_factory: object | None = None,
+    tools: object | None = None,
+) -> None:
+    """Let an in-process worker handle the next queued job."""
+    from agentops.queue import jobs  # noqa: PLC0415
+    from agentops.queue.worker import Worker  # noqa: PLC0415
+
+    s = settings or get_settings()
+    job = await jobs.claim(engine, "w-conftest", s.job_lease_seconds)  # type: ignore[attr-defined]
+    assert job is not None, "no job queued"
+    w = Worker(s, engine, saver, "w-conftest", chat_factory=chat_factory, tools=tools)  # type: ignore[arg-type]
+    await w.process(job)
+
+
+async def decide(
+    engine: AsyncEngine, tid: uuid.UUID, kind: str, raw: dict, user_id: uuid.UUID | None = None
+) -> dict:
+    """Decide the task's pending approval of `kind` exactly as the API does."""
+    from agentops import approvals  # noqa: PLC0415
+
+    async with engine.connect() as c:
+        row = (
+            await c.execute(
+                text(
+                    "SELECT id, version, payload FROM approvals WHERE task_id=:t AND level=:k "
+                    "AND status='pending'"
+                ),
+                {"t": tid, "k": kind},
+            )
+        ).one()
+    decision = approvals.validate_decision(kind, raw, dict(row.payload), get_settings())
+    status = approvals.STATUS_FOR_ACTION[decision["action"]]
+    async with engine.begin() as c:
+        won = await approvals.decide(
+            c,
+            row.id,
+            expected_version=row.version,
+            decision=decision,
+            status=status,
+            decided_by=user_id,
+        )
+        assert won is not None
+        await approvals.apply(c, won, decision, status)
+    return decision
+
+
+# ---- worker subprocesses + crash hooks (durability tests) ----------------------------------
+LEASE_S = 2.0
+
+
+@pytest.fixture
+def hook_dir(tmp_path: Path) -> Path:
+    return tmp_path
+
+
+@pytest.fixture
+def spawn(hook_dir: Path) -> Iterator:
+    procs: list[subprocess.Popen] = []
+
+    def _spawn(worker_id: str, *extra: str, env_extra: dict | None = None) -> subprocess.Popen:
+        env = {
+            **os.environ,
+            **(env_extra or {}),
+            TEST_HOOK_ENV: str(hook_dir),
+            "JOB_LEASE_SECONDS": str(LEASE_S),
+            "JOB_HEARTBEAT_SECONDS": "0.5",
+            "JOB_POLL_SECONDS": "0.1",
+            "LOG_LEVEL": "INFO",
+        }
+        p = subprocess.Popen(
+            [sys.executable, "-m", "agentops.queue.worker", "--worker-id", worker_id, *extra],
+            cwd=ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        procs.append(p)
+        return p
+
+    yield _spawn
+    for p in procs:
+        if p.poll() is None:
+            p.kill()
+        p.wait(10)
+
+
+def wait_for(path: Path, proc: subprocess.Popen, timeout: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not path.exists():
+        if proc.poll() is not None:
+            out = proc.stdout.read() if proc.stdout else ""
+            pytest.fail(f"worker exited early ({proc.returncode}):\n{out}")
+        if time.monotonic() > deadline:
+            pytest.fail(f"timed out waiting for {path.name}")
+        time.sleep(0.05)
+
+
+def finish(proc: subprocess.Popen, timeout: float = 30.0) -> str:
+    out, _ = proc.communicate(timeout=timeout)
+    assert proc.returncode == 0, out
+    return out

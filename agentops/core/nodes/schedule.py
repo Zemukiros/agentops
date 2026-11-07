@@ -100,6 +100,6 @@ def route_schedule(state: TaskState) -> list[Send] | str:
     return {
         "escalate": "escalation_gate",
         "fail": "finalize_failed",
-        "all_accepted": "synthesize",
-        "partial": "synthesize",
+        "all_accepted": "action_gate",
+        "partial": "action_gate",
     }[decision.kind]

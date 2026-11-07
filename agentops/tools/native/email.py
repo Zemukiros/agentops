@@ -60,5 +60,6 @@ EMAIL_TOOLS = [
         scope="outside",
         timeout_s=20,
         rate_per_min=10,
+        meta={"idempotency_kw": "message_id"},  # the side_effects key becomes the Message-ID
     ),
 ]

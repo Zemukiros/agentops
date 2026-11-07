@@ -21,6 +21,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -304,6 +305,7 @@ class ToolCall(Base):
     revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     step: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tool_call_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    output_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _now()
     __table_args__ = (Index("ix_tool_calls_task", "task_id"),)
 
@@ -335,7 +337,19 @@ class Approval(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    __table_args__ = (Index("ix_approvals_status", "status", "created_at"),)
+    # Phase 4 (ADR-035): semantic key, stable across node re-runs -> one row per decision point
+    key: Mapped[str] = mapped_column(String(120))
+    source: Mapped[str] = mapped_column(String(8), server_default="graph")  # graph | worker
+    blocking: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    __table_args__ = (
+        Index("ix_approvals_status", "status", "created_at"),
+        UniqueConstraint("task_id", "key", name="uq_approvals_task_key"),
+        Index(
+            "ix_approvals_pending_expiry",
+            "expires_at",
+            postgresql_where=text("status = 'pending' AND blocking"),
+        ),
+    )
 
 
 class SideEffect(Base):
@@ -349,6 +363,10 @@ class SideEffect(Base):
     result: Mapped[dict[str, Any] | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = _now()
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    tool: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    args: Mapped[dict[str, Any] | None] = mapped_column(nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = _now()
 
 
 class Memory(Base):
@@ -361,11 +379,12 @@ class Memory(Base):
     text: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
     task_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    outcome: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_task_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
     superseded: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    importance: Mapped[float] = mapped_column(Float, server_default="0.5")
     access_count: Mapped[int] = mapped_column(Integer, server_default="0")
     created_at: Mapped[datetime] = _now()
     last_accessed_at: Mapped[datetime | None] = mapped_column(

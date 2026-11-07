@@ -1,20 +1,19 @@
-"""final_review: the reviewer scores a partial deliverable (ADR-029).
+"""final_review: the reviewer scores every deliverable (ADR-029 as amended in Phase 4).
 
-score >= FINAL_REVIEW_MIN_SCORE -> completed_partial; otherwise (or if the review call fails)
--> failed. The deliverable is kept in the result either way, for inspection.
-
-Phase 3 runs this only for partial deliverables. The DECISIONS graph also reviews complete
-deliverables (low score -> escalation); that arrives with the Phase 4 gates.
+score >= FINAL_REVIEW_MIN_SCORE -> completed (or completed_partial if subtasks or actions are
+missing). Below it -> escalation_gate in final-review mode: a human approves, edits, takes
+over or rejects. A failed review call -> failed.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from langgraph.runtime import Runtime
 
 from agentops.core import prompts
 from agentops.core.nodes.common import model_of, node_event
+from agentops.core.nodes.synthesize import delivery_outcome
 from agentops.core.state import Outcome, ReviewVerdict, RunContext, TaskState
 from agentops.models.client import ModelCallError
 
@@ -24,7 +23,9 @@ async def final_review(state: TaskState, runtime: Runtime[RunContext]) -> dict[s
     assert plan is not None
     model = model_of(runtime)
     threshold = model.settings.final_review_min_score
-    msgs = prompts.final_review_messages(state["request"], plan, state.get("final") or "")
+    msgs = prompts.final_review_messages(
+        state["request"], plan, state.get("final") or "", partial=bool(state.get("partial"))
+    )
     try:
         res = await model.invoke(
             "reviewer",
@@ -45,13 +46,14 @@ async def final_review(state: TaskState, runtime: Runtime[RunContext]) -> dict[s
         type_="final_review.verdict",
         payload={**verdict.model_dump(), "threshold": threshold},
     )
-    decision = state.get("decision")
-    missing = (decision.reason if decision is not None else None) or "partial deliverable"
     if verdict.score >= threshold:
-        outcome = Outcome(status="completed_partial", reason=missing)
-    else:
-        outcome = Outcome(
-            status="failed",
-            reason=f"partial deliverable scored {verdict.score}/5, below {threshold}; {missing}",
-        )
-    return {"final_review": verdict, "outcome": outcome}
+        return {
+            "final_review": verdict,
+            "final_review_failed": False,
+            "outcome": delivery_outcome(state),
+        }
+    return {"final_review": verdict, "final_review_failed": True}
+
+
+def after_final_review(state: TaskState) -> Literal["escalation_gate", "consolidate"]:
+    return "escalation_gate" if state.get("final_review_failed") else "consolidate"

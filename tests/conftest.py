@@ -19,5 +19,7 @@ os.environ["WORKSPACE_ROOT"] = os.path.join(_TMP, "workspaces")
 os.environ.pop("WORKSPACE_HOST_ROOT", None)
 os.environ["MCP_DATA_DIR"] = os.path.join(_TMP, "mcp")
 os.environ["MCP_SERVERS"] = ""
+# Deterministic bag-of-words embeddings; the real fastembed model is exercised by e2e/model tests.
+os.environ["EMBEDDING_MODE"] = "hash"
 for _k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TAVILY_API_KEY"):
     os.environ.pop(_k, None)

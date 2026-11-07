@@ -62,7 +62,7 @@ async def test_full_slice_streams_to_completion(
     ]
     it = iter(types)
     assert all(t in it for t in order), types
-    assert types.count("llm.call") == 6
+    assert types.count("llm.call") == 8  # incl. final review and memory consolidation
 
     final = (await client.get(f"/tasks/{task['id']}", headers=alice.headers)).json()
     assert final["status"] == "completed"

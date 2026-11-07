@@ -16,6 +16,7 @@ from langgraph.graph import END, START, StateGraph
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from agentops import approvals
 from agentops.core import graph as graph_mod
 from agentops.core import prompts
 from agentops.core.graph import GraphSpec, build_main_graph
@@ -55,6 +56,45 @@ async def run_job(
     job = await jobs.claim(engine, "w-test", s.job_lease_seconds)
     assert job is not None
     await worker.process(job)
+
+
+async def process_next(engine: AsyncEngine, saver: Any, settings: Settings | None = None) -> None:
+    """Let an in-process worker handle the next queued job (e.g. a decision's resume)."""
+    s = settings or get_settings()
+    job = await jobs.claim(engine, "w-test", s.job_lease_seconds)
+    assert job is not None, "no job queued"
+    await Worker(s, engine, saver, "w-test").process(job)
+
+
+async def decide_pending(
+    engine: AsyncEngine, tid: uuid.UUID, kind: str, raw: dict, user_id: uuid.UUID | None = None
+) -> dict:
+    """Decide the task's pending approval of `kind` exactly as the API does (validate, then the
+    version-checked decide + apply in one transaction)."""
+    async with engine.connect() as c:
+        row = (
+            await c.execute(
+                text(
+                    "SELECT id, version, payload FROM approvals WHERE task_id=:t AND level=:k "
+                    "AND status='pending'"
+                ),
+                {"t": tid, "k": kind},
+            )
+        ).one()
+    decision = approvals.validate_decision(kind, raw, dict(row.payload), get_settings())
+    status = approvals.STATUS_FOR_ACTION[decision["action"]]
+    async with engine.begin() as c:
+        won = await approvals.decide(
+            c,
+            row.id,
+            expected_version=row.version,
+            decision=decision,
+            status=status,
+            decided_by=user_id,
+        )
+        assert won is not None
+        await approvals.apply(c, won, decision, status)
+    return decision
 
 
 async def new_task(
@@ -130,12 +170,14 @@ async def test_default_completes_with_final_output(
     t = await task_row(engine, tid)
     assert t["result"]["final"].startswith("Final deliverable")
     assert t["result"]["subtasks"]["draft"]["status"] == "accepted"
-    assert t["result"]["budget"]["llm_calls"] == 4
+    assert t["result"]["budget"]["llm_calls"] == 6  # + consolidate
     assert await calls(engine, tid) == [
         ("supervisor", "plan", 1, True),
         ("writing", "act", 1, True),
         ("reviewer", "review", 1, True),
         ("supervisor", "synthesize", 1, True),
+        ("reviewer", "final_review", 1, True),
+        ("supervisor", "consolidate", 1, True),
     ]
     ev = await event_types(engine, tid)
     for expected in ("plan.created", "subtask.dispatched", "review.verdict", "subtask.finished"):
@@ -149,7 +191,16 @@ async def test_revise_once_then_accept(engine: AsyncEngine, saver: Any, alice: S
     sub = (await task_row(engine, tid))["result"]["subtasks"]["draft"]
     assert (sub["status"], sub["revisions"]) == ("accepted", 1)
     purposes = [p for _, p, _, _ in await calls(engine, tid)]
-    assert purposes == ["plan", "act", "review", "act", "review", "synthesize"]
+    assert purposes == [
+        "plan",
+        "act",
+        "review",
+        "act",
+        "review",
+        "synthesize",
+        "final_review",
+        "consolidate",
+    ]
     verdicts = await rows(
         engine,
         "SELECT payload->>'verdict', (payload->>'revision')::int FROM events "
@@ -200,7 +251,8 @@ async def test_two_invalid_plans_fail(engine: AsyncEngine, saver: Any, alice: Se
     t = await task_row(engine, tid)
     assert "no valid plan after 2 attempts" in t["error"]
     assert "unknown ids ['ghost']" in t["error"]  # the second plan's error
-    assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "plan"]  # no more spend
+    # no more work after two invalid plans; only the memory of the failure is consolidated
+    assert [p for _, p, _, _ in await calls(engine, tid)] == ["plan", "plan", "consolidate"]
 
 
 async def test_specialist_error_fails_the_subtask_and_the_run(
@@ -216,19 +268,44 @@ async def test_specialist_error_fails_the_subtask_and_the_run(
     assert writing == [(1, False), (2, False), (3, False)]  # every retry recorded
 
 
-async def test_budget_exhaustion_ends_budget_exceeded(
+async def test_budget_exhaustion_pauses_then_reject_ends_budget_exceeded(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "default", budget=Budget(max_llm_calls=2))
     await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"  # not a terminal: a reviewer decides
+    need = t["result"]["approval_required"]
+    assert need["kind"] == "budget" and "llm call limit" in need["reason"]
+    assert len(await calls(engine, tid)) == 2  # the third call was never made
+    await decide_pending(engine, tid, "budget", {"action": "reject"})
+    await process_next(engine, saver)
     await assert_single_terminal(engine, tid, "budget_exceeded")
     t = await task_row(engine, tid)
-    assert "llm call limit" in t["error"]
-    assert t["result"]["budget"]["llm_calls"] == 2
-    assert len(await calls(engine, tid)) == 2  # the third call was never made
+    assert "rejected" in t["error"] and t["result"]["budget"]["llm_calls"] == 2
 
 
-async def test_recursion_limit_ends_failed(
+async def test_budget_raise_continues_from_the_checkpoint(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default", budget=Budget(max_llm_calls=2))
+    await run_job(engine, saver, tid)
+    with pytest.raises(approvals.DecisionError, match="above the current limit"):
+        approvals.validate_decision(
+            "budget",
+            {"action": "approve", "max_llm_calls": 2},
+            {"max_llm_calls": 2},
+            get_settings(),
+        )
+    await decide_pending(engine, tid, "budget", {"action": "approve", "max_llm_calls": 20})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    base = [p for _, p, _, _ in await calls(engine, tid)]
+    assert base.count("plan") == 1  # continued from the checkpoint, not restarted
+    assert "budget.raised" in await event_types(engine, tid)
+
+
+async def test_recursion_limit_pauses_for_take_over(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "default")
@@ -236,8 +313,41 @@ async def test_recursion_limit_ends_failed(
         update={"budget": get_settings().budget.model_copy(update={"recursion_limit": 3})}
     )
     await run_job(engine, saver, tid, settings=tight)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"  # not a crash
+    assert t["result"]["approval_required"]["kind"] == "recursion"
+    await decide_pending(
+        engine, tid, "recursion", {"action": "take_over", "deliverable": "Human-written answer."}
+    )
+    await process_next(engine, saver, tight)
+    await assert_single_terminal(engine, tid, "completed")
+    r = (await task_row(engine, tid))["result"]
+    assert r["final"] == "Human-written answer." and r["taken_over"] is True
+
+
+async def test_recursion_limit_continue_then_reject(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default")
+    tight = get_settings().model_copy(
+        update={"budget": get_settings().budget.model_copy(update={"recursion_limit": 3})}
+    )
+    await run_job(engine, saver, tid, settings=tight)
+    await decide_pending(engine, tid, "recursion", {"action": "approve"})
+    await process_next(engine, saver, tight)  # continues 3 more steps, pauses again
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    async with engine.connect() as c:
+        keys = [
+            r[0]
+            for r in await c.execute(
+                text("SELECT key FROM approvals WHERE task_id=:t ORDER BY created_at"), {"t": tid}
+            )
+        ]
+    assert keys == ["recursion:x1", "recursion:x2"]
+    await decide_pending(engine, tid, "recursion", {"action": "reject"})
+    await process_next(engine, saver, tight)
     await assert_single_terminal(engine, tid, "failed")
-    assert "recursion limit" in (await task_row(engine, tid))["error"]
 
 
 async def test_graph_without_outcome_is_marked_failed(
@@ -413,15 +523,40 @@ async def test_partial_result_completed_partial(
     assert base.count("synthesize") == 1 and base.count("final_review") == 1
 
 
-async def test_partial_result_below_threshold_fails(
+async def test_partial_below_threshold_escalates_then_reject(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    """ADR-029 as amended in Phase 4: a low final review escalates instead of failing."""
+    tid = await new_task(engine, alice, "partial_low_score")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    [intr] = t["result"]["interrupts"]
+    v = intr["value"]
+    assert (v["kind"], v["key"], v["partial"], v["review"]["score"]) == (
+        "final_review",
+        "final:f1",
+        True,
+        2,
+    )
+    assert "## What's missing" in v["deliverable"]
+    await decide_pending(engine, tid, "final_review", {"action": "reject", "note": "not useful"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "rejected")
+
+
+async def test_partial_below_threshold_human_accepts(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "partial_low_score")
     await run_job(engine, saver, tid)
-    await assert_single_terminal(engine, tid, "failed")
-    t = await task_row(engine, tid)
-    assert "partial deliverable scored 2/5, below 3" in t["error"]
-    assert "## What's missing" in t["result"]["final"]  # kept for inspection
+    await decide_pending(engine, tid, "final_review", {"action": "approve"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed_partial")
+    assert (
+        "accepted by a human after a final review score of 2/5"
+        in (await task_row(engine, tid))["error"]
+    )
 
 
 async def test_nothing_usable_fails_without_synthesis(
@@ -434,14 +569,56 @@ async def test_nothing_usable_fails_without_synthesis(
     assert "synthesize" not in base and "final_review" not in base
 
 
-async def test_complete_runs_skip_final_review(
+async def test_complete_runs_are_final_reviewed_too(
     engine: AsyncEngine, saver: Any, alice: SeededUser
 ) -> None:
     tid = await new_task(engine, alice, "default")
     await run_job(engine, saver, tid)
     t = await task_row(engine, tid)
-    assert t["result"]["partial"] is False and t["result"]["final_review"] is None
+    assert t["status"] == "completed" and t["result"]["partial"] is False
+    assert t["result"]["final_review"]["score"] == 4
     assert "## What's missing" not in t["result"]["final"]
+
+
+@pytest.mark.parametrize(
+    ("decision", "status", "final"),
+    [
+        (
+            {"action": "approve"},
+            "completed",
+            "Final deliverable: the summary, with a concrete example.",
+        ),
+        (
+            {"action": "edit", "deliverable": "Human-polished deliverable."},
+            "completed",
+            "Human-polished deliverable.",
+        ),
+        (
+            {"action": "take_over", "deliverable": "Written by a human."},
+            "completed",
+            "Written by a human.",
+        ),
+        ({"action": "reject"}, "rejected", None),
+    ],
+)
+async def test_low_final_review_escalates_for_complete_deliverables(
+    engine: AsyncEngine,
+    saver: Any,
+    alice: SeededUser,
+    decision: dict,
+    status: str,
+    final: str | None,
+) -> None:
+    tid = await new_task(engine, alice, "final_low")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    assert t["result"]["interrupts"][0]["value"]["partial"] is False
+    await decide_pending(engine, tid, "final_review", decision)
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, status)
+    if final is not None:
+        assert (await task_row(engine, tid))["result"]["final"] == final
 
 
 async def test_failure_plus_escalation_then_approve_is_partial(
@@ -457,3 +634,110 @@ async def test_failure_plus_escalation_then_approve_is_partial(
     await assert_single_terminal(engine, tid, "completed_partial")
     subs = (await task_row(engine, tid))["result"]["subtasks"]
     assert subs["intro"]["human_override"] is True and subs["summary"]["status"] == "blocked"
+
+
+# ---- plan_gate (ADR-036) -------------------------------------------------------------------
+async def test_confident_plans_pass_without_approval(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default")
+    await run_job(engine, saver, tid)
+    await assert_single_terminal(engine, tid, "completed")
+    async with engine.connect() as c:
+        n = (
+            await c.execute(text("SELECT count(*) FROM approvals WHERE task_id=:t"), {"t": tid})
+        ).scalar_one()
+        conf = (
+            await c.execute(
+                text("SELECT payload FROM events WHERE task_id=:t AND type='plan.confidence'"),
+                {"t": tid},
+            )
+        ).scalar_one()
+    assert n == 0 and conf["needs_approval"] is False and conf["effective"] == 0.8
+
+
+async def _low_plan(engine: AsyncEngine, saver: Any, user: SeededUser) -> uuid.UUID:
+    tid = await new_task(engine, user, "low_confidence_plan")
+    await run_job(engine, saver, tid)
+    t = await task_row(engine, tid)
+    assert t["status"] == "awaiting_approval"
+    [intr] = t["result"]["interrupts"]
+    assert intr["value"]["kind"] == "approve_plan" and intr["value"]["key"] == "plan:p1"
+    assert intr["value"]["confidence"]["effective"] == 0.3
+    return tid
+
+
+async def test_plan_gate_approve(engine: AsyncEngine, saver: Any, alice: SeededUser) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    await decide_pending(engine, tid, "approve_plan", {"action": "approve"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    assert [p for _, p, _, _ in await calls(engine, tid)].count("act") == 1
+
+
+async def test_plan_gate_edit_runs_the_edited_plan(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    sub = {"description": "d", "specialist": "writing", "expected_output": "e", "complexity": "low"}
+    edited = {
+        "subtasks": [{"id": "one", **sub}, {"id": "two", "depends_on": ["one"], **sub}],
+        "confidence": 0.9,
+        "rationale": "human edit",
+    }
+    with pytest.raises(approvals.DecisionError, match="cycle"):
+        cyclic = {
+            **edited,
+            "subtasks": [
+                {"id": "one", "depends_on": ["two"], **sub},
+                {"id": "two", "depends_on": ["one"], **sub},
+            ],
+        }
+        approvals.validate_decision(
+            "approve_plan", {"action": "edit", "plan": cyclic}, {}, get_settings()
+        )
+    await decide_pending(engine, tid, "approve_plan", {"action": "edit", "plan": edited})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    assert set((await task_row(engine, tid))["result"]["subtasks"]) == {"one", "two"}
+
+
+async def test_plan_gate_reject(engine: AsyncEngine, saver: Any, alice: SeededUser) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    await decide_pending(engine, tid, "approve_plan", {"action": "reject", "note": "too vague"})
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "rejected")
+    assert (await task_row(engine, tid))["error"] == "too vague"
+    assert "act" not in [p for _, p, _, _ in await calls(engine, tid)]
+
+
+async def test_plan_gate_take_over(engine: AsyncEngine, saver: Any, alice: SeededUser) -> None:
+    tid = await _low_plan(engine, saver, alice)
+    await decide_pending(
+        engine, tid, "approve_plan", {"action": "take_over", "deliverable": "I wrote it myself."}
+    )
+    await process_next(engine, saver)
+    await assert_single_terminal(engine, tid, "completed")
+    t = await task_row(engine, tid)
+    assert t["result"]["final"] == "I wrote it myself."
+
+
+async def test_budget_warning_fires_once_at_80_percent(
+    engine: AsyncEngine, saver: Any, alice: SeededUser
+) -> None:
+    tid = await new_task(engine, alice, "default", budget=Budget(max_llm_calls=5))
+    await run_job(engine, saver, tid)  # 5 calls: plan, act, review, synthesize, final_review
+    await assert_single_terminal(engine, tid, "completed")
+    async with engine.connect() as c:
+        warnings = (
+            (
+                await c.execute(
+                    text("SELECT payload FROM events WHERE task_id=:t AND type='budget.warning'"),
+                    {"t": tid},
+                )
+            )
+            .scalars()
+            .all()
+        )
+    [w] = warnings  # once, although calls 4 and 5 are both >= 80%
+    assert w["llm_calls"] == 4 and w["fraction_used"] == 0.8

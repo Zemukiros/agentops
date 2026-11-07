@@ -29,7 +29,7 @@ from sqlalchemy import text
 
 from agentops.core.state import ProposedAction
 from agentops.observability.events import emit_on
-from agentops.tools.framing import frame, sanitize, truncate
+from agentops.tools.framing import MAX_RESULT_CHARS, frame, sanitize, truncate
 from agentops.tools.ratelimit import try_take
 from agentops.tools.spec import ToolContext, ToolOutput, ToolSpec
 
@@ -183,6 +183,52 @@ class ToolRegistry:
         )
         return inv
 
+    async def execute_approved(
+        self,
+        name: str,
+        args: dict[str, Any],
+        ctx: ToolContext,
+        *,
+        idempotency_key: str,
+    ) -> ToolOutput:
+        """Run an action a human approved (ADR-004). Only `execute_actions` calls this, after
+        it inserted the side_effects row. Args are re-validated with the tool's input model
+        (they may have been edited). Tools that accept an idempotency key get it (email:
+        Message-ID). Raises on failure; the caller records it."""
+        spec = self._specs.get(name)
+        if spec is None:
+            raise LookupError(f"tool {name!r} is not registered in this worker")
+        parsed = spec.input_model.model_validate(args)
+        started = time.perf_counter()
+        kw: dict[str, Any] = {}
+        if spec.meta.get("idempotency_kw"):
+            kw[spec.meta["idempotency_kw"]] = idempotency_key
+        try:
+            out = await asyncio.wait_for(spec.fn(parsed, ctx, **kw), spec.timeout_s)
+        except Exception as exc:
+            inv = Invocation(name, "error", frame(name, "error", f"{type(exc).__name__}: {exc}"))
+            await self._log(
+                spec,
+                name,
+                args=parsed.model_dump(mode="json"),
+                ctx=ctx,
+                inv=inv,
+                started=started,
+                tool_call_id=idempotency_key,
+            )
+            raise
+        inv = Invocation(name, "executed", frame(name, "ok", out.text), output=out)
+        await self._log(
+            spec,
+            name,
+            args=parsed.model_dump(mode="json"),
+            ctx=ctx,
+            inv=inv,
+            started=started,
+            tool_call_id=idempotency_key,
+        )
+        return out
+
     async def _log(
         self,
         spec: ToolSpec | None,
@@ -195,17 +241,20 @@ class ToolRegistry:
         tool_call_id: str | None,
     ) -> None:
         latency_ms = int((time.perf_counter() - started) * 1000)
-        ok = inv.status == "ok"
+        ok = inv.status in {"ok", "executed"}
         preview = truncate(inv.output.text, PREVIEW_CHARS) if inv.output else None
+        # full (capped) output: consolidate screens memories against it (ADR-038)
+        full = truncate(sanitize(inv.output.text), MAX_RESULT_CHARS) if inv.output else None
         error = None if ok or inv.status == "proposed" else truncate(inv.content, PREVIEW_CHARS)
         safe_args = json.loads(json.dumps(args, default=str))
         async with ctx.engine.begin() as conn:
             row = await conn.execute(
                 text(
                     "INSERT INTO tool_calls (task_id, subtask_id, agent, tool, risk, args, ok, "
-                    "output_preview, error, latency_ms, status, source, revision, step, "
-                    "tool_call_id) VALUES (:t, :sub, :agent, :tool, :risk, CAST(:args AS jsonb), "
-                    ":ok, :preview, :error, :lat, :status, :source, :rev, :step, :tcid) "
+                    "output_preview, output_text, error, latency_ms, status, source, revision, "
+                    "step, tool_call_id) VALUES (:t, :sub, :agent, :tool, :risk, "
+                    "CAST(:args AS jsonb), :ok, :preview, :full, :error, :lat, :status, "
+                    ":source, :rev, :step, :tcid) "
                     "RETURNING id"
                 ),
                 {
@@ -217,6 +266,7 @@ class ToolRegistry:
                     "args": json.dumps(safe_args),
                     "ok": ok,
                     "preview": preview,
+                    "full": full,
                     "error": error,
                     "lat": latency_ms,
                     "status": inv.status,

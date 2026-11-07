@@ -4,11 +4,7 @@ thread at once. Synchronization uses marker files, not sleeps."""
 
 import os
 import signal
-import subprocess
-import sys
-import time
 import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -16,70 +12,21 @@ from langchain_core.runnables import RunnableConfig
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from agentops.core.graph import TEST_HOOK_ENV, build_demo_graph
+from agentops.core.graph import build_demo_graph
 from agentops.core.testhooks import TEST_HOOK_NODES_ENV
 from agentops.db.checkpointer import open_checkpointer
 from agentops.queue import jobs
 from agentops.settings import get_settings
-from tests.integration.conftest import ROOT, SeededUser, create_task
+from tests.integration.conftest import (
+    SeededUser,
+    create_task,
+    finish,
+    graph_state_values,
+    pending_approvals,
+    wait_for,
+)
 
 pytestmark = pytest.mark.integration
-
-LEASE_S = 2.0
-
-
-@pytest.fixture
-def hook_dir(tmp_path: Path) -> Path:
-    return tmp_path
-
-
-@pytest.fixture
-def spawn(hook_dir: Path) -> Iterator:
-    procs: list[subprocess.Popen] = []
-
-    def _spawn(worker_id: str, *extra: str, env_extra: dict | None = None) -> subprocess.Popen:
-        env = {
-            **os.environ,
-            **(env_extra or {}),
-            TEST_HOOK_ENV: str(hook_dir),
-            "JOB_LEASE_SECONDS": str(LEASE_S),
-            "JOB_HEARTBEAT_SECONDS": "0.5",
-            "JOB_POLL_SECONDS": "0.1",
-            "LOG_LEVEL": "INFO",
-        }
-        p = subprocess.Popen(
-            [sys.executable, "-m", "agentops.queue.worker", "--worker-id", worker_id, *extra],
-            cwd=ROOT,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        procs.append(p)
-        return p
-
-    yield _spawn
-    for p in procs:
-        if p.poll() is None:
-            p.kill()
-        p.wait(10)
-
-
-def wait_for(path: Path, proc: subprocess.Popen, timeout: float = 30.0) -> None:
-    deadline = time.monotonic() + timeout
-    while not path.exists():
-        if proc.poll() is not None:
-            out = proc.stdout.read() if proc.stdout else ""
-            pytest.fail(f"worker exited early ({proc.returncode}):\n{out}")
-        if time.monotonic() > deadline:
-            pytest.fail(f"timed out waiting for {path.name}")
-        time.sleep(0.05)
-
-
-def finish(proc: subprocess.Popen, timeout: float = 30.0) -> str:
-    out, _ = proc.communicate(timeout=timeout)
-    assert proc.returncode == 0, out
-    return out
 
 
 async def _events(engine: AsyncEngine, tid: uuid.UUID) -> list[tuple]:
@@ -231,7 +178,16 @@ async def test_main_graph_crash_inside_specialist_resumes_on_another_worker(
             )
         ]
     # A died before its first draft call; B did not re-plan
-    assert purposes == ["plan", "act", "review", "act", "review", "synthesize"]
+    assert purposes == [
+        "plan",
+        "act",
+        "review",
+        "act",
+        "review",
+        "synthesize",
+        "final_review",
+        "consolidate",
+    ]
     segments = [p for t, _, p in ev if t == "run.segment_started"]
     assert [s["worker"] for s in segments] == ["worker-A", "worker-B"]
     assert [s["resumed_from_checkpoint"] for s in segments] == [False, True]
@@ -262,7 +218,7 @@ async def test_rerun_after_crash_cannot_duplicate_a_proposal(
     finish(b, timeout=40)
 
     async with engine.connect() as c:
-        status, result = (
+        status, _result = (
             await c.execute(text("SELECT status::text, result FROM tasks WHERE id=:t"), {"t": tid})
         ).one()
         attempts = (
@@ -274,7 +230,8 @@ async def test_rerun_after_crash_cannot_duplicate_a_proposal(
                 {"t": tid},
             )
         ).scalar_one()
-    assert status == "completed"
+    assert status == "awaiting_approval"  # Phase 4: paused at action_gate
     assert attempts == 2  # both executions of the node are logged: nothing hidden
-    [proposal] = result["proposed_actions"]  # but state holds exactly one
-    assert proposal["tool"] == "send_email" and proposal["args"]["to"] == "team@example.com"
+    [proposal] = (await graph_state_values(tid))["proposed_actions"].values()  # state holds one
+    assert proposal.tool == "send_email" and proposal.args["to"] == "team@example.com"
+    assert await pending_approvals(engine, tid) == [("approve_action", f"action:{proposal.hash}")]

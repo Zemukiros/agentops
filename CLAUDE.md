@@ -26,14 +26,15 @@ uv sync                          # install deps (lockfile committed)
 cp .env.example .env             # first time only
 make up                          # docker compose: postgres(5433), mailpit, socket-proxy, mcp-notes, migrate, api(8000), worker
 make migrate                     # alembic upgrade head + checkpointer setup + seed users (tokens -> .agentops-tokens)
-make test                        # unit + integration (fake mode; needs postgres from `make up`)
+make test                        # unit + integration + sandbox (fake mode; needs `make up`, Mailpit, the sandbox image)
 make test-unit                   # fast, no services
 make lint                        # ruff + ruff format --check + mypy
 make build-sandbox               # build agentops-sandbox image (never run as a service)
 make test-sandbox                # sandbox isolation tests (real Docker; own CI job)
 make sandbox-selfcheck           # worker container -> socket proxy -> sandbox, file round trip
 make eval                        # scenario suite (Phase 6; currently prints a notice)
-uv run pytest -m e2e tests/e2e/<file> -s   # REAL models, costs money: ledger caps $0.10 (test_real_slice), $0.40 (test_real_phase3); needs ANTHROPIC_API_KEY in .env and, for phase3, the sandbox image
+uv run pytest -m model           # real fastembed model (downloads ~67 MB once into var/fastembed)
+uv run pytest -m e2e tests/e2e/<file> -s   # REAL models, costs money: ledger caps $0.10 (test_real_slice), $0.40 (test_real_phase3), 2 x $0.20 (test_real_phase4); needs ANTHROPIC_API_KEY in .env (+ sandbox image for phase3, Mailpit + fastembed model for phase4)
 docker compose --profile observability up -d jaeger   # tracing UI on :16686
 ```
 

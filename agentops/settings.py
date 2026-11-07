@@ -101,6 +101,12 @@ class Settings(BaseSettings):
     # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
     # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
     final_review_min_score: int = Field(default=3, ge=1, le=5)
+    # plan_gate (ADR-036): effective plan confidence below this -> human approves the plan.
+    plan_confidence_threshold: float = Field(default=0.6, ge=0, le=1)
+    # Approvals (ADR-035): a blocking approval left pending this long resolves as reject.
+    approval_ttl_seconds: int = Field(default=86_400, ge=1)
+    # Highest per-task max_usd a reviewer may approve when a run hits its budget.
+    budget_max_raise_usd: float = Field(default=2.0, gt=0)
     # Real-mode input estimate margin (ADR-024): count_tokens can't see the structured-output
     # schema (sent as output_config.format) or the thinking config, so the reserved input is
     # ceil(counted * ratio) + tokens. Each llm.call event records estimate vs actual.
@@ -133,6 +139,18 @@ class Settings(BaseSettings):
     # Embeddings (ADR-010: fastembed BAAI/bge-small-en-v1.5 = 384 dims; must match migration)
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384
+    # fastembed (real) or hash (deterministic bag-of-words; tests and offline dev)
+    embedding_mode: Literal["fastembed", "hash"] = "fastembed"
+    # FASTEMBED_CACHE_PATH is also the variable fastembed itself reads; the image sets it.
+    fastembed_cache_path: Path = Path("var/fastembed")
+    # Long-term memory (ADR-038): recall keeps memories with similarity >= the minimum, ranks
+    # them by alpha*sim + beta*importance + gamma*recency (half-life in days), keeps top_k.
+    memory_min_similarity: float = Field(default=0.6, ge=-1, le=1)
+    memory_top_k: int = Field(default=5, ge=1, le=20)
+    memory_alpha: float = 0.7
+    memory_beta: float = 0.2
+    memory_gamma: float = 0.1
+    memory_half_life_days: float = Field(default=30.0, gt=0)
 
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = "http://localhost:4318"
