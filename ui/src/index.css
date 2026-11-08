@@ -1,0 +1,315 @@
+@import "tailwindcss";
+
+/*
+ * AgentOps design tokens. Every color in the app is a token, so light/dark is one switch:
+ * system preference by default, or [data-theme] set by the toggle (persisted).
+ * Contrast: text tokens are AA (>= 4.5:1) on --surface and --canvas in both themes; status
+ * fg colors are AA on their own status bg.
+ */
+:root {
+  --canvas: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --surface-3: #e8ebf0;
+  --line: #e1e4ea;
+  --line-strong: #c9ced8;
+  --fg: #111827;
+  --fg-muted: #4a5361;
+  --fg-subtle: #646d7b;
+  --accent: #3f51d6;
+  --accent-hover: #3343bd;
+  --accent-fg: #ffffff;
+  --accent-soft: #eef0fd;
+  --accent-ink: #3343bd;
+  --focus: #3f51d6;
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-lg: 0 10px 30px -10px rgb(16 24 40 / 0.25);
+
+  --info-fg: #1d4ed8;
+  --info-bg: #eef4ff;
+  --info-line: #c7d7fe;
+  --success-fg: #15803d;
+  --success-bg: #effcf3;
+  --success-line: #bbefcc;
+  --warning-fg: #9a5b05;
+  --warning-bg: #fff8e6;
+  --warning-line: #fadf9b;
+  --danger-fg: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-line: #fbcaca;
+  --neutral-fg: #4a5361;
+  --neutral-bg: #f1f3f6;
+  --neutral-line: #dfe3e9;
+  --violet-fg: #6d28d9;
+  --violet-bg: #f5f2ff;
+  --violet-line: #dcd3fd;
+
+  --diff-add-bg: #e9f9ee;
+  --diff-del-bg: #fdecec;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0c1016;
+    --surface: #131922;
+    --surface-2: #19212c;
+    --surface-3: #212a36;
+    --line: #27303c;
+    --line-strong: #37414f;
+    --fg: #e7eaf0;
+    --fg-muted: #a9b2bf;
+    --fg-subtle: #8f99a7;
+    --accent: #8090ff;
+    --accent-hover: #96a3ff;
+    --accent-fg: #0c1016;
+    --accent-soft: #1d2348;
+    --accent-ink: #a9b4ff;
+    --focus: #96a3ff;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 12px 32px -12px rgb(0 0 0 / 0.7);
+    --info-fg: #9cc1ff;
+    --info-bg: #0f1f3a;
+    --info-line: #1f3a68;
+    --success-fg: #86e3a6;
+    --success-bg: #0d2617;
+    --success-line: #19482b;
+    --warning-fg: #f7cf6a;
+    --warning-bg: #2a2009;
+    --warning-line: #574316;
+    --danger-fg: #fda4a4;
+    --danger-bg: #2c1214;
+    --danger-line: #5c2124;
+    --neutral-fg: #c3cad5;
+    --neutral-bg: #1c232d;
+    --neutral-line: #333d4b;
+    --violet-fg: #c9b8ff;
+    --violet-bg: #211a3b;
+    --violet-line: #3d3170;
+    --diff-add-bg: #0f2a19;
+    --diff-del-bg: #301417;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #0c1016;
+  --surface: #131922;
+  --surface-2: #19212c;
+  --surface-3: #212a36;
+  --line: #27303c;
+  --line-strong: #37414f;
+  --fg: #e7eaf0;
+  --fg-muted: #a9b2bf;
+  --fg-subtle: #8f99a7;
+  --accent: #8090ff;
+  --accent-hover: #96a3ff;
+  --accent-fg: #0c1016;
+  --accent-soft: #1d2348;
+  --accent-ink: #a9b4ff;
+  --focus: #96a3ff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 32px -12px rgb(0 0 0 / 0.7);
+  --info-fg: #9cc1ff;
+  --info-bg: #0f1f3a;
+  --info-line: #1f3a68;
+  --success-fg: #86e3a6;
+  --success-bg: #0d2617;
+  --success-line: #19482b;
+  --warning-fg: #f7cf6a;
+  --warning-bg: #2a2009;
+  --warning-line: #574316;
+  --danger-fg: #fda4a4;
+  --danger-bg: #2c1214;
+  --danger-line: #5c2124;
+  --neutral-fg: #c3cad5;
+  --neutral-bg: #1c232d;
+  --neutral-line: #333d4b;
+  --violet-fg: #c9b8ff;
+  --violet-bg: #211a3b;
+  --violet-line: #3d3170;
+  --diff-add-bg: #0f2a19;
+  --diff-del-bg: #301417;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-info-fg: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-line: var(--info-line);
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-success-line: var(--success-line);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-line: var(--warning-line);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-line: var(--danger-line);
+  --color-neutral-fg: var(--neutral-fg);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral-line: var(--neutral-line);
+  --color-violet-fg: var(--violet-fg);
+  --color-violet-bg: var(--violet-bg);
+  --color-violet-line: var(--violet-line);
+  --color-diff-add: var(--diff-add-bg);
+  --color-diff-del: var(--diff-del-bg);
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --font-mono:
+    ui-monospace, "Cascadia Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--canvas);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Markdown (deliverables, outputs): sanitized HTML from react-markdown */
+.prose-ops {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.prose-ops > * + * {
+  margin-top: 0.75em;
+}
+.prose-ops h1 {
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.prose-ops h2 {
+  font-size: 1.12rem;
+  font-weight: 650;
+}
+.prose-ops h3 {
+  font-size: 1rem;
+  font-weight: 650;
+}
+.prose-ops ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-ops ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.prose-ops a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-ops code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.05em 0.3em;
+}
+.prose-ops pre {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.prose-ops pre code {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.prose-ops blockquote {
+  border-left: 3px solid var(--line-strong);
+  padding-left: 0.75rem;
+  color: var(--fg-muted);
+}
+.prose-ops table {
+  border-collapse: collapse;
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+.prose-ops th,
+.prose-ops td {
+  overflow-wrap: normal;
+  word-break: normal;
+  min-width: 7rem;
+  border: 1px solid var(--line);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-ops th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+/* React Flow: inherit tokens */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke: var(--line-strong);
+  --xy-edge-stroke-selected: var(--accent);
+  --xy-controls-button-background-color: var(--surface);
+  --xy-controls-button-background-color-hover: var(--surface-2);
+  --xy-controls-button-color: var(--fg);
+  --xy-controls-button-border-color: var(--line);
+  --xy-attribution-background-color: transparent;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}

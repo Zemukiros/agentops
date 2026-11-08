@@ -1,0 +1,172 @@
+// Shapes returned by the AgentOps API (agentops/api/routes/*.py, agentops/api/views.py).
+
+export type Role = "user" | "reviewer";
+export interface Me {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export type TaskStatus =
+  | "queued"
+  | "running"
+  | "awaiting_approval"
+  | "completed"
+  | "completed_partial"
+  | "failed"
+  | "rejected"
+  | "budget_exceeded"
+  | "cancelled";
+
+export const TERMINAL: ReadonlySet<TaskStatus> = new Set([
+  "completed",
+  "completed_partial",
+  "failed",
+  "rejected",
+  "budget_exceeded",
+  "cancelled",
+]);
+
+export interface Task {
+  id: string;
+  request: string;
+  graph: string;
+  status: TaskStatus;
+  kind: "task" | "replay";
+  parent_task_id: string | null;
+  root_task_id: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskListItem {
+  id: string;
+  request: string;
+  status: TaskStatus;
+  kind: "task" | "replay";
+  root_task_id: string | null;
+  scenario: string | null;
+  cost_usd: number;
+  llm_calls: number;
+  duration_s: number;
+  pending_approvals: number;
+  branches: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Page<T> {
+  items: T[];
+  next_cursor: string | null;
+}
+
+export interface Verdict {
+  verdict: "accept" | "revise" | "escalate";
+  score: number;
+  issues: string[];
+  feedback_for_specialist: string | null;
+  unsupported_claims: string[];
+}
+
+export interface SubtaskView {
+  id: string;
+  description: string;
+  specialist: string;
+  depends_on: string[];
+  expected_output: string;
+  complexity: string;
+  status: string;
+  revisions: number;
+  output: string | null;
+  reason: string | null;
+  human_override: boolean;
+  reviews: (Verdict & { revision: number })[];
+}
+
+export interface ActionOutcome {
+  hash: string;
+  tool: string;
+  status: "done" | "failed" | "unknown" | "rejected" | "human_done" | "not_considered";
+  idempotency_key: string | null;
+  detail: string | null;
+}
+
+export interface ActionView {
+  hash: string;
+  tool: string;
+  risk: string;
+  agent: string;
+  subtask_id: string;
+  args: Record<string, unknown>;
+  rationale: string | null;
+  approval: { id: string; status: string; version: number; decision: unknown } | null;
+  decision: string | null;
+  outcome: ActionOutcome | null;
+  side_effect_status: string | null;
+  mailpit_url: string | null;
+}
+
+export interface ApprovalSummary {
+  id: string;
+  kind: string;
+  key: string;
+  status: string;
+  version: number;
+  source: string;
+  blocking: boolean;
+  created_at: string;
+  decided_at: string | null;
+  expires_at: string;
+}
+
+export interface Budget {
+  max_usd: number;
+  max_tokens: number;
+  max_calls: number;
+  used_usd: number;
+  used_tokens: number;
+  used_calls: number;
+}
+
+export interface TaskDetail {
+  id: string;
+  request: string;
+  graph: string;
+  status: TaskStatus;
+  kind: "task" | "replay";
+  parent_task_id: string | null;
+  root_task_id: string | null;
+  fork_checkpoint_id: string | null;
+  scenario: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+  budget: Budget | null;
+  plan: { confidence: number; rationale: string } | null;
+  plan_confidence: {
+    self_reported: number;
+    structural: number;
+    effective: number;
+    threshold: number;
+  } | null;
+  memories: { id: string; kind: string; text: string; outcome: string | null; similarity: number }[];
+  subtasks: SubtaskView[];
+  actions: ActionView[];
+  approvals: ApprovalSummary[];
+  final: string | null;
+  final_review: Verdict | null;
+  partial: boolean;
+  outcome: { status: string; reason: string | null } | null;
+  failure_reason: string | null;
+  explanation: string | null;
+}
+
+export interface TaskEvent {
+  id: number;
+  type: string;
+  node: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
