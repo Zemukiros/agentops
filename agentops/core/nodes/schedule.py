@@ -7,13 +7,14 @@ conditional edge only reads it. Dispatching increments `wave`, so the loop is bo
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from langgraph.runtime import Runtime
 from langgraph.types import Send
 
-from agentops.core import scheduler
-from agentops.core.nodes.common import node_event
+from agentops.core import replay, scheduler
+from agentops.core.nodes.common import model_of, node_event
 from agentops.core.state import RunContext, SubtaskInput, SubtaskResult, TaskState
 
 
@@ -22,6 +23,12 @@ async def schedule(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, 
     assert plan is not None, "schedule runs only after a valid plan"
     results = state.get("results", {})
     wave = state.get("wave", 0)
+    # Wave boundary: the workspace now holds exactly what waves 1..wave wrote. Keep a copy so a
+    # replay branch forked here starts from the same files (ADR-040). Internal and idempotent:
+    # a re-run of this pass copies the same files again; nothing outside the task changes.
+    await asyncio.to_thread(
+        replay.snapshot_workspace, model_of(runtime).settings, runtime.context.task_id, wave
+    )
     decision = scheduler.decide(plan, results, wave)
     rounds = len(state.get("escalations", []))
     out: dict[str, Any] = {"decision": decision}

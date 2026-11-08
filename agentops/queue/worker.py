@@ -36,9 +36,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from agentops import approvals
+from agentops.core import replay
 from agentops.core.budget import BudgetExceededError, BudgetLedger
 from agentops.core.graph import GRAPHS
-from agentops.core.state import RunContext
+from agentops.core.state import ReplayContext, RunContext
 from agentops.db.checkpointer import open_checkpointer
 from agentops.db.models import TERMINAL_TASK_STATUSES
 from agentops.db.session import get_sessionmaker, make_engine
@@ -230,14 +231,15 @@ class Worker:
             row = (
                 await conn.execute(
                     text(
-                        "SELECT graph, request, status, config, owner_id FROM tasks WHERE id = :id"
+                        "SELECT graph, request, status, config, owner_id, kind FROM tasks "
+                        "WHERE id = :id"
                     ),
                     {"id": task_id},
                 )
             ).first()
         if row is None:
             raise RuntimeError(f"task {task_id} not found")
-        graph_name, request, status, task_config, owner_id = row
+        graph_name, request, status, task_config, owner_id, task_kind = row
         if status in TERMINAL_TASK_STATUSES:
             log.info("task %s already terminal (%s); nothing to do", task_id, status)
             return
@@ -275,6 +277,10 @@ class Worker:
                 },
             )
         model = self._model_client(dict(task_config or {})) if spec.needs_model else None
+        replay_ctx = None
+        if task_kind == "replay":
+            replay_ctx = ReplayContext(lineage=await replay.lineage(self.engine, task_id))
+            await self._restore_fork_workspace(task_id, dict(task_config or {}), graph)
         ctx = RunContext(
             task_id=task_id,
             engine=self.engine,
@@ -282,6 +288,7 @@ class Worker:
             tools=self._tools if spec.needs_model else None,
             owner_id=owner_id,
             memory=self._memory if spec.needs_model else None,
+            replay=replay_ctx,
         )
         try:
             await graph.ainvoke(graph_input, config, context=ctx)
@@ -494,7 +501,7 @@ class Worker:
     ) -> None:
         if with_budget:
             result = {**result, "budget": (await self._ledger.snapshot(task_id)).model_dump()}
-        if episode and with_budget:
+        if episode and with_budget and not await self._is_replay(task_id):
             # Terminal reached outside the graph (budget / recursion decisions, or a graph that
             # ended without an outcome): consolidate still runs, as an episode only (no LLM
             # call, so it can't overshoot an exhausted budget). Phase 4 change 2.
@@ -505,6 +512,35 @@ class Worker:
         await set_task_status(
             self.engine, task_id, status, result=result, error=error, terminal=True
         )
+
+    async def _is_replay(self, task_id: uuid.UUID) -> bool:
+        async with self.engine.connect() as c:
+            kind = (
+                await c.execute(text("SELECT kind FROM tasks WHERE id = :t"), {"t": task_id})
+            ).scalar_one_or_none()
+        return kind == "replay"
+
+    async def _restore_fork_workspace(
+        self, task_id: uuid.UUID, task_config: dict[str, Any], graph: Any
+    ) -> None:
+        """A branch gets its own copy of the source workspace as of the fork point (ADR-040).
+        Idempotent; runs before every segment but copies once."""
+        fork = task_config.get("fork") or {}
+        source = uuid.UUID(fork["source_task_id"])
+        wave = int(fork.get("wave") or 0)
+        src_state = await graph.aget_state({"configurable": {"thread_id": str(source)}})
+        live_wave = int((src_state.values or {}).get("wave") or 0)
+        how = await asyncio.to_thread(
+            replay.restore_workspace, self.settings, task_id, source, wave, live_wave
+        )
+        async with self.engine.begin() as c:
+            await emit_on(
+                c,
+                task_id,
+                "replay.workspace_restored",
+                payload={"source_task_id": str(source), "wave": wave, "from": how},
+                dedupe_key="replay:workspace",
+            )
 
     async def _write_episode(self, task_id: uuid.UUID, status: str, reason: str | None) -> None:
         async with self.engine.connect() as c:

@@ -25,7 +25,8 @@ Reviewer = Annotated[CurrentUser, require_role(UserRole.REVIEWER)]
 
 _COLS = (
     "a.id, a.task_id, a.level AS kind, a.key, a.status::text AS status, a.version, a.payload, "
-    "a.decision, a.source, a.blocking, a.expires_at, a.created_at, a.decided_at, a.decided_by"
+    "a.decision, a.source, a.blocking, a.expires_at, a.created_at, a.decided_at, a.decided_by, "
+    "t.kind AS task_kind, t.request AS task_request"
 )
 
 
@@ -44,6 +45,8 @@ class ApprovalOut(BaseModel):
     created_at: datetime
     decided_at: datetime | None
     decided_by: uuid.UUID | None
+    task_kind: str  # 'replay' items come from a replay branch (ADR-040)
+    task_request: str
 
 
 class DecisionIn(BaseModel):

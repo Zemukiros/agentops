@@ -9,7 +9,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from agentops.api.routes import approvals, health, memories, tasks
+from agentops.api.routes import approvals, health, memories, replay, tasks
 from agentops.api.sse import EventBroadcaster
 from agentops.core.graph import build_main_graph
 from agentops.db.checkpointer import open_checkpointer
@@ -55,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tasks.router)
     app.include_router(approvals.router)
     app.include_router(memories.router)
+    app.include_router(replay.router)
     return app
 
 
