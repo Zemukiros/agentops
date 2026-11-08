@@ -16,6 +16,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from agentops.observability import tracing
+
 CHANNEL = "agentops_events"
 
 TERMINAL_EVENT_TYPES = frozenset({"task.finished"})
@@ -66,6 +68,7 @@ async def emit_on(
     if row is None:
         return None
     event_id = int(row[0])
+    tracing.add_event(type_, event_id, node, task_id)
     await conn.execute(
         text("SELECT pg_notify(:c, :m)"),
         {"c": CHANNEL, "m": json.dumps({"task_id": str(task_id), "id": event_id})},

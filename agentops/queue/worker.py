@@ -46,6 +46,7 @@ from agentops.db.session import get_sessionmaker, make_engine
 from agentops.memory.service import MemoryService
 from agentops.models.client import ChatFactory, ModelClient, fake_factory
 from agentops.models.scenarios import DEFAULT_SCENARIO, SCENARIOS
+from agentops.observability import tracing
 from agentops.observability.events import emit_on
 from agentops.queue import jobs
 from agentops.queue.locks import thread_lock
@@ -291,7 +292,18 @@ class Worker:
             replay=replay_ctx,
         )
         try:
-            await graph.ainvoke(graph_input, config, context=ctx)
+            with tracing.task_trace(
+                task_id,
+                "run.segment",
+                **{
+                    "agentops.job_id": job.id,
+                    "agentops.job_kind": job.kind,
+                    "agentops.worker": self.worker_id,
+                    "agentops.attempt": job.attempts,
+                    "agentops.replay": replay_ctx is not None,
+                },
+            ):
+                await graph.ainvoke(graph_input, config, context=ctx)
         except BudgetExceededError as exc:
             # Can happen inside a parallel branch, where interrupt() is forbidden: pause at the
             # worker level instead (ADR-035). The graph resumes from its last checkpoint.
@@ -570,6 +582,7 @@ async def main(
         level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
     wid = worker_id or f"{socket.gethostname()}:{os.getpid()}"
+    provider = tracing.setup(settings, "agentops-worker")  # None unless OTEL_ENABLED
     engine = make_engine(pool_size=4)
     async with open_checkpointer() as saver:
         await saver.setup()
@@ -595,6 +608,8 @@ async def main(
             if mcp is not None:
                 await mcp.close()
             await engine.dispose()
+            if provider is not None:
+                provider.shutdown()  # flush pending spans
 
 
 if __name__ == "__main__":

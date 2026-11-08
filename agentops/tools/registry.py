@@ -28,6 +28,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 
 from agentops.core.state import ProposedAction
+from agentops.observability import tracing
 from agentops.observability.events import emit_on
 from agentops.tools.framing import MAX_RESULT_CHARS, frame, sanitize, truncate
 from agentops.tools.ratelimit import try_take
@@ -278,7 +279,7 @@ class ToolRegistry:
             )
             call_id = int(row.scalar_one())
             # Not deduplicated: every invocation really happened (or was really refused).
-            await emit_on(
+            event_id = await emit_on(
                 conn,
                 ctx.task_id,
                 "tool.call",
@@ -295,3 +296,17 @@ class ToolRegistry:
                     "proposal_hash": inv.proposal.hash if inv.proposal else None,
                 },
             )
+        tracing.call_span(
+            "tool.call",
+            latency_ms,
+            {
+                "agentops.task_id": str(ctx.task_id),
+                "agentops.tool_call_id": call_id,
+                "agentops.event_id": event_id,
+                "agentops.agent": ctx.agent,
+                "agentops.tool": name,
+                "agentops.tool_status": inv.status,
+                "agentops.subtask_id": ctx.subtask_id,
+            },
+            error=error if inv.status in {"error", "denied"} else None,
+        )

@@ -31,6 +31,7 @@ from agentops.core.budget import BudgetLedger
 from agentops.db.models import LLMCall
 from agentops.models import pricing
 from agentops.models.fake import REASK, FakeScript, ScriptedChatModel
+from agentops.observability import tracing
 from agentops.observability.events import emit_on
 from agentops.settings import LLMMode, RoleModel, Settings
 
@@ -318,7 +319,7 @@ class ModelClient:
             s.add(call)
             await s.flush()
             # Not deduplicated: every attempt is a real (possibly billed) call.
-            await emit_on(
+            event_id = await emit_on(
                 await s.connection(),
                 task_id,
                 "llm.call",
@@ -337,3 +338,21 @@ class ModelClient:
                     "latency_ms": latency_ms,
                 },
             )
+        tracing.call_span(
+            "llm.call",
+            latency_ms,
+            {
+                "agentops.task_id": str(task_id),
+                "agentops.llm_call_id": call.id,
+                "agentops.event_id": event_id,
+                "agentops.agent": role,
+                "agentops.purpose": purpose,
+                "agentops.attempt": attempt,
+                "gen_ai.system": cfg.provider,
+                "gen_ai.request.model": cfg.model,
+                "gen_ai.usage.input_tokens": in_tok,
+                "gen_ai.usage.output_tokens": out_tok,
+                "agentops.cost_usd": cost,
+            },
+            error=error,
+        )
