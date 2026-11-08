@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_retry_base_seconds: float = 0.5
     llm_timeout_seconds: float = 120.0
+    # Fake mode only: simulated model latency, so a demo run in the UI unfolds visibly instead
+    # of finishing in milliseconds. 0 (default) in tests. Ignored in real mode.
+    fake_latency_ms: int = Field(default=0, ge=0, le=10_000)
     # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
     # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
     final_review_min_score: int = Field(default=3, ge=1, le=5)

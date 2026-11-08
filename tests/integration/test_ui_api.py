@@ -43,10 +43,15 @@ async def submit(client: httpx.AsyncClient, user: SeededUser, **body: Any) -> di
 
 
 async def email_task_done(
-    client: httpx.AsyncClient, engine: AsyncEngine, saver: Any, alice: SeededUser, rita: SeededUser
+    client: httpx.AsyncClient,
+    engine: AsyncEngine,
+    saver: Any,
+    alice: SeededUser,
+    rita: SeededUser,
+    scenario: str = "proposes_email",
 ) -> str:
-    """proposes_email: run -> action approval -> reviewer approves -> email sent -> done."""
-    tid = (await submit(client, alice, scenario="proposes_email"))["id"]
+    """run -> action approval -> reviewer approves -> email sent -> done."""
+    tid = (await submit(client, alice, scenario=scenario))["id"]
     await process(engine, saver)
     [a] = (await client.get("/approvals", headers=rita.headers, params={"task_id": tid})).json()
     r = await client.post(
@@ -376,3 +381,32 @@ async def test_cors_allows_only_the_ui_origin(client: httpx.AsyncClient) -> None
     assert "access-control-allow-origin" not in bad.headers
     simple = await client.get("/health", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in simple.headers
+
+
+async def test_ui_demo_scenario_walkthrough(
+    client: httpx.AsyncClient,
+    engine: AsyncEngine,
+    saver: Any,
+    alice: SeededUser,
+    reviewer: SeededUser,
+) -> None:
+    """The scenario the UI e2e drives: research -> brief (revised once) -> email approval."""
+    tid = await email_task_done(client, engine, saver, alice, reviewer, scenario="ui_demo")
+    d = (await client.get(f"/tasks/{tid}/detail", headers=alice.headers)).json()
+    assert d["status"] == "completed", d["explanation"]
+    subs = {s["id"]: s for s in d["subtasks"]}
+    assert (subs["research"]["specialist"], subs["brief"]["depends_on"]) == (
+        "research",
+        ["research"],
+    )
+    assert subs["brief"]["revisions"] == 1
+    assert [r["verdict"] for r in subs["brief"]["reviews"]] == ["revise", "accept"]
+    assert d["final"].startswith("# Vector search")
+    [a] = d["actions"]
+    assert a["outcome"]["status"] == "done" and a["mailpit_url"]
+    tools = {
+        (i["tool"], i["status"])
+        for i in (await client.get(f"/tasks/{tid}/trace", headers=alice.headers)).json()["items"]
+        if i["kind"] == "tool"
+    }
+    assert {("web_search", "ok"), ("fetch_url", "ok"), ("send_email", "executed")} <= tools

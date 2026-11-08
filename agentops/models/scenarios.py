@@ -152,7 +152,124 @@ def build_scenarios() -> FakeScript:
         ScriptedTurn(content="Draft: the summary (an email to the team is proposed)."),
         purpose="act",
     )
+    _ui_demo(s)
     return s
+
+
+def _ui_demo(s: FakeScript) -> None:
+    """The UI walkthrough (Phase 5): research (fixture web search + fetch) feeds a brief that
+    is revised once and proposes an email to the team. Two-node DAG, a revise loop, review
+    scores, one action approval, a markdown deliverable."""
+    sc = "ui_demo"
+    s.add(
+        "supervisor",
+        sc,
+        _plan(
+            {
+                "id": "research",
+                "description": "Find how pgvector compares with dedicated vector databases.",
+                "specialist": "research",
+                "depends_on": [],
+                "expected_output": "Key findings with sources.",
+                "complexity": "low",
+            },
+            {
+                "id": "brief",
+                "description": "Write a one-page recommendation brief for the team.",
+                "specialist": "writing",
+                "depends_on": ["research"],
+                "expected_output": "A markdown brief with a recommendation.",
+                "complexity": "low",
+            },
+            confidence=0.85,
+        ),
+        purpose="plan",
+    )
+    s.add(
+        "research",
+        sc,
+        ScriptedTurn(
+            tool_calls=[
+                {"name": "web_search", "args": {"query": "pgvector vs dedicated vector database"}}
+            ]
+        ),
+        ScriptedTurn(
+            tool_calls=[
+                {
+                    "name": "fetch_url",
+                    "args": {"url": "https://fixtures.agentops.test/pgvector-vs-dedicated"},
+                }
+            ]
+        ),
+        ScriptedTurn(
+            content=(
+                "Findings:\n"
+                "- pgvector keeps vectors next to relational data: one database, one backup, "
+                "transactional consistency.\n"
+                "- Dedicated vector databases add operational surface but scale ANN search "
+                "further and offer more index types.\n"
+                "- Below tens of millions of vectors, pgvector with HNSW is usually enough.\n"
+                "Source: https://fixtures.agentops.test/pgvector-vs-dedicated"
+            )
+        ),
+        purpose="act",
+    )
+    email = {
+        "name": "send_email",
+        "args": {
+            "to": "team@example.com",
+            "subject": "Recommendation: start with pgvector",
+            "body": "The brief recommends pgvector for our current scale. Details attached.",
+        },
+    }
+    s.add(
+        "writing",
+        sc,
+        ScriptedTurn(tool_calls=[email]),
+        ScriptedTurn(content="## Brief\nUse pgvector."),
+        purpose="act/r0/brief",
+    )
+    s.add(
+        "writing",
+        sc,
+        ScriptedTurn(
+            content=(
+                "## Recommendation: start with pgvector\n\n"
+                "**Why:** our data is relational and well under 10M vectors; one database "
+                "means one backup and transactional consistency.\n\n"
+                "**When to revisit:** sustained ANN latency above budget, or growth past "
+                "tens of millions of vectors.\n\n"
+                "_Source: research findings (pgvector vs dedicated vector databases)._"
+            )
+        ),
+        purpose="act/r1/brief",
+    )
+    s.add(
+        "reviewer",
+        sc,
+        _verdict("revise", 3, "Say when the recommendation should be revisited."),
+        purpose="review/r0/brief",
+    )
+    s.add("reviewer", sc, _verdict("accept", 4), purpose="review/r0/research")
+    s.add(
+        "supervisor",
+        sc,
+        ScriptedTurn(
+            content=(
+                "# Vector search: pgvector or a dedicated database?\n\n"
+                "**Recommendation:** start with **pgvector**.\n\n"
+                "| | pgvector | Dedicated vector DB |\n"
+                "|---|---|---|\n"
+                "| Operations | one database, one backup | another service to run |\n"
+                "| Consistency | transactional with our data | eventual / separate |\n"
+                "| Scale | fine below ~10M vectors (HNSW) | built for far larger |\n\n"
+                "**Revisit when** ANN latency exceeds budget or the corpus grows past tens of "
+                "millions of vectors.\n\n"
+                "An email with this recommendation was proposed to the team for approval."
+            )
+        ),
+        purpose="synthesize",
+    )
 
 
 SCENARIOS = build_scenarios()
@@ -172,5 +289,6 @@ SCENARIO_NAMES = frozenset(
         "proposes_email",
         "low_confidence_plan",
         "final_low",
+        "ui_demo",
     }
 )

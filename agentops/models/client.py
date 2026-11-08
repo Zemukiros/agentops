@@ -213,6 +213,8 @@ class ModelClient:
         )
 
         started = time.perf_counter()
+        if self._settings.llm_mode is LLMMode.FAKE and self._settings.fake_latency_ms:
+            await asyncio.sleep(self._settings.fake_latency_ms / 1000)  # demo pacing only
         raw: AIMessage | None = None
         parsed: BaseModel | None = None
         error: str | None = None
