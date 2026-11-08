@@ -3,11 +3,11 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 4 — **complete, awaiting review** (2026-11-07). Phase 3 approved and merged (PR #2). Phase 5 not started.
-- **Branch:** `phase-4`, PR #3 (open, not merged).
+- **Phase:** 5 — **planning** (2026-11-07). Phase 4 approved and merged (PR #3, merge commit `8a904e8`).
+- **Branch:** `phase-5` (from `main` at `8a904e8`).
 - **Last updated:** 2026-11-07
 - **Test status:** 561 passed, 0 failed on `make test` (fake mode): 402 unit, 150 integration, 9 sandbox (real Docker). Lint, ruff format, mypy clean. Not in `make test`: 1 `model` test (real fastembed; passed), 4 `e2e` tests (real models).
-- **Real-model spend this phase:** $0.083560 (one run, two tasks). Cumulative AgentOps: **$0.278175**.
+- **Real-model spend:** Phase 4 $0.083560; Phase 5 $0.00 so far. Cumulative AgentOps: **$0.278175**.
 
 ## Phase plan
 | Phase | Goal | Status |
@@ -15,7 +15,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 | 1 | Foundation: repo, config, DB schema + migrations, checkpointer, job queue skeleton, fake model, health API, compose, CI | ☑ approved |
 | 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ approved, merged |
 | 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☑ approved, merged |
-| 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☑ (awaiting review) |
+| 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☑ approved, merged (PR #3) |
 | 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☐ |
 | 6 | Hardening + evals: injection suite, scenario harness, measured metrics, docs, deploy config | ☐ |
 
@@ -121,7 +121,6 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Phase 4 real spend: **$0.083560**. Cumulative real-model spend on AgentOps: **$0.278175**.
 
 ## Next up
-- Review Phase 4 (PR #3, `phase-4` → `main`).
 - Phase 5 plan: UI (React) on the existing API and SSE: task detail with plan DAG and live activity, approvals inbox, trace/cost view, memory browser, replay (ADR-015 caveat: branch-aware checkpoint ids; event dedupe keys need a branch id).
 
 ## Known limitations / stubs (be honest)
