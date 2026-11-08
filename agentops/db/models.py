@@ -128,14 +128,40 @@ class Task(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Per-task run options, e.g. {"scenario": "revise_once"} (fake mode only).
     config: Mapped[dict[str, Any]] = mapped_column(server_default=text("'{}'::jsonb"))
+    # ADR-040: a replay branch is a task. kind='replay' rows point at the task they forked from
+    # (parent) and the original task (root), and record the checkpoint they forked at.
+    kind: Mapped[str] = mapped_column(String(8), server_default="task")
+    parent_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE", name="fk_tasks_parent"), nullable=True
+    )
+    root_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE", name="fk_tasks_root"), nullable=True
+    )
+    fork_checkpoint_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    __table_args__ = (Index("ix_tasks_owner_created", "owner_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_tasks_owner_created", "owner_id", "created_at"),
+        Index("ix_tasks_root", "root_task_id"),
+        CheckConstraint("kind IN ('task', 'replay')", name="ck_tasks_kind"),
+    )
 
 
 _USD = Numeric(18, 10, asdecimal=False)
+
+
+class SseTicket(Base):
+    """ADR-041: single-use, short-lived ticket for one task's event stream (stored hashed)."""
+
+    __tablename__ = "sse_tickets"
+    ticket_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = _now()
 
 
 class TaskBudget(Base):
