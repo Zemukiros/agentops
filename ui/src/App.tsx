@@ -4,6 +4,7 @@ import { ApiError } from "./api/client";
 import { session, useSession } from "./api/session";
 import { Layout, type NavItem } from "./components/Layout";
 import { Approvals, usePendingApprovals } from "./pages/Approvals";
+import { MemoryPage } from "./pages/Memory";
 import { NewTask } from "./pages/NewTask";
 import { SignIn } from "./pages/SignIn";
 import { TaskDetailPage } from "./pages/TaskDetail";
@@ -55,6 +56,7 @@ function PendingCount() {
 const NAV: NavItem[] = [
   { to: "/tasks", label: "Tasks", icon: "list" },
   { to: "/approvals", label: "Approvals", icon: "inbox", badge: <PendingCount /> },
+  { to: "/memory", label: "Memory", icon: "brain" },
 ];
 
 function RequireIdentity() {
@@ -77,6 +79,7 @@ const router = createBrowserRouter([
           { path: "/tasks/new", element: <NewTask /> },
           { path: "/tasks/:id", element: <TaskDetailPage /> },
           { path: "/approvals", element: <Approvals /> },
+          { path: "/memory", element: <MemoryPage /> },
           { path: "*", element: <Navigate to="/tasks" replace /> },
         ],
       },

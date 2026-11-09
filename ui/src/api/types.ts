@@ -189,3 +189,52 @@ export interface Approval {
   task_kind: "task" | "replay";
   task_request: string;
 }
+
+export interface TraceItem {
+  id: number;
+  type: string;
+  node: string | null;
+  at: string;
+  kind: "event" | "llm" | "tool";
+  agent?: string;
+  purpose?: string;
+  model?: string;
+  attempt?: number;
+  ok?: boolean;
+  retry?: boolean;
+  error?: unknown;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: number | null;
+  latency_ms?: number;
+  output?: unknown;
+  input?: unknown;
+  tool?: string;
+  risk?: string;
+  status?: string;
+  subtask_id?: string | null;
+  llm_call_id?: number;
+  tool_call_id?: number;
+  payload?: unknown;
+}
+
+export interface CostBucket {
+  calls: number;
+  errors: number;
+  retries: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  latency_ms: number;
+}
+
+export interface CostSummary {
+  task_id: string;
+  total: CostBucket;
+  by_agent: Record<string, CostBucket>;
+  by_model: Record<string, CostBucket>;
+  tools: Record<string, { calls: number; errors: number; latency_ms: number }>;
+  budget: Budget | null;
+  time: { wall_s: number; compute_s: number; human_wait_s: number; queue_s: number };
+  approvals: { kind: string; key: string; status: string; blocking: boolean; wait_s: number }[];
+}

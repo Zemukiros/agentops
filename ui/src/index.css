@@ -44,6 +44,10 @@
   --violet-bg: #f5f2ff;
   --violet-line: #dcd3fd;
 
+  /* chart categorical slots (validated: dataviz validate_palette, light vs #ffffff) */
+  --viz-1: #3f51d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
   --diff-add-bg: #e9f9ee;
   --diff-del-bg: #fdecec;
   color-scheme: light;
@@ -86,7 +90,10 @@
     --violet-fg: #c9b8ff;
     --violet-bg: #211a3b;
     --violet-line: #3d3170;
-    --diff-add-bg: #0f2a19;
+    --viz-1: #7080f2;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+  --diff-add-bg: #0f2a19;
     --diff-del-bg: #301417;
     color-scheme: dark;
   }
@@ -128,6 +135,9 @@
   --violet-fg: #c9b8ff;
   --violet-bg: #211a3b;
   --violet-line: #3d3170;
+  --viz-1: #7080f2;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
   --diff-add-bg: #0f2a19;
   --diff-del-bg: #301417;
   color-scheme: dark;
@@ -166,6 +176,9 @@
   --color-violet-fg: var(--violet-fg);
   --color-violet-bg: var(--violet-bg);
   --color-violet-line: var(--violet-line);
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
+  --color-viz-3: var(--viz-3);
   --color-diff-add: var(--diff-add-bg);
   --color-diff-del: var(--diff-del-bg);
   --shadow-card: var(--shadow);

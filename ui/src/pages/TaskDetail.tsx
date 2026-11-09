@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/client";
 import { useTaskEvents } from "../api/events";
 import { TERMINAL, type TaskDetail as Detail } from "../api/types";
@@ -11,6 +11,7 @@ import { Callout, Card, ErrorState, LoadingBlock, Skeleton } from "../components
 import { ActivityFeed } from "../features/task/ActivityFeed";
 import { ActionList, BudgetMeters, Deliverable, SubtaskList } from "../features/task/panels";
 import { PlanDag } from "../features/task/PlanDag";
+import { TracePanel } from "../features/trace/TracePanel";
 import { liveSubtasks, liveTaskStatus, planFromEvents, subtaskRows } from "../lib/dag";
 import { duration, relativeTime, shortId, usd } from "../lib/format";
 import { useNow } from "../lib/useNow";
@@ -55,8 +56,56 @@ function CopyId({ id }: { id: string }) {
   );
 }
 
+export const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "trace", label: "Trace & cost" },
+] as const;
+type Tab = (typeof TABS)[number]["id"];
+
+function useTab(): [Tab, (t: Tab) => void] {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get("tab");
+  const tab = (TABS.some((t) => t.id === raw) ? raw : "overview") as Tab;
+  return [
+    tab,
+    (t) =>
+      setParams(
+        (p) => {
+          if (t === "overview") p.delete("tab");
+          else p.set("tab", t);
+          return p;
+        },
+        { replace: true },
+      ),
+  ];
+}
+
+function TaskTabs() {
+  const [tab, setTab] = useTab();
+  return (
+    <div role="tablist" aria-label="Task views" className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
+      {TABS.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          id={`tab-${t.id}`}
+          aria-selected={tab === t.id}
+          onClick={() => setTab(t.id)}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap ${
+            tab === t.id ? "border-accent text-fg" : "border-transparent text-fg-muted hover:text-fg"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TaskDetailView({ id }: { id: string }) {
   const qc = useQueryClient();
+  const [tab] = useTab();
   const detail = useQuery({
     queryKey: ["task", id, "detail"],
     queryFn: ({ signal }) => api<Detail>(`/tasks/${id}/detail`, { signal }),
@@ -142,6 +191,9 @@ function TaskDetailView({ id }: { id: string }) {
         }
       />
 
+      <TaskTabs />
+      {tab === "trace" && <TracePanel taskId={t.id} traceId={t.id.replace(/-/g, "")} />}
+      {tab === "overview" && (
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
           {pending.length > 0 && (
@@ -225,6 +277,7 @@ function TaskDetailView({ id }: { id: string }) {
           {detail.isFetching && <LoadingBlock label="Refreshing" rows={0} />}
         </div>
       </div>
+      )}
     </div>
   );
 }
