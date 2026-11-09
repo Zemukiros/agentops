@@ -30,6 +30,8 @@ describe("formatters", () => {
     const now = Date.parse("2026-11-07T12:10:00Z");
     expect(relativeTime("2026-11-07T12:09:50Z", now)).toBe("just now");
     expect(relativeTime("2026-11-07T12:00:00Z", now)).toBe("10 min ago");
+    expect(relativeTime("2026-11-08T12:10:00Z", now)).toBe("in 24 h");
+    expect(relativeTime("2026-11-07T12:40:00Z", now)).toBe("in 30 min");
   });
 });
 

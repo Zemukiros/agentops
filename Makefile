@@ -2,7 +2,7 @@ SHELL := /bin/bash
 UV ?= uv
 COMPOSE ?= docker compose
 
-.PHONY: help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
+.PHONY: test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
 
 # Task workspaces live on the host so sandbox containers can bind-mount them (ADR-031).
 export AGENTOPS_WORKSPACES_HOST_DIR ?= $(CURDIR)/var/workspaces
@@ -14,8 +14,8 @@ workspaces: ## Create the host workspace dir (worker uid 10000 and sandbox uid 1
 	mkdir -p $(AGENTOPS_WORKSPACES_HOST_DIR)
 	chmod 777 $(AGENTOPS_WORKSPACES_HOST_DIR)
 
-up: workspaces ## Start postgres, mailpit, socket proxy, mcp-notes, api, worker (runs migrations first)
-	$(COMPOSE) up -d --build --wait postgres mailpit docker-socket-proxy mcp-notes api worker
+up: workspaces ## Start postgres, mailpit, socket proxy, mcp-notes, api, worker, ui (:5173) (runs migrations first)
+	$(COMPOSE) up -d --build --wait postgres mailpit docker-socket-proxy mcp-notes api worker ui
 
 down: ## Stop the stack (keeps data)
 	$(COMPOSE) down
@@ -63,3 +63,9 @@ test-sandbox: ## Sandbox isolation tests against the local Docker daemon (needs 
 
 sandbox-selfcheck: ## Through-proxy check: worker container -> socket proxy -> sandbox, file round trip
 	$(COMPOSE) exec worker python -m agentops.tools.sandbox --selfcheck
+
+test-ui: ## UI: lint + typecheck + Vitest
+	cd ui && npm run lint && npm run typecheck && npm test
+
+e2e: ## Playwright walkthrough against the running stack (make up && make migrate first)
+	cd ui && npx playwright test

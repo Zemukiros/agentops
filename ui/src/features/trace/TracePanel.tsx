@@ -141,7 +141,7 @@ function TraceRow({ item }: { item: TraceItem }) {
         </summary>
         <div className="border-t border-line bg-surface-2/40 px-4 py-3 sm:pl-[118px]">
           {item.model && <p className="mb-2 text-xs text-fg-subtle">model {item.model}</p>}
-          <pre className="max-h-72 overflow-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
+          <pre tabIndex={0} aria-label="Call details" className="max-h-72 overflow-auto rounded-lg border border-line bg-surface p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
             {JSON.stringify(detail, null, 2)}
           </pre>
           <p className="mt-1.5 text-[11px] text-fg-subtle">Inputs and outputs are truncated; credentials are redacted on the server.</p>

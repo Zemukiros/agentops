@@ -99,7 +99,7 @@ function Detail({ approval, onDone }: { approval: Approval; onDone: () => void }
           </Link>
           <p className="mt-1 text-xs text-fg-subtle">
             Requested {relativeTime(approval.created_at)}
-            {pending && approval.blocking && <> · expires {relativeTime(approval.expires_at).replace(" ago", "")}</>} · version{" "}
+            {pending && approval.blocking && <> · expires {relativeTime(approval.expires_at)}</>} · version{" "}
             {approval.version}
           </p>
         </div>

@@ -93,3 +93,49 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -t agentops-app:ci .
       - run: docker build -t agentops-sandbox:ci sandbox
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: ui}}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: {node-version: "24.19.0", cache: npm, cache-dependency-path: ui/package-lock.json}
+      - run: npm ci  # .npmrc: ignore-scripts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    # The whole stack in fake mode (no model calls, Mailpit only), driven through the UI.
+    needs: [unit, ui]
+    runs-on: ubuntu-latest
+    env:
+      FAKE_LATENCY_MS: "300"  # lets the test watch the DAG change live
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: {version: "${{ env.UV_VERSION }}", enable-cache: true}
+      - run: uv sync --frozen
+      - uses: actions/setup-node@v7
+        with: {node-version: "24.19.0", cache: npm, cache-dependency-path: ui/package-lock.json}
+      - run: cp .env.example .env
+      - run: make up
+      - run: make migrate  # seeds demo-user / demo-reviewer -> .agentops-tokens
+      - run: npm ci && npx playwright install --with-deps chromium
+        working-directory: ui
+      - run: npx playwright test
+        working-directory: ui
+        env: {CI: "1"}
+      - if: failure()
+        run: docker compose logs --no-color > compose.log
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            ui/playwright-report
+            ui/test-results
+            compose.log
+          retention-days: 7

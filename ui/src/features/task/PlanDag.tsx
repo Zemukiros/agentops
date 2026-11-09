@@ -5,6 +5,7 @@ import {
   MarkerType,
   Position,
   ReactFlow,
+  useNodesState,
   type Edge,
   type Node,
   type NodeProps,
@@ -160,7 +161,18 @@ export function PlanDag({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const { nodes, edges } = useMemo(() => buildFlow(plan, snapshot, live, vertical), [plan, snapshot, live, vertical]);
+  const flow = useMemo(() => buildFlow(plan, snapshot, live, vertical), [plan, snapshot, live, vertical]);
+  // React Flow hides a node until it has measured it, and measures again only on resize. Live
+  // updates create new node objects, so keep each node's measurement across updates (and let
+  // React Flow write measurements back via onNodesChange); otherwise the graph goes blank.
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<SubtaskNodeData>>(flow.nodes);
+  useEffect(() => {
+    setNodes((prev) => {
+      const measured = new Map(prev.map((n) => [n.id, n.measured]));
+      return flow.nodes.map((n) => ({ ...n, measured: measured.get(n.id) }));
+    });
+  }, [flow.nodes, setNodes]);
+  const edges = flow.edges;
   const placed = layout(plan);
   const levels = Math.max(1, ...placed.map((p) => p.level + 1));
   const rows = Math.max(1, ...placed.map((p) => p.row + 1));
@@ -178,6 +190,7 @@ export function PlanDag({
       <ReactFlow
         key={vertical ? "v" : "h"}
         nodes={nodes}
+        onNodesChange={onNodesChange}
         edges={edges}
         nodeTypes={nodeTypes}
         colorMode={theme}

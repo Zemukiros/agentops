@@ -76,6 +76,7 @@ export function ActivityFeed({ events, state }: { events: TaskEvent[]; state: St
             pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
           }}
           aria-label="Activity"
+          tabIndex={0} // scrollable: keyboard users must be able to reach and scroll it
           className="max-h-[440px] space-y-0.5 overflow-y-auto px-2 py-2"
         >
           {lines.map((l) => (

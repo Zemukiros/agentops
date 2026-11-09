@@ -124,6 +124,21 @@ services:
     networks: [docker-proxy]
     restart: unless-stopped
 
+  ui:
+    build:
+      context: ./ui
+      args:
+        VITE_API_URL: http://localhost:${API_PORT:-8000}
+        VITE_JAEGER_URL: ${UI_JAEGER_URL:-}
+    image: agentops-ui:dev
+    environment:
+      API_ORIGIN: http://localhost:${API_PORT:-8000}
+    ports:
+      - "127.0.0.1:${UI_PORT:-5173}:80"
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/jaeger:2.22.0
     profiles: [observability]

@@ -25,6 +25,12 @@ export function compact(n: number): string {
 
 export function relativeTime(iso: string, now: number = Date.now()): string {
   const diff = (now - new Date(iso).getTime()) / 1000;
+  if (diff < -45) {
+    const ahead = -diff;
+    if (ahead < 3600) return `in ${Math.round(ahead / 60)} min`;
+    if (ahead < 86400 * 2) return `in ${Math.round(ahead / 3600)} h`;
+    return `in ${Math.round(ahead / 86400)} days`;
+  }
   if (diff < 45) return "just now";
   if (diff < 3600) return `${Math.round(diff / 60)} min ago`;
   if (diff < 86400) return `${Math.round(diff / 3600)} h ago`;
