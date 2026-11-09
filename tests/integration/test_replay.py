@@ -483,3 +483,24 @@ def test_restore_falls_back_safely(tmp_path: Path) -> None:
     assert (tmp_path / str(f2) / "x.txt").read_text() == "live"
     with pytest.raises(replay.ReplayError, match="missing"):
         replay.restore_workspace(s, f3, src, 1, 2)
+
+
+async def test_checkpoint_fields_prefill_the_fork_form(
+    client: httpx.AsyncClient, engine: AsyncEngine, saver: Any, alice: SeededUser, bob: SeededUser
+) -> None:
+    root = await submit(client, alice)
+    await process(engine, saver)
+    cps = await checkpoints(client, alice, root)
+    early = at(cps, "plan_gate")
+    late = at(cps, "final_review")
+    e = (await client.get(f"/tasks/{root}/checkpoints/{early}", headers=alice.headers)).json()
+    assert e["editable"] == ["plan"] and e["plan"]["subtasks"] and e["outputs"] == {}
+    assert e["final"] is None and e["request"] == "Summarize"
+    late_f = (await client.get(f"/tasks/{root}/checkpoints/{late}", headers=alice.headers)).json()
+    assert late_f["editable"] == ["final"] and late_f["final"] and late_f["outputs"]
+    assert (
+        await client.get(f"/tasks/{root}/checkpoints/nope", headers=alice.headers)
+    ).status_code == 404
+    assert (
+        await client.get(f"/tasks/{root}/checkpoints/{late}", headers=bob.headers)
+    ).status_code == 404

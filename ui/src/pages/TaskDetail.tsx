@@ -11,6 +11,7 @@ import { Callout, Card, ErrorState, LoadingBlock, Skeleton } from "../components
 import { ActivityFeed } from "../features/task/ActivityFeed";
 import { ActionList, BudgetMeters, Deliverable, SubtaskList } from "../features/task/panels";
 import { PlanDag } from "../features/task/PlanDag";
+import { ReplayPanel } from "../features/replay/ReplayPanel";
 import { TracePanel } from "../features/trace/TracePanel";
 import { liveSubtasks, liveTaskStatus, planFromEvents, subtaskRows } from "../lib/dag";
 import { duration, relativeTime, shortId, usd } from "../lib/format";
@@ -59,6 +60,7 @@ function CopyId({ id }: { id: string }) {
 export const TABS = [
   { id: "overview", label: "Overview" },
   { id: "trace", label: "Trace & cost" },
+  { id: "replay", label: "Replay" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
@@ -193,6 +195,7 @@ function TaskDetailView({ id }: { id: string }) {
 
       <TaskTabs />
       {tab === "trace" && <TracePanel taskId={t.id} traceId={t.id.replace(/-/g, "")} />}
+      {tab === "replay" && <ReplayPanel taskId={t.id} />}
       {tab === "overview" && (
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">

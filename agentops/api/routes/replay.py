@@ -81,6 +81,37 @@ async def list_checkpoints(task_id: uuid.UUID, request: Request, user: AuthUser)
     }
 
 
+@router.get("/{task_id}/checkpoints/{checkpoint_id}")
+async def checkpoint_fields(
+    task_id: uuid.UUID, checkpoint_id: str, request: Request, user: AuthUser
+) -> dict[str, Any]:
+    """The editable fields as they were at this checkpoint (prefills the fork form)."""
+    task = await _get_owned(request, task_id, user)
+    graph = request.app.state.graphs["main"]
+    cp = next(
+        (
+            c
+            for c in await replay.checkpoints(graph, task_id, origin_as_node=_origin(task))
+            if c["checkpoint_id"] == checkpoint_id
+        ),
+        None,
+    )
+    if cp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "checkpoint not found for this task")
+    values = await replay.checkpoint_values(graph, task_id, checkpoint_id)
+    plan = values.get("plan")
+    results = values.get("results") or {}
+    return {
+        **cp,
+        "request": values.get("request"),
+        "plan": plan.model_dump(mode="json") if plan is not None else None,
+        "outputs": {
+            sid: r.output for sid, r in results.items() if r.status == "accepted" and r.output
+        },
+        "final": values.get("final"),
+    }
+
+
 class ForkIn(BaseModel):
     checkpoint_id: str = Field(min_length=1, max_length=64)
     edits: replay.ForkEdits = Field(default_factory=replay.ForkEdits)

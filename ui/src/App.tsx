@@ -4,6 +4,7 @@ import { ApiError } from "./api/client";
 import { session, useSession } from "./api/session";
 import { Layout, type NavItem } from "./components/Layout";
 import { Approvals, usePendingApprovals } from "./pages/Approvals";
+import { ComparePage } from "./pages/Compare";
 import { MemoryPage } from "./pages/Memory";
 import { NewTask } from "./pages/NewTask";
 import { SignIn } from "./pages/SignIn";
@@ -80,6 +81,7 @@ const router = createBrowserRouter([
           { path: "/tasks/:id", element: <TaskDetailPage /> },
           { path: "/approvals", element: <Approvals /> },
           { path: "/memory", element: <MemoryPage /> },
+          { path: "/compare/:a/:b", element: <ComparePage /> },
           { path: "*", element: <Navigate to="/tasks" replace /> },
         ],
       },

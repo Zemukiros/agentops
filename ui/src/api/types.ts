@@ -238,3 +238,60 @@ export interface CostSummary {
   time: { wall_s: number; compute_s: number; human_wait_s: number; queue_s: number };
   approvals: { kind: string; key: string; status: string; blocking: boolean; wait_s: number }[];
 }
+
+export interface Checkpoint {
+  checkpoint_id: string;
+  step: number | null;
+  created_at: string | null;
+  next: string[];
+  wave: number;
+  forkable: boolean;
+  reason: string | null;
+  as_node: string | null;
+  editable: ("request" | "plan" | "outputs" | "final")[];
+  subtasks: Record<string, string>;
+  has_final: boolean;
+}
+
+export interface CheckpointList {
+  task_id: string;
+  task_status: TaskStatus;
+  fork_blocked_reason: string | null;
+  default_budget: { max_usd: number; max_tokens: number; max_llm_calls: number };
+  checkpoints: Checkpoint[];
+}
+
+export interface CheckpointFields extends Checkpoint {
+  request: string | null;
+  plan: { subtasks: unknown[]; confidence: number; rationale: string } | null;
+  outputs: Record<string, string>;
+  final: string | null;
+}
+
+export interface Lineage {
+  root_task_id: string;
+  tasks: { id: string; kind: "task" | "replay"; parent_task_id: string | null; fork_checkpoint_id: string | null; status: TaskStatus; created_at: string }[];
+}
+
+export interface CompareSide {
+  id: string;
+  kind: "task" | "replay";
+  status: TaskStatus;
+  request: string;
+  fork_checkpoint_id: string | null;
+  explanation: string | null;
+  final: string | null;
+  final_review: Verdict | null;
+  subtasks: { id: string; status: string; revisions: number; score: number | null; output: string | null }[];
+  actions: { tool: string; decision: string | null; status: string | null; detail: string | null }[];
+  cost: CostBucket;
+  time: CostSummary["time"];
+}
+
+export interface Comparison {
+  left: CompareSide;
+  right: CompareSide;
+  final_diff: string[];
+  subtask_changes: { id: string; left: string | null; right: string | null; output_changed: boolean }[];
+  status_changed: boolean;
+}
