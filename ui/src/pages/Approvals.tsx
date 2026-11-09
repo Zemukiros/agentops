@@ -105,7 +105,7 @@ function Detail({ approval, onDone }: { approval: Approval; onDone: () => void }
         </div>
       </div>
 
-      <ApprovalContext approval={approval} />
+      <ApprovalContext approval={approval} editing={form.action === "edit"} />
 
       {conflict && (
         <Callout tone="warning" icon="refresh" title="Changed by someone else">

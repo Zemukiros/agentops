@@ -39,6 +39,7 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
 
 export function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
+    hourCycle: "h23",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",

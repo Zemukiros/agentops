@@ -178,6 +178,9 @@ export function Callout({
 export const inputClass =
   "w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle shadow-[inset_0_1px_1px_rgb(0_0_0/0.03)] focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 aria-[invalid=true]:border-danger-fg";
 
+/** inputClass without the full width, for inline controls with their own width */
+export const inlineInputClass = inputClass.replace("w-full ", "");
+
 export function Field({
   label,
   htmlFor,

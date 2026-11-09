@@ -47,7 +47,15 @@ describe("schema form", () => {
         on: { type: "boolean" },
       },
     });
-    expect(f.map((x) => x.kind)).toEqual(["integer", "text", "enum", "list", "json", "boolean"]);
+    // required first (model order), then the rest by name
+    expect(f.map((x) => [x.name, x.kind])).toEqual([
+      ["note_id", "integer"],
+      ["labels", "list"],
+      ["meta", "json"],
+      ["mode", "enum"],
+      ["on", "boolean"],
+      ["tag", "text"],
+    ]);
     expect(toArgs(f, { note_id: "0", tag: "", mode: "b", labels: "x\n y \n", meta: '{"k":1}', on: true })).toEqual({
       args: { tag: null, mode: "b", labels: ["x", "y"], meta: { k: 1 }, on: true },
       errors: { note_id: "Must be ≥ 1" },
@@ -96,5 +104,12 @@ describe("plan editor", () => {
     expect(renameSubtask(p, 0, "research").subtasks[1]!.depends_on).toEqual(["research"]);
     expect(removeSubtask(p, 0).subtasks).toEqual([st("b")]);
     expect(newSubtask(p).id).toBe("step-3");
+  });
+});
+
+describe("schema field order", () => {
+  it("follows the required list even when jsonb reordered the properties", () => {
+    const reordered = { ...EMAIL, properties: { to: EMAIL.properties.to, body: EMAIL.properties.body, subject: EMAIL.properties.subject } };
+    expect(fieldsFromSchema(reordered).map((f) => f.name)).toEqual(["to", "subject", "body"]);
   });
 });

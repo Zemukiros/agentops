@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import type { CheckpointFields, CheckpointList, Lineage, Task } from "../../api/types";
 import { Icon } from "../../components/Icon";
 import { Badge, StatusBadge } from "../../components/StatusBadge";
-import { Button, Callout, Card, EmptyState, ErrorState, Field, Skeleton, inputClass } from "../../components/ui";
+import { Button, Callout, Card, EmptyState, ErrorState, Field, Skeleton, inputClass, inlineInputClass } from "../../components/ui";
 import { nodeLabel } from "../../lib/diff";
 import { compact, relativeTime, shortId, usd } from "../../lib/format";
 import { hasErrors, validatePlan, type EditablePlan } from "../../lib/planEdit";
@@ -302,7 +302,7 @@ export function ReplayPanel({ taskId }: { taskId: string }) {
               <label htmlFor="compare-with" className="text-sm text-fg-muted">
                 Compare this task with
               </label>
-              <select id="compare-with" value={compareWith} onChange={(e) => setCompareWith(e.target.value)} className={`${inputClass} h-8 w-48 py-1 text-xs`}>
+              <select id="compare-with" value={compareWith} onChange={(e) => setCompareWith(e.target.value)} className={`${inlineInputClass} h-8 w-56 py-1 text-xs`}>
                 <option value="">choose…</option>
                 {others.map((t) => (
                   <option key={t.id} value={t.id}>

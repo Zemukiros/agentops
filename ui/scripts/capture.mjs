@@ -69,7 +69,7 @@ if (mode === "seed") {
 }
 
 const browser = await chromium.launch();
-async function shoot(theme, width, name, fn) {
+async function shoot(theme, width, name, fn, who = 0) {
   const height = width < 600 ? 844 : 900;
   const ctx = await browser.newContext({
     viewport: { width, height },
@@ -79,11 +79,16 @@ async function shoot(theme, width, name, fn) {
   const page = await ctx.newPage();
   await page.addInitScript(([s, signedIn]) => {
     if (signedIn) sessionStorage.setItem("agentops.session", s);
-  }, [sessionFor(0), name !== "sign-in"]);
+  }, [sessionFor(who), name !== "sign-in"]);
   await fn(page);
   await page.waitForTimeout(350);
   const file = `${out}/${name}-${theme}-${width}.png`;
-  await page.screenshot({ path: file, fullPage: true });
+  // grow the viewport to the page instead of fullPage: the sticky sidebar then spans it
+  const h = await page.evaluate(() => document.documentElement.scrollHeight);
+  await page.setViewportSize({ width, height: Math.min(Math.max(h, height), 4800) });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: file });
   console.log("saved", file);
   await ctx.close();
 }
@@ -108,34 +113,110 @@ for (const theme of ["light", "dark"]) {
   });
 }
 
+// a plan awaiting approval (for the plan editor shot)
+const planTask = await create("Plan the Q1 data platform migration across four teams", "low_confidence_plan");
+
 // mid-run (light only: one live moment), then paused for approval, then completed
 await shoot("light", 1440, "task-running", async (p) => {
   await p.goto(`${UI}/tasks/${demo.id}`);
   await p.getByText(/Working|Revising|In review/).first().waitFor({ timeout: 30_000 });
 });
 await waitFor(demo.id, ["awaiting_approval"]);
+await waitFor(planTask.id, ["awaiting_approval"]);
+const pending = await call("/approvals?state=pending", REVIEWER);
+const demoApproval = pending.find((a) => a.task_id === demo.id);
+const planApproval = pending.find((a) => a.task_id === planTask.id);
 for (const theme of ["light", "dark"]) {
   await shoot(theme, 1440, "task-awaiting-approval", async (p) => {
     await p.goto(`${UI}/tasks/${demo.id}`);
     await p.getByText("Waiting for a reviewer").waitFor();
   });
+  await shoot(
+    theme,
+    1440,
+    "approvals",
+    async (p) => {
+      await p.goto(`${UI}/approvals?id=${demoApproval.id}`);
+      await p.getByText("team@example.com").first().waitFor();
+      await p.getByRole("radio", { name: "Edit & approve" }).click({ force: true });
+    },
+    1,
+  );
 }
+await shoot(
+  "light",
+  1440,
+  "approvals-plan-editor",
+  async (p) => {
+    await p.goto(`${UI}/approvals?id=${planApproval.id}`);
+    await p.getByRole("radio", { name: "Edit plan" }).click({ force: true });
+    await p.getByRole("button", { name: "Add subtask" }).waitFor();
+  },
+  1,
+);
+await shoot(
+  "light",
+  390,
+  "approvals",
+  async (p) => {
+    await p.goto(`${UI}/approvals?id=${demoApproval.id}`);
+    await p.getByText("team@example.com").first().waitFor();
+  },
+  1,
+);
 await approveAll(demo.id);
 await waitFor(demo.id, ["completed", "completed_partial"]);
+
+// a replay branch with an edited deliverable, for the replay + compare shots
+const cps = await call(`/tasks/${demo.id}/checkpoints`, USER);
+const before = cps.checkpoints.find((c) => c.forkable && c.next[0] === "final_review");
+const branch = await call(`/tasks/${demo.id}/branches`, USER, {
+  method: "POST",
+  body: JSON.stringify({
+    checkpoint_id: before.checkpoint_id,
+    edits: {
+      final:
+        "# Vector search: start with pgvector\n\n**Recommendation:** pgvector now; re-evaluate at 10M vectors.\n\n- One database and one backup\n- Transactional with our data\n\nAn email with this recommendation was proposed to the team for approval.",
+    },
+  }),
+});
+await waitFor(branch.id, ["completed", "completed_partial"]);
+
 for (const theme of ["light", "dark"]) {
   await shoot(theme, 1440, "task-completed", async (p) => {
     await p.goto(`${UI}/tasks/${demo.id}`);
-    await p.getByRole("heading", { name: /Vector search/ }).waitFor();
+    await p.getByRole("heading", { name: /Vector search/ }).first().waitFor();
     await p.locator("details summary", { hasText: "brief" }).first().click();
   });
+  await shoot(theme, 1440, "trace-cost", async (p) => {
+    await p.goto(`${UI}/tasks/${demo.id}?tab=trace`);
+    await p.getByRole("list", { name: "Trace timeline" }).waitFor();
+    await p.getByRole("list", { name: "Trace timeline" }).locator("summary").filter({ hasText: "supervisor · plan" }).first().click();
+  });
+  await shoot(theme, 1440, "replay", async (p) => {
+    await p.goto(`${UI}/tasks/${demo.id}?tab=replay`);
+    await p.getByRole("button", { name: /Deliverable written, before final review/ }).click();
+    await p.getByText(/Defaults to the original task/).waitFor();
+  });
+  await shoot(theme, 1440, "compare", async (p) => {
+    await p.goto(`${UI}/compare/${demo.id}/${branch.id}`);
+    await p.getByRole("heading", { name: "Compare branches" }).waitFor();
+    await p.getByText(/lines$/).first().waitFor();
+  });
+  await shoot(theme, 1440, "memory", async (p) => {
+    await p.goto(`${UI}/memory`);
+    await p.getByRole("list", { name: "Memories" }).waitFor();
+    await p.getByRole("list", { name: "Memories" }).getByRole("button").first().click();
+    await p.getByRole("button", { name: "Delete memory" }).waitFor();
+  });
   await shoot(theme, 1440, "tasks", async (p) => {
-    await p.goto(`${UI}/tasks`);
+    await p.goto(`${UI}/tasks?replays=1`);
     await p.getByRole("table").waitFor();
   });
 }
 await shoot("light", 390, "task-completed", async (p) => {
   await p.goto(`${UI}/tasks/${demo.id}`);
-  await p.getByRole("heading", { name: /Vector search/ }).waitFor();
+  await p.getByRole("heading", { name: /Vector search/ }).first().waitFor();
 });
 await shoot("dark", 390, "tasks", async (p) => {
   await p.goto(`${UI}/tasks`);
@@ -143,4 +224,4 @@ await shoot("dark", 390, "tasks", async (p) => {
 });
 
 await browser.close();
-console.log("demo task", demo.id);
+console.log("demo task", demo.id, "branch", branch.id, "plan task", planTask.id);

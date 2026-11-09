@@ -6,7 +6,7 @@ import { api } from "../../api/client";
 import type { CostBucket, CostSummary, TraceItem } from "../../api/types";
 import { Icon, type IconName } from "../../components/Icon";
 import { Badge } from "../../components/StatusBadge";
-import { Button, Card, EmptyState, ErrorState, Skeleton, inputClass } from "../../components/ui";
+import { Button, Card, EmptyState, ErrorState, Skeleton, inlineInputClass } from "../../components/ui";
 import { clockTime, compact, duration, usd } from "../../lib/format";
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -265,7 +265,7 @@ export function TracePanel({ taskId, traceId }: { taskId: string; traceId: strin
           <label htmlFor="trace-agent" className="sr-only">
             Agent
           </label>
-          <select id="trace-agent" value={agent} onChange={(e) => setAgent(e.target.value)} className={`${inputClass} h-8 w-40 py-1 text-xs`}>
+          <select id="trace-agent" value={agent} onChange={(e) => setAgent(e.target.value)} className={`${inlineInputClass} h-8 w-40 py-1 text-xs`}>
             <option value="">All agents</option>
             {agents.map((a) => (
               <option key={a}>{a}</option>

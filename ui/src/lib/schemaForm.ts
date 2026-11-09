@@ -38,7 +38,12 @@ export function fieldsFromSchema(schema: Schema | null | undefined): FieldSpec[]
   if (!schema || schema.type !== "object") return [];
   const props = (schema.properties ?? {}) as Record<string, Schema>;
   const required = new Set((schema.required ?? []) as string[]);
-  return Object.entries(props).map(([name, raw]) => {
+  // Postgres jsonb does not keep key order, so `properties` may come back reordered; the
+  // `required` array keeps the model's field order.
+  const order = (schema.required ?? []) as string[];
+  const rank = (n: string) => (order.includes(n) ? order.indexOf(n) : order.length);
+  const entries = Object.entries(props).sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
+  return entries.map(([name, raw]) => {
     const { schema: s, nullable } = unwrap(raw);
     const base = {
       name,

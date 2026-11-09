@@ -17,10 +17,12 @@ export const KIND_LABEL: Record<string, string> = {
   side_effect_review: "Side-effect check",
 };
 
-function Args({ args }: { args: Record<string, unknown> }) {
+function Args({ args, order = [] }: { args: Record<string, unknown>; order?: string[] }) {
+  const rank = (k: string) => (order.includes(k) ? order.indexOf(k) : order.length);
+  const entries = Object.entries(args).sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-[13px]">
-      {Object.entries(args).map(([k, v]) => (
+      {entries.map(([k, v]) => (
         <div key={k} className="contents">
           <dt className="font-mono text-fg-subtle">{k}</dt>
           <dd className="break-words whitespace-pre-wrap text-fg">{typeof v === "string" ? v : JSON.stringify(v)}</dd>
@@ -49,7 +51,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function ApprovalContext({ approval: a }: { approval: Approval }) {
+export function ApprovalContext({ approval: a, editing = false }: { approval: Approval; editing?: boolean }) {
   const p = a.payload;
   switch (a.kind) {
     case "approve_action":
@@ -63,7 +65,10 @@ export function ApprovalContext({ approval: a }: { approval: Approval }) {
                 by {String(p.agent)} in {String(p.subtask_id)}
               </span>
             </div>
-            <Args args={(p.args ?? {}) as Record<string, unknown>} />
+            <Args
+              args={(p.args ?? {}) as Record<string, unknown>}
+              order={((p.input_schema as { required?: string[] } | undefined)?.required ?? []) as string[]}
+            />
           </Section>
           {typeof p.rationale === "string" && p.rationale && (
             <Section title="Why the agent proposed it">
@@ -81,7 +86,7 @@ export function ApprovalContext({ approval: a }: { approval: Approval }) {
             Self-reported {c.self_reported?.toFixed(2)}, structural {c.structural?.toFixed(2)}. Approve it, edit it, or take
             over.
           </Callout>
-          <PlanDag plan={plan.subtasks} snapshot={[]} live={{}} />
+          {!editing && <PlanDag plan={plan.subtasks} snapshot={[]} live={{}} />}
           <ul className="space-y-1.5 text-[13px]">
             {plan.subtasks.map((s) => (
               <li key={s.id}>
