@@ -103,6 +103,12 @@ function TaskDetailView({ id }: { id: string }) {
   // the stream is newer than the snapshot between refetches
   const t = { ...detail.data, status: (liveTaskStatus(events) ?? detail.data.status) as Detail["status"] };
   const rows = subtaskRows(plan, t.subtasks);
+  const finished = TERMINAL.has(t.status);
+  const deliverableCard = (
+    <Card id="deliverable" title="Deliverable">
+      <Deliverable task={t} />
+    </Card>
+  );
   const pending = t.approvals.filter((a) => a.status === "pending");
   const wall = (new Date(TERMINAL.has(t.status) ? t.updated_at : now).getTime() - new Date(t.created_at).getTime()) / 1000;
 
@@ -140,8 +146,11 @@ function TaskDetailView({ id }: { id: string }) {
         <div className="min-w-0 space-y-4">
           {pending.length > 0 && (
             <Callout tone="warning" icon="hand" title={`Waiting for a reviewer (${pending.length})`}>
-              {pending.map((a) => a.kind.replace(/_/g, " ")).join(", ")}. A reviewer decides in the approvals
-              inbox; the run resumes on its own afterwards.
+              {pending.map((a) => a.kind.replace(/_/g, " ")).join(", ")}. A reviewer decides in the{" "}
+              <Link to={`/approvals?id=${pending[0]!.id}`} className="font-medium underline">
+                approvals inbox
+              </Link>
+              ; the run resumes on its own afterwards.
             </Callout>
           )}
           {t.explanation && (
@@ -175,6 +184,8 @@ function TaskDetailView({ id }: { id: string }) {
             )}
           </Card>
 
+          {/* finished: the result first; while running: the work first */}
+          {finished && deliverableCard}
           <Card id="subtasks" title="Subtasks" bodyClassName="">
             <SubtaskList subtasks={rows} live={live} />
           </Card>
@@ -182,10 +193,8 @@ function TaskDetailView({ id }: { id: string }) {
           <Card id="actions" title="Proposed actions" bodyClassName="">
             <ActionList actions={t.actions} />
           </Card>
+          {!finished && deliverableCard}
 
-          <Card id="deliverable" title="Deliverable">
-            <Deliverable task={t} />
-          </Card>
         </div>
 
         <div className="min-w-0 space-y-4 lg:sticky lg:top-6">

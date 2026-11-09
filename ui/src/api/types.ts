@@ -170,3 +170,22 @@ export interface TaskEvent {
   payload: Record<string, unknown>;
   created_at: string;
 }
+
+export interface Approval {
+  id: string;
+  task_id: string;
+  kind: string;
+  key: string;
+  status: string;
+  version: number;
+  payload: Record<string, unknown>;
+  decision: Record<string, unknown> | null;
+  source: string;
+  blocking: boolean;
+  expires_at: string;
+  created_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  task_kind: "task" | "replay";
+  task_request: string;
+}

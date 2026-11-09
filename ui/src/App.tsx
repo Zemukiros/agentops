@@ -3,6 +3,7 @@ import { Navigate, Outlet, RouterProvider, createBrowserRouter } from "react-rou
 import { ApiError } from "./api/client";
 import { session, useSession } from "./api/session";
 import { Layout, type NavItem } from "./components/Layout";
+import { Approvals, usePendingApprovals } from "./pages/Approvals";
 import { NewTask } from "./pages/NewTask";
 import { SignIn } from "./pages/SignIn";
 import { TaskDetailPage } from "./pages/TaskDetail";
@@ -28,7 +29,33 @@ export const queryClient = new QueryClient({
   },
 });
 
-const NAV: NavItem[] = [{ to: "/tasks", label: "Tasks", icon: "list" }];
+// Query keys don't include the identity, so switching identity must drop every cached
+// response (a user must never see a reviewer's cached lists, or vice versa).
+let lastIdentity = session.active()?.id ?? null;
+session.subscribe(() => {
+  const now = session.active()?.id ?? null;
+  if (now !== lastIdentity) {
+    lastIdentity = now;
+    queryClient.clear();
+  }
+});
+
+function PendingCount() {
+  const { active } = useSession();
+  const q = usePendingApprovals(Boolean(active));
+  const n = q.data?.length ?? 0;
+  if (!n) return null;
+  return (
+    <span className="rounded-full bg-warning-bg px-1.5 text-xs font-semibold text-warning-fg tabular-nums" aria-label={`${n} pending`}>
+      {n}
+    </span>
+  );
+}
+
+const NAV: NavItem[] = [
+  { to: "/tasks", label: "Tasks", icon: "list" },
+  { to: "/approvals", label: "Approvals", icon: "inbox", badge: <PendingCount /> },
+];
 
 function RequireIdentity() {
   const { active } = useSession();
@@ -49,6 +76,7 @@ const router = createBrowserRouter([
           { path: "/tasks", element: <TaskHistory /> },
           { path: "/tasks/new", element: <NewTask /> },
           { path: "/tasks/:id", element: <TaskDetailPage /> },
+          { path: "/approvals", element: <Approvals /> },
           { path: "*", element: <Navigate to="/tasks" replace /> },
         ],
       },
