@@ -24,7 +24,7 @@
 ```bash
 uv sync                          # install deps (lockfile committed)
 cp .env.example .env             # first time only
-make up                          # docker compose: postgres(5433), mailpit, socket-proxy, mcp-notes, migrate, api(8000), worker
+make up                          # docker compose: postgres(5433), mailpit, socket-proxy, mcp-notes, migrate, api(8000), worker, ui(5173)
 make migrate                     # alembic upgrade head + checkpointer setup + seed users (tokens -> .agentops-tokens)
 make test                        # unit + integration + sandbox (fake mode; needs `make up`, Mailpit, the sandbox image)
 make test-unit                   # fast, no services
@@ -33,9 +33,14 @@ make build-sandbox               # build agentops-sandbox image (never run as a 
 make test-sandbox                # sandbox isolation tests (real Docker; own CI job)
 make sandbox-selfcheck           # worker container -> socket proxy -> sandbox, file round trip
 make eval                        # scenario suite (Phase 6; currently prints a notice)
+make test-ui                     # UI (ui/): ESLint + tsc + Vitest
+make e2e                         # Playwright walkthrough + axe against the running stack (make up && make migrate)
+FAKE_LATENCY_MS=600 make up      # fake mode: pace runs so the live UI is watchable (0 by default)
+cd ui && npx vite                # UI dev server on :5173 (API on :8000); `npm ci` first (ignore-scripts)
+cd ui && node scripts/capture.mjs ../docs/screenshots   # regenerate README screenshots from a live stack
 uv run pytest -m model           # real fastembed model (downloads ~67 MB once into var/fastembed)
 uv run pytest -m e2e tests/e2e/<file> -s   # REAL models, costs money: ledger caps $0.10 (test_real_slice), $0.40 (test_real_phase3), 2 x $0.20 (test_real_phase4); needs ANTHROPIC_API_KEY in .env (+ sandbox image for phase3, Mailpit + fastembed model for phase4)
-docker compose --profile observability up -d jaeger   # tracing UI on :16686
+OTEL_ENABLED=true docker compose --profile observability up -d   # tracing to Jaeger (UI :16686); trace id = task id
 ```
 
 ## Environment

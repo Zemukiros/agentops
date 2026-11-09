@@ -3,11 +3,11 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 5 — **planning** (2026-11-07). Phase 4 approved and merged (PR #3, merge commit `8a904e8`).
-- **Branch:** `phase-5` (from `main` at `8a904e8`).
-- **Last updated:** 2026-11-07
-- **Test status:** 561 passed, 0 failed on `make test` (fake mode): 402 unit, 150 integration, 9 sandbox (real Docker). Lint, ruff format, mypy clean. Not in `make test`: 1 `model` test (real fastembed; passed), 4 `e2e` tests (real models).
-- **Real-model spend:** Phase 4 $0.083560; Phase 5 $0.00 so far. Cumulative AgentOps: **$0.278175**.
+- **Phase:** 5 — **complete, awaiting review** (2026-11-09). Phase 4 approved and merged (PR #3, merge commit `8a904e8`).
+- **Branch:** `phase-5` (from `main` at `8a904e8`), pushed; no PR yet (CI's new `ui` and `e2e` jobs run on pull requests).
+- **Last updated:** 2026-11-09
+- **Test status:** backend 603 passed, 0 failed on `make test` (fake mode): 422 unit, 172 integration, 9 sandbox (real Docker); lint, ruff format, mypy clean. UI: 64 Vitest tests (`make test-ui`), ESLint + tsc clean. Playwright walkthrough against the compose stack (`make e2e`): 1 passed, with axe on 9 pages. Not in `make test`: 1 `model` test (real fastembed), 4 `e2e` tests (real models).
+- **Real-model spend:** Phase 5 **$0.00** (fake mode only; no demo run). Cumulative AgentOps: **$0.278175**.
 
 ## Phase plan
 | Phase | Goal | Status |
@@ -16,8 +16,27 @@ _Update at the end of every work session and every phase. Keep it short. This is
 | 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ approved, merged |
 | 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☑ approved, merged |
 | 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☑ approved, merged (PR #3) |
-| 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☐ |
+| 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☑ (awaiting review) |
 | 6 | Hardening + evals: injection suite, scenario harness, measured metrics, docs, deploy config | ☐ |
+
+## Done (Phase 5)
+| Step | What | Commit |
+|---|---|---|
+| 1 | Read APIs: task list (filters, keyset pagination), detail (state + approvals + Mailpit deep link), trace (events ⋈ llm/tool calls, redacted), cost + compute/human-wait/queue time; single-use SSE tickets (ADR-041); CORS to the UI origin; optional per-task budget | `7fe0204` |
+| 2 | Replay (ADR-040): branch = task with its own thread; forkable points; validated edits; paused/terminal roots only; budget = root's original limits; reuse of upstream results; no re-executed side effects; no memories; workspace snapshots per wave | `85c9e93` |
+| 3 | OpenTelemetry (ADR-043): one trace per task (trace id = task id), segment/node/llm/tool spans with our row and event ids; verified in Jaeger | `98db875`, `163cf3c` |
+| 4–5 | UI scaffold + design tokens (light/dark), sign-in with identity switching, new task, history, task detail with live DAG and activity over SSE; visual review → fixes | `98c4132`, `3ad9eec` |
+| 6 | Approvals inbox: per-kind context, schema-generated edit form, plan editor, 409 handling that keeps input, side-effect review | `7b6a625` |
+| 7–8 | Trace & cost tab (palette validated), memory browser (search, inspect, delete one/all) | `c0f85e1` |
+| 9 | Replay UI: checkpoint timeline, fork form (only editable fields, prefilled), branches, side-by-side compare with diff | `d6657c9` |
+| 10 | UI image (nginx + CSP), Playwright walkthrough + axe, CI `ui` and `e2e` jobs, screenshots in `docs/screenshots/` | `24365e5`, `3289900` |
+
+**Found by building it (fixed):**
+- React Flow nodes went blank under fast live updates (new node objects dropped their measurements). Found by the e2e test, not by unit tests.
+- The worker's own compose `environment:` replaced the shared one, so `OTEL_ENABLED` etc. never reached it (YAML merge is shallow).
+- nginx drops server-level security headers in any `location` with its own `add_header`; caching now uses `expires`.
+- Postgres `jsonb` reorders object keys, so tool arguments showed out of order; fields follow the schema's `required` order.
+- axe: a scrollable feed wasn't keyboard-reachable.
 
 ## Done (Phase 4)
 Approved plan + the 3 user changes (side_effect_review inbox item, consolidate under budget exhaustion, expiry-vs-human race) + the decision that low final reviews escalate for partial deliverables too (ADR-029 amended).
@@ -121,7 +140,8 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Phase 4 real spend: **$0.083560**. Cumulative real-model spend on AgentOps: **$0.278175**.
 
 ## Next up
-- Phase 5 plan: UI (React) on the existing API and SSE: task detail with plan DAG and live activity, approvals inbox, trace/cost view, memory browser, replay (ADR-015 caveat: branch-aware checkpoint ids; event dedupe keys need a branch id).
+- Review Phase 5 (branch `phase-5`). Open a PR so CI runs the new `ui` and `e2e` jobs (they have only run locally).
+- Phase 6 plan: injection suite, scenario harness (`make eval`), measured metrics, docs, deploy config.
 
 ## Known limitations / stubs (be honest)
 - **Side-effect ambiguity window:** a crash between inserting the `side_effects` row and performing the action is treated as "outcome unknown" (surfaced for review, never retried), the same as a crash after performing. Conservative: it can under-execute, never double-execute.
@@ -133,13 +153,19 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Worker-level pauses (budget, recursion) resume from the last checkpoint: the node that failed re-runs from its start, and its model calls before the failure are already in the ledger.
 - Real mode makes one extra `count_tokens` request per attempt (free; adds latency). Output caps are tight with thinking on.
 - `make eval` only prints a notice. No scenario harness until Phase 6. Fake scenarios test orchestration logic, not model quality.
-- Replay forks (Phase 5) will need a branch id in event dedupe keys (ADR-025).
+- Replay: forks are offered only at serial points (never inside a parallel wave). A branch reuses the original's decisions for the same action; an action the original never decided is not executed in the branch (and not asked about). Branches don't write memories.
+- Workspace snapshots (one per wave) are never pruned.
+- The UI has no pagination for approvals beyond 100 items and lists checkpoints without paging (fine at today's sizes).
+- The CI `e2e` job has not run on GitHub yet (CI triggers on PRs and `main`); it passes locally against the same compose stack.
+- Real-mode UI behavior is untested (no real-model run this phase); fake mode drives everything through the real API.
+- The Mailpit link is resolved by searching Mailpit's API at read time; if Mailpit is down the UI falls back to a search link.
 
 ## Open risks
 - LangGraph moves fast (1.2.20). Phase 4 relies on `interrupt(response_schema=...)` validation (verified against 1.2.20) and on node writes being discarded when a node is killed (tested).
 - `mcp` 2.x is young (2.3.0); re-check its stdio env inheritance and error codes on upgrade (ADR-032).
 - fastembed downloads the model at image build; a build without network access fails (runtime is offline by design).
-- Replay forks share the thread head (ADR-015 caveat). The Phase 5 design must track branch checkpoint ids.
+- Replay depends on `aupdate_state(as_node=...)` recomputing routing as probed on LangGraph 1.2.20 (tested at every fork point); re-probe on upgrade.
+- Very new npm releases: everything is pinned exactly (versions at least 7 days old when chosen), with `ignore-scripts`.
 
 ## Measured metrics (only from `evals/` runs, with date + config)
 - none yet
