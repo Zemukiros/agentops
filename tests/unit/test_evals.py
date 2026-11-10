@@ -129,3 +129,22 @@ def test_estimate_scales_with_k_and_kind() -> None:
     assert estimate.agent_cost(s["rev-clean-summary"]) == estimate.REVIEWER_CALL
     one = estimate.agent_cost(s["plan-simple-summary"])
     assert estimate.agent_cost(s["mem-sources-line"]) == pytest.approx(one * 3)
+
+
+def test_real_mode_uses_real_role_models_in_process_and_in_worker_subprocesses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: real mode once kept the fake role models from .env, so every paid run
+    would have failed with ModelConfigError (caught at $0 when the baseline started)."""
+    from agentops.settings import Settings
+    from evals.runner import REAL_ROLES, eval_settings, role_env
+
+    s = eval_settings(Settings(), "real")
+    assert {r: m.provider for r, m in s.role_models.items()} == dict.fromkeys(
+        REAL_ROLES, "anthropic"
+    )
+    for k, v in role_env(s).items():
+        monkeypatch.setenv(k, v)
+    sub = Settings()  # what a worker subprocess builds from its environment
+    assert sub.role_models == s.role_models
+    assert eval_settings(Settings(), "dry").role_models == Settings().role_models

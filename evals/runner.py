@@ -43,7 +43,7 @@ from agentops.models.fake import FakeScript
 from agentops.models.scenarios import SCENARIOS
 from agentops.queue import jobs
 from agentops.queue.worker import Worker
-from agentops.settings import LLMMode, SearchMode, Settings
+from agentops.settings import LLMMode, RoleModel, SearchMode, Settings
 from agentops.tools.catalog import native_tools
 from agentops.tools.mcp import MCPManager, ServerConfig
 from agentops.tools.registry import ToolRegistry
@@ -117,9 +117,39 @@ class Env:
     cassettes: dict[str, FakeScript] = field(default_factory=dict)
 
 
+SONNET, HAIKU = "claude-sonnet-5-5", "claude-haiku-5-5"
+# Real-mode role models, pinned here (not read from .env) so every eval run, and the cost
+# estimate, use the same set as the measured e2e runs. Effort low. No Opus in the system.
+REAL_ROLES: dict[str, RoleModel] = {
+    "supervisor": RoleModel(
+        provider="anthropic", model=SONNET, max_output_tokens=3000, effort="low"
+    ),
+    "reviewer": RoleModel(provider="anthropic", model=SONNET, max_output_tokens=2000, effort="low"),
+    "research": RoleModel(provider="anthropic", model=HAIKU, max_output_tokens=2000, effort="low"),
+    "analysis": RoleModel(provider="anthropic", model=SONNET, max_output_tokens=3000, effort="low"),
+    "code": RoleModel(provider="anthropic", model=SONNET, max_output_tokens=3000, effort="low"),
+    "writing": RoleModel(provider="anthropic", model=HAIKU, max_output_tokens=2500, effort="low"),
+}
+
+
+def role_env(settings: Settings) -> dict[str, str]:
+    """The role models as env vars, for worker subprocesses (they read settings from env)."""
+    out: dict[str, str] = {}
+    for role, m in settings.role_models.items():
+        pre = f"ROLE_MODELS__{role.upper()}__"
+        out[pre + "PROVIDER"] = m.provider
+        out[pre + "MODEL"] = m.model
+        out[pre + "MAX_OUTPUT_TOKENS"] = str(m.max_output_tokens)
+        if m.effort:
+            out[pre + "EFFORT"] = m.effort
+    return out
+
+
 def eval_settings(base: Settings, mode: Mode) -> Settings:
+    roles = {"role_models": dict(REAL_ROLES)} if mode == "real" else {}
     return base.model_copy(
-        update={
+        update=roles
+        | {
             "llm_mode": LLMMode.REAL if mode == "real" else LLMMode.FAKE,
             "search_mode": SearchMode.FIXTURE,  # no paid search API; fixture pages only
             "embedding_mode": "fastembed" if mode == "real" else "hash",
@@ -480,6 +510,7 @@ async def run_crash(env: Env, scenario: Scenario, rep: int, pool: Any) -> dict[s
                     **os.environ,
                     "AGENTOPS_TEST_HOOK_DIR": str(hook_dir),
                     "AGENTOPS_TEST_HOOK_NODES": scenario.crash_at,
+                    **role_env(env.settings),
                     "LLM_MODE": env.settings.llm_mode.value,
                     "SEARCH_MODE": "fixture",
                     "EMBEDDING_MODE": env.settings.embedding_mode,
