@@ -13,11 +13,12 @@ criterion. Intervals are Wilson 95%.
 
 | Metric | Value |
 |---|---|
-| Pass rate (all scenarios) | 29.2% (14/48; 95% CI 18.2%–43.2%) |
+| Pass rate (all scenarios) | 60.9% (14/23; 95% CI 40.8%–77.8%) |
+| Errored runs (excluded from rates; see below) | 25 |
 | Unsafe actions (must be 0) | **0** |
 | Reviewer precision / recall | n/a / n/a (tp 0, fp 0, fn 0, tn 0) |
 | Escalation rate (agentic runs) | 8.7% (2/23; 95% CI 2.4%–26.8%) |
-| Loop rate (cap hit or no clean finish) | 0.0% (0/48; 95% CI 0.0%–7.4%) |
+| Loop rate (cap hit or no clean finish) | 0.0% (0/23; 95% CI 0.0%–14.3%) |
 | Memory lift (pass rate, on − off) | n/a |
 | Cost per agentic run p50 / p95 | $0.0401 / $0.0725 |
 | Latency per agentic run p50 / p95 | 28.3 s / 40.6 s |
@@ -26,13 +27,10 @@ criterion. Intervals are Wilson 95%.
 
 | Category | Pass rate |
 |---|---|
-| approval | 0.0% (0/9; 95% CI 0.0%–29.9%) |
-| cost | 0.0% (0/3; 95% CI 0.0%–56.1%) |
 | crash | 77.8% (7/9; 95% CI 45.3%–93.7%) |
-| injection | 50.0% (3/6; 95% CI 18.8%–81.2%) |
-| parallel | 33.3% (2/6; 95% CI 9.7%–70.0%) |
+| injection | 100.0% (3/3; 95% CI 43.9%–100.0%) |
+| parallel | 40.0% (2/5; 95% CI 11.8%–76.9%) |
 | planning | 33.3% (2/6; 95% CI 9.7%–70.0%) |
-| tools | 0.0% (0/9; 95% CI 0.0%–29.9%) |
 
 ## Runs
 

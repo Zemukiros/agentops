@@ -7,6 +7,12 @@
    "scenarios": 60,
    "cap_usd": 16.0,
    "label": "baseline",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
    "git_commit": "fef717e00fc22df81e55aadd970de26bd076d3d1-dirty",
    "finished_at": "2026-11-10T17:22:43.618562+00:00",
    "role_models": {
@@ -16,12 +22,6 @@
     "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
     "writing": "anthropic/claude-haiku-5-5 (effort low)",
     "code": "anthropic/claude-sonnet-5-5 (effort low)"
-   },
-   "judge": {
-    "model": "claude-opus-5-5",
-    "effort": "low",
-    "prompt_version": "4acd9112afef",
-    "bias_note": null
    },
    "fingerprints": [
     [
@@ -271,6 +271,7 @@
     0.6896260010381905
    ]
   },
+  "errored_runs": 0,
   "by_category": {
    "approval": {
     "n": 15,

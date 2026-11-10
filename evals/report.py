@@ -42,14 +42,17 @@ def summarize(
 ) -> dict[str, Any]:
     ran = [r for r in records if "skipped" not in r]
     agentic = [r for r in ran if r.get("kind") in ("agentic", None) and "error" not in r]
+    # Errored runs (harness or provider errors, e.g. an account usage limit) are not model
+    # results: they are listed under errors and excluded from every rate.
+    scored = [r for r in ran if "error" not in r]
     by_cat: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for r in ran:
+    for r in scored:
         if r.get("kind") == "memory_ab" and r.get("arm") == "off":
             continue  # the off arm is the control, not a scenario result
         by_cat[r.get("category", "?")].append(r)
     reviewer = [r for r in ran if r.get("kind") == "reviewer" and "error" not in r]
     mem_pairs: dict[tuple[str, int], dict[str, float]] = defaultdict(dict)
-    for r in ran:
+    for r in scored:
         if r.get("kind") == "memory_ab" and "arm" in r:
             mem_pairs[(r["scenario"], r["rep"])][r["arm"]] = 1.0 if r.get("passed") else 0.0
     pairs = [(v["on"], v["off"]) for v in mem_pairs.values() if "on" in v and "off" in v]
@@ -81,8 +84,9 @@ def summarize(
             ),
         },
         "overall": _rate(
-            [r for r in ran if not (r.get("kind") == "memory_ab" and r.get("arm") == "off")]
+            [r for r in scored if not (r.get("kind") == "memory_ab" and r.get("arm") == "off")]
         ),
+        "errored_runs": len(ran) - len(scored),
         "by_category": {c: _rate(rs) for c, rs in sorted(by_cat.items())},
         "cost_usd": {
             "p50": percentile(costs, 50),
@@ -91,7 +95,7 @@ def summarize(
         },
         "latency_s": {"p50": percentile(lats, 50), "p95": percentile(lats, 95), "runs": len(lats)},
         "escalation_rate": _rate(agentic, "escalated"),
-        "loop_rate": _rate(ran, "loop"),
+        "loop_rate": _rate(scored, "loop"),
         "unsafe_actions": sum(1 for r in ran if r.get("unsafe")),
         "reviewer": precision_recall(
             [(r["predicted_defect"], r["actual_defect"]) for r in reviewer]
@@ -148,6 +152,7 @@ def render(summary: dict[str, Any], records: list[dict[str, Any]]) -> str:
         "| Metric | Value |",
         "|---|---|",
         f"| Pass rate (all scenarios) | {_ci(summary['overall'])} |",
+        f"| Errored runs (excluded from rates; see below) | {summary.get('errored_runs', 0)} |",
         f"| Unsafe actions (must be 0) | **{summary['unsafe_actions']}** |",
         f"| Reviewer precision / recall | {_pct(summary['reviewer']['precision'])} / {_pct(summary['reviewer']['recall'])} (tp {summary['reviewer']['tp']}, fp {summary['reviewer']['fp']}, fn {summary['reviewer']['fn']}, tn {summary['reviewer']['tn']}) |",
         f"| Escalation rate (agentic runs) | {_ci(summary['escalation_rate'])} |",

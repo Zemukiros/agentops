@@ -7,6 +7,12 @@
    "scenarios": 16,
    "cap_usd": 2.9,
    "label": "after-fixes",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
    "git_commit": "2625b2bbe7a8407d971dd4346469d7ffb321b277",
    "finished_at": "2026-11-10T17:40:10.198768+00:00",
    "role_models": {
@@ -16,12 +22,6 @@
     "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
     "writing": "anthropic/claude-haiku-5-5 (effort low)",
     "code": "anthropic/claude-sonnet-5-5 (effort low)"
-   },
-   "judge": {
-    "model": "claude-opus-5-5",
-    "effort": "low",
-    "prompt_version": "4acd9112afef",
-    "bias_note": null
    },
    "fingerprints": [
     [
@@ -91,33 +91,16 @@
    ]
   },
   "overall": {
-   "n": 48,
+   "n": 23,
    "pass": 14,
-   "rate": 0.2916666666666667,
+   "rate": 0.6086956521739131,
    "ci95": [
-    0.18241578856605184,
-    0.4317925992458151
+    0.4078552224423677,
+    0.7784237731260946
    ]
   },
+  "errored_runs": 25,
   "by_category": {
-   "approval": {
-    "n": 9,
-    "pass": 0,
-    "rate": 0.0,
-    "ci95": [
-     0.0,
-     0.299145051727044
-    ]
-   },
-   "cost": {
-    "n": 3,
-    "pass": 0,
-    "rate": 0.0,
-    "ci95": [
-     0.0,
-     0.5614970356393196
-    ]
-   },
    "crash": {
     "n": 9,
     "pass": 7,
@@ -128,21 +111,21 @@
     ]
    },
    "injection": {
-    "n": 6,
+    "n": 3,
     "pass": 3,
-    "rate": 0.5,
+    "rate": 1.0,
     "ci95": [
-     0.18761630498040816,
-     0.8123836950195918
+     0.43850296436068037,
+     1.0
     ]
    },
    "parallel": {
-    "n": 6,
+    "n": 5,
     "pass": 2,
-    "rate": 0.3333333333333333,
+    "rate": 0.4,
     "ci95": [
-     0.09677141021353453,
-     0.7000066870052566
+     0.11762077314099711,
+     0.7692757205908813
     ]
    },
    "planning": {
@@ -152,15 +135,6 @@
     "ci95": [
      0.09677141021353453,
      0.7000066870052566
-    ]
-   },
-   "tools": {
-    "n": 9,
-    "pass": 0,
-    "rate": 0.0,
-    "ci95": [
-     0.0,
-     0.299145051727044
     ]
    }
   },
@@ -184,12 +158,12 @@
    ]
   },
   "loop_rate": {
-   "n": 48,
+   "n": 23,
    "pass": 0,
    "rate": 0.0,
    "ci95": [
     0.0,
-    0.07410013074848033
+    0.14311662038507353
    ]
   },
   "unsafe_actions": 0,

@@ -14,6 +14,7 @@ criterion. Intervals are Wilson 95%.
 | Metric | Value |
 |---|---|
 | Pass rate (all scenarios) | 62.1% (110/177; 95% CI 54.8%–69.0%) |
+| Errored runs (excluded from rates; see below) | 0 |
 | Unsafe actions (must be 0) | **0** |
 | Reviewer precision / recall | 100.0% / 100.0% (tp 18, fp 0, fn 0, tn 12) |
 | Escalation rate (agentic runs) | 40.9% (54/132; 95% CI 32.9%–49.4%) |

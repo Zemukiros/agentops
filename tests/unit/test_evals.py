@@ -6,6 +6,7 @@ import pytest
 from agentops.settings import Settings
 from evals import cassette, estimate, metrics
 from evals.judge import parse
+from evals.report import summarize
 from evals.runner import REAL_ROLES, eval_settings, role_env
 from evals.spec import DEFAULT_DECISIONS, Rule, decision_for, load
 
@@ -147,3 +148,15 @@ def test_real_mode_uses_real_role_models_in_process_and_in_worker_subprocesses(
     sub = Settings()  # what a worker subprocess builds from its environment
     assert sub.role_models == s.role_models
     assert eval_settings(Settings(), "dry").role_models == Settings().role_models
+
+
+def test_errored_runs_are_excluded_from_rates_and_counted() -> None:
+
+    runs = [
+        {"scenario": "a", "rep": 0, "category": "tools", "kind": "agentic", "passed": True},
+        {"scenario": "a", "rep": 1, "category": "tools", "kind": "agentic", "passed": False},
+        {"scenario": "a", "rep": 2, "category": "tools", "error": "BadRequestError: usage limit"},
+    ]
+    s = summarize(runs, eval_settings(Settings(), "dry"), {"run_id": "t", "judge": "x"})
+    assert (s["overall"]["n"], s["overall"]["pass"], s["errored_runs"]) == (2, 1, 1)
+    assert s["by_category"]["tools"]["n"] == 2
