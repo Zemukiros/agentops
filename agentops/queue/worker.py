@@ -45,7 +45,7 @@ from agentops.db.models import TERMINAL_TASK_STATUSES
 from agentops.db.session import get_sessionmaker, make_engine
 from agentops.memory.service import MemoryService
 from agentops.models.client import ChatFactory, ModelClient, fake_factory
-from agentops.models.fake import topic_of
+from agentops.models.fake import FakeScript, topic_of
 from agentops.models.scenarios import DEFAULT_SCENARIO, SCENARIOS
 from agentops.observability import tracing
 from agentops.observability.events import emit_on
@@ -109,9 +109,11 @@ class Worker:
         *,
         chat_factory: ChatFactory | None = None,
         tools: ToolRegistry | None = None,
+        fake_script: FakeScript | None = None,
     ) -> None:
         """`chat_factory` overrides model selection (tests); otherwise fake mode uses the
-        task's scripted scenario and real mode the provider factory."""
+        task's scripted scenario (from `fake_script`, default the built-in scenarios; the eval
+        harness passes recorded cassettes here) and real mode the provider factory."""
         self.settings = settings
         self.engine = engine
         self.checkpointer = checkpointer
@@ -120,6 +122,7 @@ class Worker:
         self._sessionmaker = get_sessionmaker(engine)
         self._ledger = BudgetLedger(self._sessionmaker)
         self._chat_factory = chat_factory
+        self._fake_script = fake_script
         self._real_factory: ChatFactory | None = None
         self._tools = tools if tools is not None else build_registry(settings)
         self._memory = MemoryService(settings, engine)
@@ -217,7 +220,7 @@ class Worker:
         if factory is None:
             if self.settings.llm_mode is LLMMode.FAKE:
                 scenario = str(task_config.get("scenario") or DEFAULT_SCENARIO)
-                factory = fake_factory(SCENARIOS, scenario, topic_of(request))
+                factory = fake_factory(self._fake_script or SCENARIOS, scenario, topic_of(request))
             else:
                 if self._real_factory is None:
                     from agentops.models.anthropic import real_factory  # noqa: PLC0415

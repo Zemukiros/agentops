@@ -1,0 +1,70 @@
+- id: par-two-sections
+  category: parallel
+  title: Independent sections run in the same wave
+  request: Write two independent sections about pgvector, an "Introduction" and a "Frequently asked questions" section with three questions. They do not depend on each other.
+  expected_subtasks: 2
+  cassette: true
+  fake_scenario: chain
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: parallel_wave, args: {min_width: 2}}
+    - {name: bounded}
+  rubric:
+    - Has an Introduction section.
+    - Has a FAQ section with three questions and answers.
+
+- id: par-research-and-sql
+  category: parallel
+  title: Research and data work in parallel, then combined
+  request: Independently (a) summarize what pgvector is and (b) find the total number of orders in the demo database. Then combine both into one short note.
+  expected_subtasks: 3
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: parallel_wave, args: {min_width: 2}}
+    - {name: plan_has_dependency}
+    - {name: deliverable_matches_sql, args: {query: "SELECT count(*) FROM demo.orders"}}
+  rubric:
+    - Summarizes pgvector correctly.
+    - States the order count.
+    - Is one combined note.
+
+- id: par-glossary
+  category: parallel
+  title: Three independent definitions, merged
+  request: Write three independent short definitions (embeddings, HNSW, cosine similarity) as separate pieces of work, then merge them into one glossary.
+  expected_subtasks: 4
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: parallel_wave, args: {min_width: 2}}
+    - {name: deliverable_mentions, args: {any_of: [embedding, hnsw, cosine], min_hits: 3}}
+  rubric:
+    - Defines all three terms correctly.
+    - Is presented as one glossary.
+
+- id: par-regions
+  category: parallel
+  title: Two independent data lookups, then a comparison
+  request: In the demo sales database, compute total revenue (quantity times unit price) for the East region and, separately, for the West region. Then write one sentence comparing them.
+  expected_subtasks: 3
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: tool_used, args: {tool: sql_query}}
+    - {name: deliverable_matches_sql, args: {query: "SELECT sum(o.quantity*p.unit_price) FROM demo.orders o JOIN demo.customers c ON c.id=o.customer_id JOIN demo.products p ON p.id=o.product_id WHERE c.region='East'"}}
+    - {name: deliverable_matches_sql, args: {query: "SELECT sum(o.quantity*p.unit_price) FROM demo.orders o JOIN demo.customers c ON c.id=o.customer_id JOIN demo.products p ON p.id=o.product_id WHERE c.region='West'"}}
+  rubric:
+    - Gives both totals.
+    - Correctly says which region is higher.
+
+- id: par-fan-in
+  category: parallel
+  title: Three parallel parts feed one conclusion
+  request: Produce a mini report with three independent parts written in parallel (pros of pgvector, cons of pgvector, when to choose a dedicated vector database) and a final conclusion that depends on all three.
+  expected_subtasks: 4
+  checks:
+    - {name: status_in, args: {statuses: [completed, completed_partial]}}
+    - {name: parallel_wave, args: {min_width: 3}}
+    - {name: plan_has_dependency}
+    - {name: bounded}
+  rubric:
+    - Has pros, cons and a "when to choose a dedicated database" part.
+    - Ends with a conclusion that draws on all three parts.

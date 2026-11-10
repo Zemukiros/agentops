@@ -1,0 +1,80 @@
+# Memory A/B: arm "on" first runs the prime task(s) for the same user (a stated team
+# preference), arm "off" runs the target task for a fresh user. Lift = pass(on) - pass(off).
+# No check depends on the arm, so the comparison is fair; only the rubric differs in outcome.
+- id: mem-sources-line
+  category: memory
+  kind: memory_ab
+  title: Remembers "end briefs with a Sources line"
+  prime:
+    - "Write a short brief on pgvector for the team. Team rule for every brief: end with a line that starts with 'Sources:'."
+  request: Write a short brief on HNSW indexes for the team.
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+  rubric:
+    - The brief ends with a line that starts with "Sources:".
+    - The brief explains HNSW correctly.
+
+- id: mem-tldr-first
+  category: memory
+  kind: memory_ab
+  title: Remembers "start summaries with a TL;DR"
+  prime:
+    - "Summarize what pgvector is. Team preference for every summary: start with a one-line TL;DR."
+  request: Summarize what vector embeddings are.
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+  rubric:
+    - The summary starts with a one-line TL;DR.
+    - The summary explains embeddings correctly.
+
+- id: mem-word-limit
+  category: memory
+  kind: memory_ab
+  title: Remembers a word limit
+  prime:
+    - "Summarize what HNSW is. Team preference: our summaries are at most 80 words."
+  request: Summarize what IVFFlat indexes are.
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+  rubric:
+    - The summary is at most 80 words.
+    - The summary explains IVFFlat correctly.
+
+- id: mem-recommendation-first
+  category: memory
+  kind: memory_ab
+  title: Remembers "recommendation on the first line"
+  prime:
+    - "Recommend whether to use pgvector for a 500k-vector FAQ search. Team format: the first line is 'Recommendation: <choice>'."
+  request: Recommend whether to use pgvector for a 2-million-vector product catalog search.
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+  rubric:
+    - 'The first line has the form "Recommendation: <choice>".'
+    - The recommendation is justified.
+
+- id: mem-no-jargon
+  category: memory
+  kind: memory_ab
+  title: Remembers the audience
+  prime:
+    - "Explain what pgvector is. Our readers are non-technical executives: avoid acronyms such as ANN, HNSW and SQL."
+  request: Explain how vector search works.
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+  rubric:
+    - Uses no unexplained acronyms (ANN, HNSW, SQL, kNN).
+    - Is understandable by a non-technical executive.
+
+- id: mem-revenue-format
+  category: memory
+  kind: memory_ab
+  title: Remembers a number format
+  prime:
+    - "Report the total revenue (quantity times unit price) for the East region of the demo database. Team format: amounts in thousands with a 'k' suffix, e.g. 20.2k."
+  request: Report the total revenue (quantity times unit price) for the South region of the demo database.
+  expected_subtasks: 2
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+  rubric:
+    - States the South region's revenue in thousands with a 'k' suffix (about 19.2k).

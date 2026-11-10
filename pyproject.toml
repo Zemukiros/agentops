@@ -43,6 +43,8 @@ dev = [
     "mypy==2.4.1",
     "pre-commit==4.7.0",
     "detect-secrets==1.5.0",
+    "pyyaml==6.0.3",
+    "types-pyyaml==6.0.12.20261103",
 ]
 
 [build-system]
@@ -62,6 +64,11 @@ select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "SIM", "RUF", "PL"]
 ignore = ["PLR0913", "PLR2004", "S101"]
 
 [tool.ruff.lint.per-file-ignores]
+# eval harness (tooling, not the service): seeded random for sampling (S311), fixed git and
+# worker subprocesses (S603/S607), a polling harness (ASYNC*), one long orchestration function
+# (PLR0915), typographic dashes in the report (RUF001); report.py renders long table rows.
+"evals/**" = ["S311", "S603", "S607", "ASYNC110", "ASYNC220", "ASYNC240", "PLR0915", "RUF001"]
+"evals/report.py" = ["S311", "S603", "S607", "RUF001", "E501"]
 "tests/**" = ["S", "PLR", "ASYNC109", "ASYNC110", "ASYNC220", "ASYNC221", "ASYNC240"]
 "tests/conftest.py" = ["S", "PLR", "E501"]
 "tests/e2e/**" = ["S", "PLR", "E501"]  # report-printing lines
@@ -81,7 +88,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 check_untyped_defs = true
 ignore_missing_imports = false
-files = ["agentops", "tests"]
+files = ["agentops", "tests", "evals"]
 
 [[tool.mypy.overrides]]
 module = ["agentops.core.*", "agentops.tools.*", "agentops.queue.*"]

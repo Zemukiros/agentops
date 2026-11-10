@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
-PRICE_TABLE_VERSION = "2026-11-05.2"
+PRICE_TABLE_VERSION = "2026-11-10.1"
 
 
 @dataclass(frozen=True)
@@ -55,6 +55,15 @@ PRICES: dict[tuple[str, str], ModelPrice] = {
         10.0,
         verified=True,
         source="platform.claude.com/docs/en/about-claude/pricing, checked 2026-11-05",
+    ),
+    # Eval judge (Phase 6). Checked against the same page on 2026-11-10.
+    ("anthropic", "claude-opus-5-5"): ModelPrice(
+        "anthropic",
+        "claude-opus-5-5",
+        4.0,
+        20.0,
+        verified=True,
+        source="platform.claude.com/docs/en/about-claude/pricing, checked 2026-11-10",
     ),
     ("anthropic", "claude-haiku-5-5"): ModelPrice(
         "anthropic",

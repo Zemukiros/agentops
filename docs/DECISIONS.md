@@ -332,6 +332,10 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 **Decision.** The screen drops any candidate that contains an email address, a standing directive ("from now on", "going forward", "in all future tasks"), an always/never/must/should + send/forward/email/cc/share/upload/post/delete/remove/disclose/leak construction, injection phrasing, or tool-call language. Recall still labels memories as "past examples, may not apply" inside data delimiters.
 **Cost.** Some legitimate lessons are dropped (e.g. "drafts should remove jargon"). Accepted: a lost lesson costs a little quality; a stored order is a persistent compromise. Measured by the eval's memory category.
 
+## ADR-046 · Replay snapshots never fail a task · accepted
+**Problem (found by the eval dry run).** The `.snapshots` directory was created by the compose worker (container user, mode 755). A worker running as another user on the same volume (the host-side eval workers, or a second deployment) got `PermissionError` in `schedule`, and the **user's task failed** over something that only serves future replays.
+**Decision.** Snapshot directories are created world-writable like the task workspaces (the sandbox's uid must write there too). A snapshot error is caught in `schedule`, recorded as a `replay.snapshot_failed` event, and the run continues; forking at that wave then fails with the existing "snapshot missing" error instead of guessing.
+
 ## Deferred (not in scope unless time allows)
 - Nightly memory consolidation clustering (do a simple version: dedupe near-identical memories)
 - gVisor runtime, warm sandbox pool
