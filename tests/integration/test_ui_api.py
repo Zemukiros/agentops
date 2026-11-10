@@ -401,7 +401,7 @@ async def test_ui_demo_scenario_walkthrough(
     )
     assert subs["brief"]["revisions"] == 1
     assert [r["verdict"] for r in subs["brief"]["reviews"]] == ["revise", "accept"]
-    assert d["final"].startswith("# Vector search")
+    assert d["final"].startswith("# Summarize")  # the request's topic, not canned text
     [a] = d["actions"]
     assert a["outcome"]["status"] == "done" and a["mailpit_url"]
     tools = {

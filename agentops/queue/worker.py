@@ -45,6 +45,7 @@ from agentops.db.models import TERMINAL_TASK_STATUSES
 from agentops.db.session import get_sessionmaker, make_engine
 from agentops.memory.service import MemoryService
 from agentops.models.client import ChatFactory, ModelClient, fake_factory
+from agentops.models.fake import topic_of
 from agentops.models.scenarios import DEFAULT_SCENARIO, SCENARIOS
 from agentops.observability import tracing
 from agentops.observability.events import emit_on
@@ -211,12 +212,12 @@ class Worker:
                 run.cancel()
                 return
 
-    def _model_client(self, task_config: dict[str, Any]) -> ModelClient:
+    def _model_client(self, task_config: dict[str, Any], request: str = "") -> ModelClient:
         factory = self._chat_factory
         if factory is None:
             if self.settings.llm_mode is LLMMode.FAKE:
                 scenario = str(task_config.get("scenario") or DEFAULT_SCENARIO)
-                factory = fake_factory(SCENARIOS, scenario)
+                factory = fake_factory(SCENARIOS, scenario, topic_of(request))
             else:
                 if self._real_factory is None:
                     from agentops.models.anthropic import real_factory  # noqa: PLC0415
@@ -277,7 +278,7 @@ class Worker:
                     "orphaned_reservations_charged": orphans,
                 },
             )
-        model = self._model_client(dict(task_config or {})) if spec.needs_model else None
+        model = self._model_client(dict(task_config or {}), request) if spec.needs_model else None
         replay_ctx = None
         if task_kind == "replay":
             replay_ctx = ReplayContext(lineage=await replay.lineage(self.engine, task_id))

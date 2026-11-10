@@ -266,7 +266,7 @@ export function Layout({ items }: { items: NavItem[] }) {
           </div>
         </aside>
         <main id="main" className="min-w-0 flex-1">
-          <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+          <div className="w-full px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
             <Outlet />
           </div>
         </main>

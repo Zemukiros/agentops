@@ -2,7 +2,7 @@ SHELL := /bin/bash
 UV ?= uv
 COMPOSE ?= docker compose
 
-.PHONY: test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
+.PHONY: reset-demo test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
 
 # Task workspaces live on the host so sandbox containers can bind-mount them (ADR-031).
 export AGENTOPS_WORKSPACES_HOST_DIR ?= $(CURDIR)/var/workspaces
@@ -63,6 +63,9 @@ test-sandbox: ## Sandbox isolation tests against the local Docker daemon (needs 
 
 sandbox-selfcheck: ## Through-proxy check: worker container -> socket proxy -> sandbox, file round trip
 	$(COMPOSE) exec worker python -m agentops.tools.sandbox --selfcheck
+
+reset-demo: ## Dev only: delete local tasks, memories, workspaces, Mailpit (asks first; keeps users)
+	$(UV) run python -m agentops.db.reset_demo
 
 test-ui: ## UI: lint + typecheck + Vitest
 	cd ui && npm run lint && npm run typecheck && npm test

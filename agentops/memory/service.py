@@ -138,6 +138,25 @@ class MemoryService:
                 ).first()
                 if exists:
                     continue
+                dup = await store.find_duplicate(
+                    conn,
+                    user_id=user_id,
+                    kind=kind,
+                    text_=text_,
+                    embedding=v,
+                    threshold=self.settings.memory_dedupe_similarity,
+                )
+                if dup is not None:
+                    await store.refresh(
+                        conn,
+                        dup,
+                        text_=text_,
+                        embedding=v,
+                        importance=importance,
+                        outcome=status,
+                        source_task_id=task_id,
+                    )
+                    continue
                 ids.append(
                     await store.insert(
                         conn,

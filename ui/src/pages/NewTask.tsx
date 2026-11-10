@@ -34,15 +34,21 @@ export function parseBudget(f: BudgetForm): { value: Record<string, number> | nu
 
 export function NewTask() {
   const [request, setRequest] = useState("");
-  const [scenario, setScenario] = useState("");
+  // null = not chosen yet: the server's default (ui_demo in fake mode) applies
+  const [picked, setScenario] = useState<string | null>(null);
   const [budget, setBudget] = useState<BudgetForm>({ max_usd: "", max_llm_calls: "", max_tokens: "" });
   const [errors, setErrors] = useState<Partial<BudgetForm> & { request?: string }>({});
   const navigate = useNavigate();
   const scenarios = useQuery({
     queryKey: ["scenarios"],
-    queryFn: () => api<{ fake_mode: boolean; scenarios: string[] }>("/tasks/scenarios"),
+    queryFn: () =>
+      api<{ fake_mode: boolean; default: string | null; scenarios: { name: string; description: string }[] }>(
+        "/tasks/scenarios",
+      ),
     staleTime: Infinity,
   });
+  const scenario = picked ?? scenarios.data?.default ?? "";
+  const chosen = scenarios.data?.scenarios.find((s) => s.name === scenario);
   const create = useMutation({
     mutationFn: (body: object) => api<Task>("/tasks", { method: "POST", body }),
     onSuccess: (t) => navigate(`/tasks/${t.id}`),
@@ -111,17 +117,14 @@ export function NewTask() {
               <Field
                 label="Demo scenario (fake mode)"
                 htmlFor="scenario"
-                hint="Scripted model responses for local runs. Real mode ignores this."
+                hint={chosen?.description ?? "Scripted model responses for local runs. Real mode ignores this."}
               >
                 <select id="scenario" value={scenario} onChange={(e) => setScenario(e.target.value)} className={inputClass}>
-                  <option value="">default</option>
-                  {scenarios.data.scenarios
-                    .filter((s) => s !== "default")
-                    .map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
+                  {scenarios.data.scenarios.map((s) => (
+                    <option key={s.name} value={s.name}>
+                      {s.name}: {s.description}
+                    </option>
+                  ))}
                 </select>
               </Field>
             </div>

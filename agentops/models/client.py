@@ -68,7 +68,9 @@ class _Attempt:
     usd: float | None
 
 
-def fake_factory(script: FakeScript | None = None, scenario: str = "default") -> ChatFactory:
+def fake_factory(
+    script: FakeScript | None = None, scenario: str = "default", topic: str = "the request"
+) -> ChatFactory:
     def make(role: str, purpose: str, cfg: RoleModel) -> BaseChatModel:
         return ScriptedChatModel(
             role=role,
@@ -77,6 +79,7 @@ def fake_factory(script: FakeScript | None = None, scenario: str = "default") ->
             script=script or FakeScript(),
             model_name=cfg.model,
             max_tokens=cfg.max_output_tokens,
+            topic=topic,
         )
 
     return make

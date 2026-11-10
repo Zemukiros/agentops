@@ -185,7 +185,7 @@ await waitFor(branch.id, ["completed", "completed_partial"]);
 for (const theme of ["light", "dark"]) {
   await shoot(theme, 1440, "task-completed", async (p) => {
     await p.goto(`${UI}/tasks/${demo.id}`);
-    await p.getByRole("heading", { name: /Vector search/ }).first().waitFor();
+    await p.getByRole("heading", { name: /^Compare pgvector/ }).first().waitFor();
     await p.locator("details summary", { hasText: "brief" }).first().click();
   });
   await shoot(theme, 1440, "trace-cost", async (p) => {
@@ -216,7 +216,7 @@ for (const theme of ["light", "dark"]) {
 }
 await shoot("light", 390, "task-completed", async (p) => {
   await p.goto(`${UI}/tasks/${demo.id}`);
-  await p.getByRole("heading", { name: /Vector search/ }).first().waitFor();
+  await p.getByRole("heading", { name: /^Compare pgvector/ }).first().waitFor();
 });
 await shoot("dark", 390, "tasks", async (p) => {
   await p.goto(`${UI}/tasks`);

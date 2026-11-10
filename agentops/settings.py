@@ -162,6 +162,9 @@ class Settings(BaseSettings):
     # them by alpha*sim + beta*importance + gamma*recency (half-life in days), keeps top_k.
     memory_min_similarity: float = Field(default=0.6, ge=-1, le=1)
     memory_top_k: int = Field(default=5, ge=1, le=20)
+    # Near-duplicates (same user + kind, cosine >= this, or identical text) are not stored twice
+    # and are collapsed at recall (Phase 6: repeated requests recalled the same task N times).
+    memory_dedupe_similarity: float = Field(default=0.95, gt=0, le=1)
     memory_alpha: float = 0.7
     memory_beta: float = 0.2
     memory_gamma: float = 0.1

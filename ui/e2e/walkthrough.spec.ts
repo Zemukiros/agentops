@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { MAILPIT, expectAccessible, identityButton, mailCount, signIn, switchIdentity, tokens } from "./support";
+import { API, MAILPIT, expectAccessible, identityButton, mailCount, signIn, switchIdentity, tokens } from "./support";
+
+const created: string[] = [];
+
+test.afterAll(async () => {
+  // Leave no e2e runs behind: DELETE /tasks purges each task's tree (branches, memories).
+  const { user } = tokens();
+  for (const id of created) {
+    await fetch(`${API}/tasks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${user}` } });
+  }
+});
 
 const REQUEST = `Compare pgvector with dedicated vector databases and email the team a brief (e2e ${Date.now()})`;
 
@@ -29,11 +39,12 @@ test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> 
   await expect(page.getByRole("heading", { name: "New task", level: 1 })).toBeVisible();
   await page.getByLabel("Request", { exact: true }).fill(REQUEST);
   await expect(page.getByLabel("Request", { exact: true })).toHaveValue(REQUEST);
-  await page.getByLabel("Demo scenario (fake mode)").selectOption("ui_demo");
+  await expect(page.getByLabel("Demo scenario (fake mode)")).toHaveValue("ui_demo"); // the default
   await expectAccessible(page, "new task");
   await page.getByRole("button", { name: "Start task" }).click();
   await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]{36}$/);
   const taskId = page.url().split("/").pop()!;
+  created.push(taskId);
 
   // 3. the DAG updates live (no reload): research works, is accepted, then brief starts
   const graph = page.getByRole("group", { name: /Plan graph/ });
@@ -59,7 +70,8 @@ test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> 
   await switchIdentity(page, /demo-user/);
   await page.goto(`/tasks/${taskId}`);
   await expect(page.getByText("Completed").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Vector search: pgvector or a dedicated database/ })).toBeVisible();
+  // fake-mode text is titled with the request's topic
+  await expect(page.getByRole("heading", { name: /^Compare pgvector with dedicated vector databases/ })).toBeVisible();
   const mail = page.getByRole("link", { name: /View email in Mailpit/ });
   await expect(mail).toHaveAttribute("href", new RegExp(`^${MAILPIT}/view/`));
   const messageId = await page.evaluate(async (id) => {

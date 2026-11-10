@@ -62,7 +62,7 @@ export function ComparePage() {
   const stats = diffStats(rows);
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-[1600px] space-y-4">
       <nav aria-label="Breadcrumb" className="text-xs text-fg-subtle">
         <Link to={`/tasks/${left.id}?tab=replay`} className="hover:text-fg hover:underline">
           {shortId(left.id)} replay
