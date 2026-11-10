@@ -357,6 +357,10 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 **Problem (found by CI on PR #6).** LangGraph 1.2.20 defaults to `durability="async"`: a step's checkpoint is written *while the next step already runs*. A worker killed early in step N can therefore lose step N−1's checkpoint and redo finished work on resume, which weakens the crash-recovery guarantee (ADR-022). `test_run_resumes_from_checkpoint_on_another_process_after_crash` caught it on a slow CI runner (`state.next == ()` while step_two was running); it passed locally 10/10.
 **Decision.** The worker runs every graph with `durability="sync"`: each step's checkpoint is committed before the next step starts. Cost: one checkpoint round trip per step, small next to model calls. A test-only hook (`AGENTOPS_TEST_CHECKPOINT_DELAY_S`, inert unless the test hook dir is set) slows checkpoint writes by 1.5 s so the race is certain; the regression test fails under the default and passes with sync.
 
+## ADR-052 · The deliverable reports what actually happened to actions · accepted
+**Problem (found by the real-model UI walkthrough).** The email was approved and sent exactly once, but the deliverable began "Status: not sent. No email tool was available". The writer's draft is written *before* approval (it only proposes), and the synthesizer composed the final text from that draft without seeing the action outcomes.
+**Decision.** `synth_messages` gets an `<actions>` block, one line per proposed action with its real outcome (done, done by a human, rejected, failed, unknown, not performed) and detail; the synthesizer is told to report actions exactly as listed, even where a pre-approval draft says otherwise. The "What's missing" section for unperformed actions is unchanged. Unit-tested; not re-measured with real models (eval budget spent).
+
 ## Deferred (not in scope unless time allows)
 - Nightly memory consolidation clustering (do a simple version: dedupe near-identical memories)
 - gVisor runtime, warm sandbox pool

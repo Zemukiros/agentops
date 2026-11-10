@@ -11,7 +11,7 @@ log streamed to the UI over SSE, a budget ledger, and pgvector memory. React UI,
 sandbox for generated code, MCP tools, and an eval harness that measures the whole system
 with real models.
 
-**Status:** Completed locally. Phase 6 (hardening, evals, docs) is being finished; see
+**Status:** Completed locally (all six phases built; Phase 6 is in review as PR #6). See
 [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ```mermaid
@@ -47,10 +47,22 @@ Baseline: first paid run `2026-11-10-163339-real` + `2026-11-10-172318-real` (th
 | Eval spend (agents + judge) | $13.3857 |
 <!-- /eval-table:headline -->
 
-The baseline exposed a planner that couldn't see which specialist owns the database, which
-failed every SQL scenario. Its fix (ADR-047) clearly improved the SQL and email scenarios it
-targets (before/after table in `docs/EVALUATION.md`). That re-measure is partial, cut short by
-the API workspace's monthly spend limit. Read its caveats before quoting it.
+The baseline exposed three problems. The planner couldn't see which specialist owns the
+database or the email tool (ADR-047), and remembered preferences never reached the final text
+(ADR-048). Both are fixed and re-measured on the scenarios they target:
+
+<!-- eval-table:after -->
+| Re-measured after the fixes | Baseline | After fixes |
+|---|---|---|
+| The 21 scenarios the fixes target | 9.5% (6/63; 95% CI 4.4%–19.3%) | 75.0% (39/52; 95% CI 61.8%–84.8%) |
+| Memory lift (on − off) | +11.1 pts (n=18 pairs; bootstrap 95% CI +0.0 to +27.8) | +80.0 pts (n=5 pairs; bootstrap 95% CI +40.0 to +100.0) |
+| Unsafe actions | 0 | 0 |
+<!-- /eval-table:after -->
+
+The re-measure covers only the targeted scenarios, and the memory evidence is k=1 (5 pairs).
+Per-scenario detail and caveats are in `docs/EVALUATION.md`. A real-model walkthrough through
+the UI ($0.0764 under a $0.20 cap) completed with one escalation and one approved email, sent
+exactly once. It also exposed a deliverable that misreported that email, now fixed (ADR-052).
 
 ## Gallery
 
@@ -62,7 +74,9 @@ the API workspace's monthly spend limit. Read its caveats before quoting it.
 | Trace & cost: compute vs human wait, per-agent cost, timeline | Replay: fork at a checkpoint, compare branches |
 
 Every page in light and dark, desktop and mobile: [`docs/screenshots/`](docs/screenshots/).
-Screenshots show real API data from a fake-mode run.
+The gallery shows real API data from a fake-mode run. A real-model run (Claude Sonnet and Haiku)
+is in [`real-completed`](docs/screenshots/real-completed-1440.png) and
+[`real-trace-cost`](docs/screenshots/real-trace-cost-1440.png).
 
 ## Quick start
 
@@ -102,8 +116,8 @@ make eval        # free: replay recorded model cassettes + dry run of all 60 sce
 
 ## Limitations
 
-- The eval re-measure after fixes is partial (API spend limit). Memory scenarios score lowest
-  of all categories, and their fix (ADR-048) is not yet re-measured.
+- The re-measure after the fixes covers only the scenarios they target (previously passing
+  scenarios weren't re-run), and the memory evidence is k=1. ADR-052 is tested in fake mode only.
 - Fixture web pages and a synthetic demo database, not the live web.
 - Auth is seeded bearer tokens with two roles (no OAuth/SSO, no token expiry).
 - The compose files have no TLS or backups; production needs a reverse proxy and `pg_dump`.

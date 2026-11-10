@@ -698,6 +698,7 @@ async def run_all(
     out_dir: Path,
     judge_model: str = "claude-opus-5-5",
     progress: Any = print,
+    record_cassettes: bool = False,
 ) -> tuple[list[dict[str, Any]], EvalBudget]:
     settings = eval_settings(base, mode)
     run_id = out_dir.name
@@ -787,6 +788,9 @@ async def run_all(
                     and rep == 0
                     and "task_id" in r
                     and r.get("arm", "on") == "on"
+                    # the first real recording is kept; later runs never overwrite it
+                    # silently (a re-measure once did), only with --record-cassettes
+                    and (record_cassettes or not (cassette.CASSETTE_DIR / f"{s.id}.json").exists())
                 ):
                     await cassette.record(engine, s, uuid.UUID(r["task_id"]), r)
             ok = all(r.get("passed") for r in got)

@@ -23,7 +23,11 @@ def git_commit() -> str:
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
         ).stdout.strip()
         dirty = subprocess.run(
-            ["git", "status", "--porcelain"], capture_output=True, text=True, check=False
+            # tracked changes only: untracked result dirs of earlier runs aren't code
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            check=False,
         ).stdout
         return sha + ("-dirty" if dirty.strip() else "")
     except (OSError, subprocess.CalledProcessError):

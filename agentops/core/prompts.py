@@ -15,6 +15,7 @@ import json
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from agentops.core.state import (
+    ActionOutcome,
     AttemptRecord,
     MemoryHit,
     Plan,
@@ -103,7 +104,10 @@ claims that neither a tool result nor the context supports."""
 SYNTH_SYSTEM = """You are the supervisor. Compose the final deliverable for the user from the
 accepted subtask outputs. Keep their substance; remove duplication; add nothing unsupported.
 If past examples show this user's preferences for format, audience or length and they fit this
-request, follow them. Output only the deliverable, in markdown."""
+request, follow them. The <actions> block (if any) is what actually happened to the actions
+proposed during the task, after human review: report them exactly as listed there (e.g. an
+email marked done WAS sent), even where a subtask output, written before approval, says
+otherwise. Output only the deliverable, in markdown."""
 
 SYNTH_PARTIAL_NOTE = """Some subtasks did not complete. Use ONLY the outputs provided; do not
 invent the missing parts. A "What's missing" section is appended automatically after your text,
@@ -253,6 +257,29 @@ def reviewer_messages(
     return msgs
 
 
+ACTION_WORDS = {
+    "done": "done",
+    "human_done": "done by a human",
+    "rejected": "rejected, not performed",
+    "failed": "failed, not performed",
+    "unknown": "outcome unknown (flagged for human review)",
+    "not_considered": "not performed",
+}
+
+
+def actions_block(actions: list[ActionOutcome]) -> str:
+    """What happened to proposed actions (ADR-052), so the deliverable reports outcomes, not
+    the pre-approval drafts' guesses ("no email tool was available", seen in a real run)."""
+    if not actions:
+        return ""
+    lines = [
+        f"- {a.tool}: {ACTION_WORDS.get(a.status, a.status)}"
+        + (f" ({a.detail})" if a.detail else "")
+        for a in actions
+    ]
+    return "\n\n<actions>\n" + "\n".join(lines) + "\n</actions>"
+
+
 def synth_messages(
     request: str,
     plan: Plan,
@@ -260,6 +287,7 @@ def synth_messages(
     *,
     partial: bool = False,
     memories: list[MemoryHit] | None = None,
+    actions: list[ActionOutcome] | None = None,
 ) -> list[BaseMessage]:
     """`memories`: the task's recalled memories (ADR-048), so this user's format and audience
     preferences reach the text the user actually gets, not only the plan."""
@@ -272,8 +300,8 @@ def synth_messages(
     return [
         SystemMessage(system),
         HumanMessage(
-            f"<request>\n{request}\n</request>{memory_block(memories or [])}\n\n{parts}\n\n"
-            "Write the final deliverable."
+            f"<request>\n{request}\n</request>{memory_block(memories or [])}\n\n{parts}"
+            f"{actions_block(actions or [])}\n\nWrite the final deliverable."
         ),
     ]
 

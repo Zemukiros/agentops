@@ -76,6 +76,7 @@ async def _run(args: argparse.Namespace) -> int:
         concurrency=args.concurrency,
         out_dir=out,
         judge_model=JUDGE_MODELS[args.judge],
+        record_cassettes=args.record_cassettes,
     )
     summary = report.write(
         out,
@@ -141,6 +142,11 @@ def main() -> None:
             sp.add_argument("--yes", action="store_true", help="confirm a paid (real) run")
             sp.add_argument("--concurrency", type=int, default=4)
             sp.add_argument("--label", default="", help="e.g. baseline / after-fixes")
+            sp.add_argument(
+                "--record-cassettes",
+                action="store_true",
+                help="overwrite existing cassettes (default: record only missing ones)",
+            )
     args = p.parse_args()
     if args.cmd == "tables":
         if args.check:

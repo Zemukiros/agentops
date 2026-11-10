@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from agentops.core import prompts, scheduler
 from agentops.core.state import (
+    ActionOutcome,
     AttemptRecord,
     MemoryHit,
     Plan,
@@ -99,3 +100,21 @@ def test_recalled_memories_reach_the_synthesizer() -> None:
     human = prompts.synth_messages("req", plan, {"a": "out"}, memories=[hit])[1].content
     assert "Recommendation: X" in str(human) and 'note="past example, may not apply"' in str(human)
     assert "past example" not in str(prompts.synth_messages("req", plan, {"a": "out"})[1].content)
+
+
+def test_the_synthesizer_is_told_what_actually_happened_to_actions() -> None:
+    """ADR-052: in the real UI walkthrough the email was approved and sent, but the deliverable
+    said "Status: not sent. No email tool was available" (from the pre-approval draft)."""
+    plan = Plan(
+        subtasks=[Subtask(id="a", description="d", specialist="writing", expected_output="e")],
+        confidence=0.9,
+        rationale="r",
+    )
+    done = ActionOutcome(hash="h1", tool="send_email", status="done", detail="sent to t@x.io")
+    rejected = ActionOutcome(hash="h2", tool="send_email", status="rejected", detail="not now")
+    msgs = prompts.synth_messages("req", plan, {"a": "draft"}, actions=[done, rejected])
+    human = str(msgs[1].content)
+    assert "- send_email: done (sent to t@x.io)" in human
+    assert "- send_email: rejected, not performed (not now)" in human
+    assert "<actions>" in str(msgs[0].content)
+    assert "<actions>" not in str(prompts.synth_messages("req", plan, {"a": "x"})[1].content)

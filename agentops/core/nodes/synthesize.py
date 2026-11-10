@@ -73,7 +73,12 @@ async def synthesize(state: TaskState, runtime: Runtime[RunContext]) -> dict[str
     await node_event(runtime, "synthesize", "started", payload={"partial": partial})
     outputs = {sid: r.output or "" for sid, r in results.items() if r.status == "accepted"}
     msgs = prompts.synth_messages(
-        state["request"], plan, outputs, partial=partial, memories=state.get("memories") or []
+        state["request"],
+        plan,
+        outputs,
+        partial=partial,
+        memories=state.get("memories") or [],
+        actions=[o for _, o in sorted((state.get("action_outcomes") or {}).items())],
     )
     try:
         res = await model_of(runtime).invoke(

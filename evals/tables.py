@@ -24,10 +24,18 @@ ROOT = Path(__file__).resolve().parent.parent
 RESULTS = Path(__file__).parent / "results"
 BASELINE = RESULTS / "2026-11-10-163339-real"
 FILL = RESULTS / "2026-11-10-172318-real"
-AFTER = RESULTS / "2026-11-10-173107-real"
+# After the fixes (ADR-047..049; B and C also include ADR-050/051, which don't touch model
+# behavior): A = SQL + email k=3 (25 runs errored on the API usage limit), B = the 8 scenarios
+# whose A runs all errored, k=3 (+ B_FILL: its 3 cap-skipped runs), C = memory, k=1.
+AFTER_RUNS = {
+    "A": RESULTS / "2026-11-10-173107-real",
+    "B": RESULTS / "2026-11-10-190413-real",
+    "B-fill": RESULTS / "2026-11-10-190749-real",
+    "C": RESULTS / "2026-11-10-190914-real",
+}
 TARGETS = {
-    ROOT / "README.md": ("headline",),
-    ROOT / "docs" / "EVALUATION.md": ("headline", "categories", "compare"),
+    ROOT / "README.md": ("headline", "after"),
+    ROOT / "docs" / "EVALUATION.md": ("headline", "categories", "compare", "after"),
 }
 
 
@@ -139,19 +147,44 @@ def categories() -> str:
     return "\n".join(out)
 
 
+def after_runs() -> list[dict[str, Any]]:
+    return [r | {"_run": k} for k, d in AFTER_RUNS.items() for r in _runs(d)]
+
+
+def _pairs(runs: list[dict[str, Any]]) -> list[tuple[float, float]]:
+    pairs: dict[tuple[str, int], dict[str, float]] = defaultdict(dict)
+    for r in runs:
+        if r.get("kind") == "memory_ab" and "arm" in r and "error" not in r and "skipped" not in r:
+            pairs[(r["scenario"], r["rep"])][r["arm"]] = 1.0 if r.get("passed") else 0.0
+    return [(v["on"], v["off"]) for v in pairs.values() if {"on", "off"} <= set(v)]
+
+
+def _lift_txt(pairs: list[tuple[float, float]]) -> str:
+    lift = paired_lift(pairs)
+    lo, hi, mid = lift["low"], lift["high"], lift["lift"]
+    if mid is None or lo is None or hi is None:
+        return "n/a"
+    return (
+        f"{100 * mid:+.1f} pts (n={lift['n']} pairs; bootstrap 95% CI "
+        f"{100 * lo:+.1f} to {100 * hi:+.1f})"
+    )
+
+
 def compare() -> str:
     base = _scored(baseline_runs())
-    after_all = [r for r in _runs(AFTER) if "skipped" not in r]
-    after = _scored(after_all)
+    allr = [r for r in after_runs() if "skipped" not in r]
+    after = _scored(allr)
+    skipped = [r for r in after_runs() if "skipped" in r]
     errored: dict[str, int] = defaultdict(int)
-    for r in after_all:
+    for r in allr:
         if "error" in r:
             errored[r["scenario"]] += 1
-    ids = sorted({r["scenario"] for r in after_all})
+    ids = sorted({r["scenario"] for r in allr} | {r["scenario"] for r in skipped})
+    filled = {r["scenario"] for r in after}
     out = [
-        f"After the fixes: `{AFTER.name}` (k=3 on the {len(ids)} SQL and email scenarios the "
-        "fixes target). Errored runs hit the Anthropic workspace usage limit; they are not "
-        "model results and are excluded.",
+        "Runs: " + ", ".join(f"{k} `{d.name}`" for k, d in AFTER_RUNS.items()) + ". "
+        "Errored runs (Anthropic workspace usage limit, run A) are not model results and are "
+        "excluded. Memory scenarios: memory-on arm, k=1.",
         "",
         "| Scenario | Baseline | After fixes (valid runs) | Errored |",
         "|---|---|---|---|",
@@ -160,19 +193,40 @@ def compare() -> str:
         b = [r for r in base if r["scenario"] == sid]
         a = [r for r in after if r["scenario"] == sid]
         bt = f"{sum(1 for r in b if r.get('passed'))}/{len(b)}"
-        at = f"{sum(1 for r in a if r.get('passed'))}/{len(a)}" if a else "—"
+        at = f"{sum(1 for r in a if r.get('passed'))}/{len(a)}" if a else "not run (cost cap)"
         out.append(f"| {sid} | {bt} | {at} | {errored.get(sid, 0)} |")
-    measured = {r["scenario"] for r in after}
-    b_same = [r for r in base if r["scenario"] in measured]
+    b_same = [r for r in base if r["scenario"] in filled]
     out += [
         "",
-        f"Scenarios with at least one valid after-fix run ({len(measured)}): baseline "
-        f"{_rate(b_same)} → after fixes {_rate(after)}. Spend `${_spend(after_all):.4f}`.",
+        f"Same {len(filled)} scenarios: baseline {_rate(b_same)} → after fixes {_rate(after)}.",
+        "",
+        f"Memory lift, baseline: {_lift_txt(_pairs(baseline_runs()))}; after ADR-048: "
+        f"{_lift_txt(_pairs(allr))}.",
+        "",
+        f"Re-measure spend: `${_spend(after_runs()):.4f}`.",
     ]
     return "\n".join(out)
 
 
-RENDER = {"headline": headline, "categories": categories, "compare": compare}
+def after() -> str:
+    """Short before/after line set for the README."""
+    base = _scored(baseline_runs())
+    after = _scored([r for r in after_runs() if "skipped" not in r])
+    ids = {r["scenario"] for r in after}
+    b_same = [r for r in base if r["scenario"] in ids]
+    return "\n".join(
+        [
+            "| Re-measured after the fixes | Baseline | After fixes |",
+            "|---|---|---|",
+            f"| The {len(ids)} scenarios the fixes target | {_rate(b_same)} | {_rate(after)} |",
+            f"| Memory lift (on − off) | {_lift_txt(_pairs(baseline_runs()))} | "
+            f"{_lift_txt(_pairs([r for r in after_runs() if 'skipped' not in r]))} |",
+            f"| Unsafe actions | 0 | {sum(1 for r in after_runs() if r.get('unsafe'))} |",
+        ]
+    )
+
+
+RENDER = {"headline": headline, "categories": categories, "compare": compare, "after": after}
 
 
 def _block(name: str) -> re.Pattern[str]:
