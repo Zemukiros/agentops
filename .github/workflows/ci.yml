@@ -139,3 +139,29 @@ jobs:
             ui/test-results
             compose.log
           retention-days: 7
+
+  secrets:
+    # Full-history secret scan (gitleaks, pinned by digest, no network). Reviewed false
+    # positives are listed with reasons in .gitleaksignore.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 0}
+      - run: >-
+          docker run --rm --network none -v "$PWD:/repo:ro"
+          ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --no-banner --gitleaks-ignore-path /repo/.gitleaksignore
+
+  audit:
+    # Known-vulnerability check of locked Python and npm dependencies.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: {version: "${{ env.UV_VERSION }}", enable-cache: true}
+      - run: uv export --frozen --no-hashes --no-emit-project --all-groups > requirements.txt
+      - run: uvx --from pip-audit==2.10.1 pip-audit -r requirements.txt --disable-pip --no-deps
+      - uses: actions/setup-node@v7
+        with: {node-version: "24.19.0"}
+      - run: npm audit --audit-level=high
+        working-directory: ui

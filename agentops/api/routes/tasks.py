@@ -19,6 +19,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from agentops.api import tickets, views
 from agentops.api.auth import AuthUser, CurrentUser, get_current_user, owned_by
+from agentops.api.ratelimit import rate_limit
 from agentops.api.sse import event_stream
 from agentops.core.budget import open_budget_on
 from agentops.db.models import Task, User
@@ -112,7 +113,11 @@ def task_budget(settings: Settings, body: BudgetIn | None) -> Budget:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_task(body: CreateTask, request: Request, user: AuthUser) -> TaskOut:
+async def create_task(
+    body: CreateTask,
+    request: Request,
+    user: Annotated[CurrentUser, rate_limit("create_task")],
+) -> TaskOut:
     settings = request.app.state.settings
     config: dict[str, Any] = {}
     if body.scenario is not None:
@@ -261,7 +266,9 @@ async def get_task(task_id: uuid.UUID, request: Request, user: AuthUser) -> Task
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(task_id: uuid.UUID, request: Request, user: AuthUser) -> None:
+async def delete_task(
+    task_id: uuid.UUID, request: Request, user: Annotated[CurrentUser, rate_limit("delete")]
+) -> None:
     """Dev/test only: remove a finished task and everything derived from it (replay branches,
     events, calls, approvals, side effects, checkpoints, memories). Refused in production,
     where those records are the audit trail."""
@@ -348,7 +355,11 @@ class TicketOut(BaseModel):
 
 
 @router.post("/{task_id}/stream-ticket", status_code=status.HTTP_201_CREATED)
-async def stream_ticket(task_id: uuid.UUID, request: Request, user: AuthUser) -> TicketOut:
+async def stream_ticket(
+    task_id: uuid.UUID,
+    request: Request,
+    user: Annotated[CurrentUser, rate_limit("stream_ticket")],
+) -> TicketOut:
     await _get_owned(request, task_id, user)
     ticket, expires = await tickets.issue(request.app.state.engine, user.id, task_id)
     return TicketOut(ticket=ticket, expires_at=expires)

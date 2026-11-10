@@ -12,12 +12,13 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentops import approvals
 from agentops.api.auth import AuthUser, CurrentUser, require_role
+from agentops.api.ratelimit import rate_limit
 from agentops.db.models import UserRole
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
@@ -80,13 +81,25 @@ async def _load(request: Request, approval_id: uuid.UUID, user: CurrentUser) -> 
 @router.get("")
 async def list_approvals(
     request: Request,
+    response: Response,
     user: AuthUser,
+    *,
     state: Literal["pending", "decided", "all"] = "pending",
     task_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    cursor: Annotated[str | None, Query(max_length=100)] = None,
 ) -> list[ApprovalOut]:
+    """Newest first, keyset-paginated: the next page's cursor is in the X-Next-Cursor header
+    (the body stays a plain list for existing clients)."""
     where, params = _visible(user)
     clauses = [where]
+    if cursor:
+        try:
+            ts, cid = cursor.split("|", 1)
+            params["c_ts"], params["c_id"] = datetime.fromisoformat(ts), uuid.UUID(cid)
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid cursor") from None
+        clauses.append("(a.created_at, a.id) < (:c_ts, :c_id)")
     if state == "pending":
         clauses.append("a.status = 'pending'")
     elif state == "decided":
@@ -99,12 +112,17 @@ async def list_approvals(
             await conn.execute(
                 text(
                     f"SELECT {_COLS} FROM approvals a JOIN tasks t ON t.id = a.task_id "  # noqa: S608
-                    f"WHERE {' AND '.join(clauses)} ORDER BY a.created_at DESC LIMIT :lim"
+                    f"WHERE {' AND '.join(clauses)} ORDER BY a.created_at DESC, a.id DESC "
+                    "LIMIT :lim"
                 ),
-                {**params, "lim": limit},
+                {**params, "lim": limit + 1},
             )
         ).all()
-    return [ApprovalOut(**r._mapping) for r in rows]
+    page = rows[:limit]
+    if len(rows) > limit and page:
+        last = page[-1]._mapping
+        response.headers["X-Next-Cursor"] = f"{last['created_at'].isoformat()}|{last['id']}"
+    return [ApprovalOut(**r._mapping) for r in page]
 
 
 @router.get("/{approval_id}")
@@ -114,7 +132,11 @@ async def get_approval(approval_id: uuid.UUID, request: Request, user: AuthUser)
 
 @router.post("/{approval_id}/decision")
 async def decide(
-    approval_id: uuid.UUID, body: DecisionIn, request: Request, user: Reviewer
+    approval_id: uuid.UUID,
+    body: DecisionIn,
+    request: Request,
+    user: Reviewer,
+    _limited: Annotated[CurrentUser, rate_limit("decide")],
 ) -> ApprovalOut:
     current = await _load(request, approval_id, user)
     if current.status != "pending":

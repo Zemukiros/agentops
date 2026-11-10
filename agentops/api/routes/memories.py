@@ -8,7 +8,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
-from agentops.api.auth import AuthUser
+from agentops.api.auth import AuthUser, CurrentUser
+from agentops.api.ratelimit import rate_limit
 from agentops.memory import store
 from agentops.memory.service import MemoryService
 
@@ -37,7 +38,7 @@ async def list_memories(
 @router.get("/search")
 async def search_memories(
     request: Request,
-    user: AuthUser,
+    user: Annotated[CurrentUser, rate_limit("memory_search")],
     q: Annotated[str, Query(min_length=1, max_length=500)],
     k: Annotated[int, Query(ge=1, le=20)] = 5,
     min_similarity: Annotated[float | None, Query(ge=-1, le=1)] = None,

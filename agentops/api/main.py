@@ -48,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=settings.ui_origins,
         allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Last-Event-ID"],
+        expose_headers=["X-Next-Cursor", "Retry-After"],
         allow_credentials=False,
         max_age=600,
     )

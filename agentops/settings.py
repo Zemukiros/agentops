@@ -146,6 +146,17 @@ class Settings(BaseSettings):
     ui_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"]
     )
+    # API rate limits per user and route group, requests per minute (0 = off). Phase 6.
+    api_rate_limits: dict[str, int] = Field(
+        default_factory=lambda: {
+            "create_task": 30,
+            "decide": 60,
+            "fork": 20,
+            "stream_ticket": 120,
+            "memory_search": 60,
+            "delete": 30,
+        }
+    )
     # Upper bounds for a budget a user sets on a new task (POST /tasks).
     task_budget_max_usd: float = Field(default=2.0, gt=0)
     task_budget_max_tokens: int = Field(default=2_000_000, gt=0)
