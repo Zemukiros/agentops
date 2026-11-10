@@ -4,6 +4,7 @@ estimate                     cost estimate (free; uses count_tokens if an API ke
 run --mode dry               all scenarios with scripted models + fake judge ($0)
 run --mode real --yes        the paid run (refuses without --yes; hard cap enforced)
 replay                       recorded cassettes, compared with their recorded outcome ($0)
+tables [--check]             regenerate (or check) the doc tables from committed results ($0)
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from agentops.settings import get_settings
-from evals import cassette, estimate, report, runner
+from evals import cassette, estimate, report, runner, tables
 from evals.judge import JUDGE_MODELS
 from evals.spec import Scenario, load
 
@@ -125,6 +126,8 @@ async def _replay(args: argparse.Namespace) -> int:
 def main() -> None:
     p = argparse.ArgumentParser(prog="python -m evals")
     sub = p.add_subparsers(dest="cmd", required=True)
+    tp = sub.add_parser("tables")
+    tp.add_argument("--check", action="store_true", help="exit 1 if a doc table is stale")
     for name in ("estimate", "run", "replay"):
         sp = sub.add_parser(name)
         sp.add_argument("--k", type=int, default=3)
@@ -139,6 +142,13 @@ def main() -> None:
             sp.add_argument("--concurrency", type=int, default=4)
             sp.add_argument("--label", default="", help="e.g. baseline / after-fixes")
     args = p.parse_args()
+    if args.cmd == "tables":
+        if args.check:
+            bad = tables.stale()
+            print("stale doc tables: " + ", ".join(bad) if bad else "doc tables up to date")
+            sys.exit(1 if bad else 0)
+        print("rewrote: " + (", ".join(tables.write()) or "nothing (up to date)"))
+        return
     if args.cmd == "estimate":
         asyncio.run(_estimate(args))
         return

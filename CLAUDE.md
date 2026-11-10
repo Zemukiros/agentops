@@ -32,7 +32,11 @@ make lint                        # ruff + ruff format --check + mypy
 make build-sandbox               # build agentops-sandbox image (never run as a service)
 make test-sandbox                # sandbox isolation tests (real Docker; own CI job)
 make sandbox-selfcheck           # worker container -> socket proxy -> sandbox, file round trip
-make eval                        # scenario suite (Phase 6; currently prints a notice)
+make eval                        # free: replay eval cassettes + dry run of 60 scenarios (stop the compose worker first)
+make eval-estimate               # free cost estimate for the paid eval (count_tokens)
+make eval-tables                 # regenerate README/EVALUATION.md tables from evals/results (drift-tested)
+uv run python -m evals run --mode real --yes --k 3 --cap 16   # PAID eval (~$13); needs approval; compose worker stopped
+make prod-config / make prod-up  # prod profile (docker-compose.prod.yml + untracked .env.prod; ADR-050)
 make test-ui                     # UI (ui/): ESLint + tsc + Vitest
 make e2e                         # Playwright walkthrough + axe against the running stack (make up && make migrate); E2E_CPU_THROTTLE=4 to mimic a slow CI runner
 FAKE_LATENCY_MS=600 make up      # fake mode: pace runs so the live UI is watchable (0 by default)

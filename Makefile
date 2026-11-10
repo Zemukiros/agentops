@@ -2,7 +2,7 @@ SHELL := /bin/bash
 UV ?= uv
 COMPOSE ?= docker compose
 
-.PHONY: prod-config prod-up reset-demo test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
+.PHONY: eval-estimate eval-tables prod-config prod-up reset-demo test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
 
 # Task workspaces live on the host so sandbox containers can bind-mount them (ADR-031).
 export AGENTOPS_WORKSPACES_HOST_DIR ?= $(CURDIR)/var/workspaces
@@ -52,8 +52,15 @@ fmt:
 	$(UV) run ruff check --fix .
 	$(UV) run ruff format .
 
-eval: ## Scenario suite (Phase 6; not implemented yet)
-	@echo "eval: scenario harness is not implemented until Phase 6 (see docs/PROGRESS.md)"
+eval: ## Free eval: replay recorded cassettes + dry run (scripted models), $0. Paid run: docs/EVALUATION.md
+	$(UV) run python -m evals replay
+	$(UV) run python -m evals run --mode dry --k 1
+
+eval-estimate: ## Cost estimate for the paid eval (free; count_tokens)
+	$(UV) run python -m evals estimate --k 3
+
+eval-tables: ## Regenerate README / EVALUATION.md tables from committed results
+	$(UV) run python -m evals tables
 
 build-sandbox: ## Build the agentops-sandbox image (never run as a service)
 	$(COMPOSE) --profile build-only build sandbox

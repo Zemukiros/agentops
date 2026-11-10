@@ -4,7 +4,7 @@ cassette conversion. (The harness end to end is exercised by `python -m evals ru
 import pytest
 
 from agentops.settings import Settings
-from evals import cassette, estimate, metrics
+from evals import cassette, estimate, metrics, tables
 from evals.judge import parse
 from evals.report import summarize
 from evals.runner import REAL_ROLES, eval_settings, role_env
@@ -160,3 +160,9 @@ def test_errored_runs_are_excluded_from_rates_and_counted() -> None:
     s = summarize(runs, eval_settings(Settings(), "dry"), {"run_id": "t", "judge": "x"})
     assert (s["overall"]["n"], s["overall"]["pass"], s["errored_runs"]) == (2, 1, 1)
     assert s["by_category"]["tools"]["n"] == 2
+
+
+def test_doc_tables_match_the_committed_eval_results() -> None:
+    """README and docs/EVALUATION.md numbers are generated, never typed (python -m evals tables)."""
+
+    assert tables.stale() == []
