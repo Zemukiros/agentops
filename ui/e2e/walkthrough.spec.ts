@@ -70,8 +70,12 @@ test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> 
   await switchIdentity(page, /demo-user/);
   await page.goto(`/tasks/${taskId}`);
   await expect(page.getByText("Completed").first()).toBeVisible();
-  // fake-mode text is titled with the request's topic
-  await expect(page.getByRole("heading", { name: /^Compare pgvector with dedicated vector databases/ })).toBeVisible();
+  // fake-mode text is titled with the request's topic. Scoped to the deliverable card: since
+  // Phase 6 the page title (the request) starts with the same words, so an unscoped heading
+  // query matches two h1s (strict-mode violation under CPU throttling).
+  await expect(
+    page.getByRole("region", { name: "Deliverable" }).getByRole("heading", { name: /^Compare pgvector with dedicated vector databases/ }),
+  ).toBeVisible();
   const mail = page.getByRole("link", { name: /View email in Mailpit/ });
   await expect(mail).toHaveAttribute("href", new RegExp(`^${MAILPIT}/view/`));
   const messageId = await page.evaluate(async (id) => {
