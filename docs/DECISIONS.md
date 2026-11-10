@@ -336,6 +336,18 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 **Problem (found by the eval dry run).** The `.snapshots` directory was created by the compose worker (container user, mode 755). A worker running as another user on the same volume (the host-side eval workers, or a second deployment) got `PermissionError` in `schedule`, and the **user's task failed** over something that only serves future replays.
 **Decision.** Snapshot directories are created world-writable like the task workspaces (the sandbox's uid must write there too). A snapshot error is caught in `schedule`, recorded as a `replay.snapshot_failed` event, and the run continues; forking at that wave then fails with the existing "snapshot missing" error instead of guessing.
 
+## ADR-047 · The planner sees what each specialist can do · accepted
+**Problem (found by the paid eval baseline, 2026-11-10-163339-real).** The planner was shown only the specialist names. It gave database questions to `code`, which has no database tool, so `sql_query` ran 2 times in 177 runs; `code` reported "no database", the reviewer escalated, and every SQL-dependent scenario failed (`deliverable_matches_sql` 23 failures, `tool_used` 18). The same gap hid email: only `writing` has `send_email`, but nothing said so, and the writing prompt never mentioned it, so "email X to Y" usually produced the text and no proposal (approval category 3/15).
+**Decision.** The planner prompt carries a catalog: one line per specialist with a fixed summary plus its **actual tool names from the registry**, and two rules: an emailing request needs a writing subtask that proposes the email; remembered user preferences go into the deliverable subtasks' descriptions. The writing prompt says to propose `send_email` when asked to email (still proposal-only, ADR-003). A unit test ties the summaries' claims (only `analysis` has SQL, only `writing` has email) to the registry, so the catalog can't drift. **Scenarios and rubrics unchanged.**
+
+## ADR-048 · Recalled memories reach the synthesizer · accepted
+**Problem (baseline).** Recalled memories went only to the planner. A remembered format rule ("first line is `Recommendation: <choice>`") was recalled (similarity 0.79) but the user's text is written by the synthesizer, which never saw it; memory category 2/15.
+**Decision.** `synth_messages` also gets the task's recalled memories, in the same `memory_block` (labelled "past example, may not apply", never instructions; the ADR-045 screen still applies at write time), and the synthesizer follows fitting format/audience/length preferences. Specialists still don't get memories (smaller prompts; the planner passes preferences down per ADR-047).
+
+## ADR-049 · A failed token count is retried, not fatal · accepted
+**Problem (baseline).** The worst-case reservation counts input tokens first; in real mode that is a `count_tokens` API call, made **outside** the retry loop. Two transient errors there (`APITimeoutError`, `APIConnectionError`) failed whole jobs; the job queue retried them and both tasks completed, but a run segment was redone.
+**Decision.** A token-count failure is an attempt failure: it is retried with the same backoff as a failed call. Nothing was reserved or billed for it, so no `llm_calls` row is written; if every attempt fails, `ModelCallError` names it.
+
 ## Deferred (not in scope unless time allows)
 - Nightly memory consolidation clustering (do a simple version: dedupe near-identical memories)
 - gVisor runtime, warm sandbox pool

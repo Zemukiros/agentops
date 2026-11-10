@@ -68,16 +68,21 @@ async def test_records_tokens_cost_latency_and_settles_budget(
 
 
 class Flaky(BaseChatModel):
-    """Fails the first `fail_times` calls (shared counter), then answers."""
+    """Fails the first `fail_times` calls (shared counter), then answers. `count_fails`: the
+    first token counts fail (count_tokens is an API call in real mode)."""
 
     fail_times: int
     counter: Any  # shared mutable list; `Any` stops pydantic from copying it
+    count_fails: Any = None
 
     @property
     def _llm_type(self) -> str:
         return "flaky"
 
     def get_num_tokens_from_messages(self, messages: Any, tools: Any = None) -> int:
+        if self.count_fails and self.count_fails[0] > 0:
+            self.count_fails[0] -= 1
+            raise TimeoutError("count_tokens read timed out")
         return 3
 
     def _generate(
@@ -112,6 +117,25 @@ async def test_every_retry_attempt_is_recorded(
     snap = await client.ledger.snapshot(tid)
     assert snap.llm_calls == 3  # failed attempts count toward the call budget
     assert [r["status"] for r in await _rows(engine, "budget_reservations")] == ["settled"] * 3
+
+
+async def test_a_failed_token_count_is_retried_not_fatal(
+    engine: AsyncEngine, sessionmaker: async_sessionmaker[AsyncSession], alice: SeededUser
+) -> None:
+    """ADR-049: a count_tokens timeout (seen twice in the Phase 6 baseline, where it failed the
+    whole job) is retried like a failed call. Nothing is reserved, billed or recorded for it."""
+    tid = await create_task(engine, alice)
+    counter, count_fails = [0], [1]
+    client = _client(
+        sessionmaker,
+        lambda role, purpose, cfg: Flaky(fail_times=0, counter=counter, count_fails=count_fails),
+        llm_max_retries=2,
+    )
+    res = await client.invoke("analysis", [HumanMessage("x")], task_id=tid)
+    assert res.attempts == 2
+    assert counter == [1]  # the model was called once, after the count succeeded
+    assert [(r["attempt"], r["ok"]) for r in await _rows(engine)] == [(2, True)]
+    assert [r["status"] for r in await _rows(engine, "budget_reservations")] == ["settled"]
 
 
 async def test_all_attempts_fail(

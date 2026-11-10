@@ -72,7 +72,9 @@ async def synthesize(state: TaskState, runtime: Runtime[RunContext]) -> dict[str
     )
     await node_event(runtime, "synthesize", "started", payload={"partial": partial})
     outputs = {sid: r.output or "" for sid, r in results.items() if r.status == "accepted"}
-    msgs = prompts.synth_messages(state["request"], plan, outputs, partial=partial)
+    msgs = prompts.synth_messages(
+        state["request"], plan, outputs, partial=partial, memories=state.get("memories") or []
+    )
     try:
         res = await model_of(runtime).invoke(
             "supervisor", msgs, task_id=runtime.context.task_id, purpose="synthesize"
