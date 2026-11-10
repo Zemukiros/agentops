@@ -126,10 +126,16 @@ class ToolRegistry:
             (s for s in self._specs.values() if agent in s.allowed_agents), key=lambda s: s.name
         )
 
+    def disabled_reason(self, name: str, settings: Any) -> str | None:
+        """Why this tool can't be used in this deployment (e.g. no SMTP relay), or None."""
+        spec = self._specs.get(name)
+        check = spec.meta.get("disabled_reason") if spec else None
+        return check(settings) if check else None
+
     def model_tools(self, agent: str) -> list[dict[str, Any]]:
         return [s.model_schema() for s in self.tools_for(agent)]
 
-    async def invoke(
+    async def invoke(  # noqa: PLR0911  (a ladder of guard clauses)
         self,
         name: str,
         args: dict[str, Any],
@@ -160,6 +166,22 @@ class ToolRegistry:
             )
             return inv
         clean_args = parsed.model_dump(mode="json")
+
+        if reason := self.disabled_reason(name, ctx.settings):
+            # ADR-050: refused with the reason, so the specialist and the trace both say why;
+            # no proposal is recorded for an action this deployment can't perform.
+            msg = f"{name} refused: {reason}. Do not retry; say so in your answer."
+            inv = Invocation(name, "disabled", frame(name, "disabled", msg))
+            await self._log(
+                spec,
+                name,
+                args=clean_args,
+                ctx=ctx,
+                inv=inv,
+                started=started,
+                tool_call_id=tool_call_id,
+            )
+            return inv
 
         if not spec.executes_directly:
             proposal = ProposedAction(

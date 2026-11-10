@@ -2,7 +2,7 @@ SHELL := /bin/bash
 UV ?= uv
 COMPOSE ?= docker compose
 
-.PHONY: reset-demo test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
+.PHONY: prod-config prod-up reset-demo test-ui e2e help up down logs ps migrate seed test test-unit test-integration test-sandbox lint fmt eval build-sandbox sandbox-selfcheck workspaces clean-db
 
 # Task workspaces live on the host so sandbox containers can bind-mount them (ADR-031).
 export AGENTOPS_WORKSPACES_HOST_DIR ?= $(CURDIR)/var/workspaces
@@ -72,3 +72,11 @@ test-ui: ## UI: lint + typecheck + Vitest
 
 e2e: ## Playwright walkthrough against the running stack (make up && make migrate first)
 	cd ui && npx playwright test
+
+PROD = docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml
+
+prod-config: ## show the resolved prod profile (needs .env.prod; see docs/DEPLOYMENT.md)
+	$(PROD) config
+
+prod-up: ## start the prod profile (ENV=prod, no Mailpit, no DB host port; needs .env.prod)
+	$(PROD) up -d --build

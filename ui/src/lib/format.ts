@@ -111,7 +111,7 @@ export function feedLine(e: TaskEvent): FeedLine | null {
       return {
         ...base,
         text: `${str(p.agent)} → ${str(p.tool)} (${st})`,
-        tone: st === "error" || st === "denied" ? "danger" : st === "proposed" ? "violet" : "neutral",
+        tone: st === "error" || st === "denied" || st === "disabled" ? "danger" : st === "proposed" ? "violet" : "neutral",
       };
     }
     case "llm.call":

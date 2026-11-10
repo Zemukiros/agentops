@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import asyncio
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from pydantic import Field
 
+from agentops.settings import Settings
 from agentops.tools.spec import ToolContext, ToolInput, ToolOutput, ToolSpec
 
 
@@ -27,14 +29,28 @@ class EmailIn(ToolInput):
     body: str = Field(min_length=1, max_length=20_000)
 
 
-def _send(host: str, port: int, msg: EmailMessage) -> None:
-    with smtplib.SMTP(host, port, timeout=10) as smtp:
+class EmailDisabledError(RuntimeError):
+    pass
+
+
+def _send(settings: Settings, msg: EmailMessage) -> None:
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
+        if settings.smtp_starttls:
+            smtp.starttls(context=ssl.create_default_context())
+        if settings.smtp_username and settings.smtp_password:
+            smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
         smtp.send_message(msg)
+
+
+def email_disabled(settings: Settings) -> str | None:
+    return settings.email_disabled_reason
 
 
 async def send_email(
     args: EmailIn, ctx: ToolContext, *, message_id: str | None = None
 ) -> ToolOutput:
+    if reason := ctx.settings.email_disabled_reason:  # never silently dropped (ADR-050)
+        raise EmailDisabledError(reason)
     msg = EmailMessage()
     msg["From"] = ctx.settings.smtp_from
     msg["To"] = str(args.to)
@@ -42,7 +58,7 @@ async def send_email(
     if message_id:
         msg["Message-ID"] = f"<{message_id}@agentops>"
     msg.set_content(args.body)
-    await asyncio.to_thread(_send, ctx.settings.smtp_host, ctx.settings.smtp_port, msg)
+    await asyncio.to_thread(_send, ctx.settings, msg)
     return ToolOutput(text=f"sent to {args.to}", data={"message_id": msg["Message-ID"]})
 
 
@@ -60,6 +76,9 @@ EMAIL_TOOLS = [
         scope="outside",
         timeout_s=20,
         rate_per_min=10,
-        meta={"idempotency_kw": "message_id"},  # the side_effects key becomes the Message-ID
+        meta={
+            "idempotency_kw": "message_id",  # the side_effects key becomes the Message-ID
+            "disabled_reason": email_disabled,  # settings -> reason | None (ADR-050)
+        },
     ),
 ]

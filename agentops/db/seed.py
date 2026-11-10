@@ -70,4 +70,9 @@ if __name__ == "__main__":
         write_tokens(new)
         print(f"generated tokens for {', '.join(new)}; written to {TOKENS_FILE} (0600)")
     else:
-        print("seed users present")
+        applied = [env for _, _, env in SEED_USERS if os.environ.get(env)]
+        print(
+            f"seed users present; token(s) from {', '.join(applied)} applied"
+            if applied
+            else "seed users present"
+        )

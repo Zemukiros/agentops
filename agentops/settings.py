@@ -134,13 +134,18 @@ class Settings(BaseSettings):
     mcp_servers: Annotated[list[str], NoDecode] = Field(default_factory=list)
     mcp_data_dir: Path = Path("var/mcp")
 
-    # Mail (Mailpit in dev: captures, sends nothing out)
+    # Mail (Mailpit in dev: captures, sends nothing out). An EMPTY smtp_host means no relay is
+    # configured: send_email is then disabled and proposals are refused with that reason
+    # (ADR-050), never silently dropped. The prod compose profile has no Mailpit.
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_from: str = "agentops@localhost"
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_starttls: bool = False
     # Mailpit HTTP API as this process sees it (lookup), and its UI as the browser sees it (links)
     mailpit_api_url: str = "http://localhost:8025"
-    mailpit_ui_url: str = "http://localhost:8025"
+    mailpit_ui_url: str = "http://localhost:8025"  # empty: no Mailpit (prod), no links
 
     # Web UI (ADR-042): the only origins allowed by CORS (comma-separated).
     ui_origins: Annotated[list[str], NoDecode] = Field(
@@ -213,6 +218,13 @@ class Settings(BaseSettings):
 
     def model_for(self, role: str) -> RoleModel:
         return self.role_models.get(role, RoleModel())
+
+    @property
+    def email_disabled_reason(self) -> str | None:
+        """Why send_email can't be used in this deployment, or None if it can (ADR-050)."""
+        if not self.smtp_host.strip():
+            return "email is disabled in this deployment: no SMTP relay is configured"
+        return None
 
     @property
     def sqlalchemy_url(self) -> str:

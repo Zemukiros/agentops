@@ -348,6 +348,11 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 **Problem (baseline).** The worst-case reservation counts input tokens first; in real mode that is a `count_tokens` API call, made **outside** the retry loop. Two transient errors there (`APITimeoutError`, `APIConnectionError`) failed whole jobs; the job queue retried them and both tasks completed, but a run segment was redone.
 **Decision.** A token-count failure is an attempt failure: it is retried with the same backoff as a failed call. Nothing was reserved or billed for it, so no `llm_calls` row is written; if every attempt fails, `ModelCallError` names it.
 
+## ADR-050 · Prod compose profile; email disabled without a relay · accepted
+**Decision.** `docker-compose.prod.yml` layers over the base file with its own untracked `.env.prod` (used for interpolation **and** as the containers' env file, so the dev `.env` never leaks in). It sets `ENV=prod` (dev-only `DELETE /tasks` and `make reset-demo` refuse, audit records are never deleted; the settings validator refuses dev secrets), requires `POSTGRES_PASSWORD`, `API_TOKEN_PEPPER`, `SQL_TOOL_PASSWORD` (compose won't start without them), drops Mailpit and the Postgres host port. Users are seeded with operator-supplied `SEED_USER_TOKEN`/`SEED_REVIEWER_TOKEN` (nothing written into the image).
+**Email.** An empty `SMTP_HOST` means no relay: the registry refuses `send_email` at proposal time with status `disabled` and the reason ("no SMTP relay is configured"), visible to the specialist and in the trace; nothing is proposed or sent. An action proposed while a relay existed and approved after it was removed is `rejected` with the reason (no `side_effects` row) and listed under "not performed". Never silently dropped. With a relay: optional STARTTLS and login (`SMTP_PASSWORD` is a `SecretStr`).
+**Verified** by booting the profile as a separate compose project: migrate + API healthy, fake email task → `send_email` `disabled` with the reason, `DELETE` → 403, `reset-demo` refused, no DB port, no Mailpit. **Not included:** TLS termination/reverse proxy, backups, log shipping (docs/DEPLOYMENT.md).
+
 ## Deferred (not in scope unless time allows)
 - Nightly memory consolidation clustering (do a simple version: dedupe near-identical memories)
 - gVisor runtime, warm sandbox pool
