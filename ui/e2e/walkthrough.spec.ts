@@ -1,25 +1,34 @@
 import { expect, test } from "@playwright/test";
-import { MAILPIT, expectAccessible, mailCount, signIn, switchIdentity, tokens } from "./support";
+import { MAILPIT, expectAccessible, identityButton, mailCount, signIn, switchIdentity, tokens } from "./support";
 
 const REQUEST = `Compare pgvector with dedicated vector databases and email the team a brief (e2e ${Date.now()})`;
 
 test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> replay diff", async ({ page }) => {
+  // E2E_CPU_THROTTLE=4 approximates a slow CI runner locally (timing races show up there).
+  const throttle = Number(process.env.E2E_CPU_THROTTLE ?? 0);
+  if (throttle > 1) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: throttle });
+  }
   const { user, reviewer } = tokens();
 
   // 1. sign in as the user, then add the reviewer identity (switchable)
   await page.goto("/sign-in");
   await expectAccessible(page, "sign-in");
   await signIn(page, reviewer);
-  await page.getByRole("button", { name: /demo-reviewer/ }).click();
+  await identityButton(page, /demo-reviewer/).click();
   await page.getByRole("menuitem", { name: /Add another token/ }).click();
-  await page.getByLabel("API token").fill(user);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("button", { name: /demo-user/ })).toBeVisible();
+  await signIn(page, user);
+  await expect(identityButton(page, /demo-user/)).toBeVisible();
   await expectAccessible(page, "tasks");
 
   // 2. submit the walkthrough scenario
   await page.getByRole("link", { name: "New task" }).first().click();
-  await page.getByLabel("Request").fill(REQUEST);
+  // Wait for the page itself: during the route change the history page's "Search requests"
+  // box is still there, and a non-exact "Request" label would match it (CI flake, PR #4).
+  await expect(page.getByRole("heading", { name: "New task", level: 1 })).toBeVisible();
+  await page.getByLabel("Request", { exact: true }).fill(REQUEST);
+  await expect(page.getByLabel("Request", { exact: true })).toHaveValue(REQUEST);
   await page.getByLabel("Demo scenario (fake mode)").selectOption("ui_demo");
   await expectAccessible(page, "new task");
   await page.getByRole("button", { name: "Start task" }).click();
@@ -38,6 +47,7 @@ test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> 
   // 4. the reviewer approves the email in the inbox
   await switchIdentity(page, /demo-reviewer/);
   await page.getByRole("link", { name: /Approvals/ }).click();
+  await expect(page.getByRole("heading", { name: "Approvals", level: 1 })).toBeVisible();
   const row = page.getByRole("button", { name: new RegExp(`Action.*task ${taskId.slice(0, 8)}`) });
   await row.click();
   await expect(page.getByText("team@example.com").first()).toBeVisible();
@@ -73,7 +83,7 @@ test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> 
   await page.getByRole("button", { name: /Deliverable written, before final review/ }).click();
   await expect(page.getByText(/Defaults to the original task’s limits/)).toBeVisible();
   const edited = "# Vector search: start with pgvector\n\nEdited in a replay branch.";
-  await page.getByLabel("Deliverable").fill(edited);
+  await page.getByLabel("Deliverable", { exact: true }).fill(edited);
   await expectAccessible(page, "replay");
   await page.getByRole("button", { name: "Fork and run" }).click();
   await expect(page.getByText(/Replay of/)).toBeVisible();
@@ -93,6 +103,7 @@ test("sign in -> live DAG -> approve email -> deliverable -> trace -> memory -> 
 
   // 8. memory: the original task's episode is visible, inspectable and deletable
   await page.getByRole("link", { name: "Memory" }).click();
+  await expect(page.getByRole("heading", { name: "Memory", level: 1 })).toBeVisible();
   await page.getByLabel("Search memories").fill(REQUEST);
   const hit = page.getByRole("list", { name: "Memories" }).getByRole("button", { name: new RegExp(REQUEST.slice(-12).replace(/[()]/g, ".")) }).first();
   await expect(hit).toBeVisible();

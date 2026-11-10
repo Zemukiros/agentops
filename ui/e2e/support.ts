@@ -32,10 +32,16 @@ export async function signIn(page: Page, token: string): Promise<void> {
   await page.getByLabel("API token").fill(token);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page.getByRole("heading", { name: "Tasks", level: 1 })).toBeVisible();
+}
+
+/** The sidebar's identity menu button (not the sign-in page's identity list). */
+export function identityButton(page: Page, name: RegExp) {
+  return page.locator('button[aria-haspopup="menu"]').filter({ hasText: name });
 }
 
 export async function switchIdentity(page: Page, name: RegExp): Promise<void> {
-  await page.getByRole("button", { name: /demo-(user|reviewer)/ }).last().click();
+  await identityButton(page, /demo-(user|reviewer)/).click();
   await page.getByRole("menuitem", { name }).click();
 }
 
