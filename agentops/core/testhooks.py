@@ -34,3 +34,22 @@ async def block_if_hooked(task_id: str, node: str, *, always: bool = False) -> N
         if time.monotonic() > deadline:
             raise TimeoutError("test hook release file never appeared")
         await asyncio.sleep(0.05)
+
+
+TEST_CHECKPOINT_DELAY_ENV = "AGENTOPS_TEST_CHECKPOINT_DELAY_S"
+
+
+def slow_checkpoint_writes(saver: object) -> None:
+    """Test-only (inert unless AGENTOPS_TEST_HOOK_DIR and the delay are both set): delay every
+    checkpoint write, the way a slow database would. Lets a test prove a step's checkpoint is
+    committed before the next step starts (ADR-051) instead of hoping a CI runner is slow."""
+    delay = os.environ.get(TEST_CHECKPOINT_DELAY_ENV)
+    if not (os.environ.get(TEST_HOOK_ENV) and delay):
+        return
+    original = saver.aput  # type: ignore[attr-defined]
+
+    async def aput(*args: object, **kwargs: object) -> object:
+        await asyncio.sleep(float(delay))
+        return await original(*args, **kwargs)
+
+    saver.aput = aput  # type: ignore[attr-defined]

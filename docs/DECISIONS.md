@@ -353,6 +353,10 @@ Complete runs (all accepted) skip `final_review` in Phase 3. The DECISIONS graph
 **Email.** An empty `SMTP_HOST` means no relay: the registry refuses `send_email` at proposal time with status `disabled` and the reason ("no SMTP relay is configured"), visible to the specialist and in the trace; nothing is proposed or sent. An action proposed while a relay existed and approved after it was removed is `rejected` with the reason (no `side_effects` row) and listed under "not performed". Never silently dropped. With a relay: optional STARTTLS and login (`SMTP_PASSWORD` is a `SecretStr`).
 **Verified** by booting the profile as a separate compose project: migrate + API healthy, fake email task → `send_email` `disabled` with the reason, `DELETE` → 403, `reset-demo` refused, no DB port, no Mailpit. **Not included:** TLS termination/reverse proxy, backups, log shipping (docs/DEPLOYMENT.md).
 
+## ADR-051 · Graphs run with durability="sync" · accepted
+**Problem (found by CI on PR #6).** LangGraph 1.2.20 defaults to `durability="async"`: a step's checkpoint is written *while the next step already runs*. A worker killed early in step N can therefore lose step N−1's checkpoint and redo finished work on resume, which weakens the crash-recovery guarantee (ADR-022). `test_run_resumes_from_checkpoint_on_another_process_after_crash` caught it on a slow CI runner (`state.next == ()` while step_two was running); it passed locally 10/10.
+**Decision.** The worker runs every graph with `durability="sync"`: each step's checkpoint is committed before the next step starts. Cost: one checkpoint round trip per step, small next to model calls. A test-only hook (`AGENTOPS_TEST_CHECKPOINT_DELAY_S`, inert unless the test hook dir is set) slows checkpoint writes by 1.5 s so the race is certain; the regression test fails under the default and passes with sync.
+
 ## Deferred (not in scope unless time allows)
 - Nightly memory consolidation clustering (do a simple version: dedupe near-identical memories)
 - gVisor runtime, warm sandbox pool

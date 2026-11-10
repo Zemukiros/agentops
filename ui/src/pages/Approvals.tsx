@@ -165,7 +165,9 @@ export function Approvals() {
   const selectedId = params.get("id");
   const { active } = useSession();
   const list = useInfiniteQuery({
-    queryKey: ["approvals", tab],
+    // Not ["approvals", "pending"]: the nav badge's usePendingApprovals caches a plain array
+    // there, and an infinite query on the same key would read it as {pages} and crash.
+    queryKey: ["approvals", "list", tab],
     queryFn: ({ signal, pageParam }) =>
       apiWithHeaders<Approval[]>("/approvals", { signal, query: { state: tab, limit: 50, cursor: pageParam } }),
     initialPageParam: null as string | null,
