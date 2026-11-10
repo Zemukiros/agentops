@@ -96,7 +96,10 @@ class Judge:
         if client is None:
             import anthropic  # noqa: PLC0415
 
-            client = anthropic.AsyncAnthropic()
+            from agentops.settings import get_settings  # noqa: PLC0415
+
+            key = get_settings().anthropic_api_key  # SecretStr from .env; never logged
+            client = anthropic.AsyncAnthropic(api_key=key.get_secret_value() if key else None)
         self.client = client
 
     async def grade(

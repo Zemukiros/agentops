@@ -3,8 +3,10 @@ cassette conversion. (The harness end to end is exercised by `python -m evals ru
 
 import pytest
 
+from agentops.settings import Settings
 from evals import cassette, estimate, metrics
 from evals.judge import parse
+from evals.runner import REAL_ROLES, eval_settings, role_env
 from evals.spec import DEFAULT_DECISIONS, Rule, decision_for, load
 
 pytestmark = pytest.mark.unit
@@ -136,9 +138,6 @@ def test_real_mode_uses_real_role_models_in_process_and_in_worker_subprocesses(
 ) -> None:
     """Regression: real mode once kept the fake role models from .env, so every paid run
     would have failed with ModelConfigError (caught at $0 when the baseline started)."""
-    from agentops.settings import Settings
-    from evals.runner import REAL_ROLES, eval_settings, role_env
-
     s = eval_settings(Settings(), "real")
     assert {r: m.provider for r, m in s.role_models.items()} == dict.fromkeys(
         REAL_ROLES, "anthropic"

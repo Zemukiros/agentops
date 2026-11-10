@@ -181,6 +181,21 @@ async def make_user(engine: AsyncEngine, name: str) -> uuid.UUID:
     return uid
 
 
+async def ledger_spend(env: Env, scenario_id: str, rep: int) -> float:
+    """Total ledger spend of every task one run created (its users are named per run)."""
+    name = f"eval:{env.run_id}:{scenario_id}:{rep}"
+    return float(
+        await _val(
+            env.engine,
+            "SELECT coalesce(sum(b.used_usd), 0) FROM task_budgets b JOIN tasks t ON t.id = "
+            "b.task_id JOIN users u ON u.id = t.owner_id WHERE u.name = :n OR u.name LIKE :p",
+            n=name,
+            p=name + ":%",
+        )
+        or 0
+    )
+
+
 async def create_task(
     env: Env, owner: uuid.UUID, request: str, scenario: Scenario, *, enqueue: bool = True
 ) -> uuid.UUID:
@@ -744,7 +759,9 @@ async def run_all(
                     {
                         "error": f"{type(exc).__name__}: {exc}"[:500],
                         "passed": False,
-                        "cost_usd": 0.0,
+                        # the run's model calls were paid even though it errored: read the
+                        # spend back from the budget ledger so the hard cap stays truthful
+                        "cost_usd": await ledger_spend(env, s.id, rep),
                         "judge_cost_usd": 0.0,
                     }
                 ]
