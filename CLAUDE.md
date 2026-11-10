@@ -34,7 +34,7 @@ make test-sandbox                # sandbox isolation tests (real Docker; own CI 
 make sandbox-selfcheck           # worker container -> socket proxy -> sandbox, file round trip
 make eval                        # scenario suite (Phase 6; currently prints a notice)
 make test-ui                     # UI (ui/): ESLint + tsc + Vitest
-make e2e                         # Playwright walkthrough + axe against the running stack (make up && make migrate)
+make e2e                         # Playwright walkthrough + axe against the running stack (make up && make migrate); E2E_CPU_THROTTLE=4 to mimic a slow CI runner
 FAKE_LATENCY_MS=600 make up      # fake mode: pace runs so the live UI is watchable (0 by default)
 cd ui && npx vite                # UI dev server on :5173 (API on :8000); `npm ci` first (ignore-scripts)
 cd ui && node scripts/capture.mjs ../docs/screenshots   # regenerate README screenshots from a live stack

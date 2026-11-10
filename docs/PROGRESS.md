@@ -3,9 +3,9 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 5 — **complete, awaiting review** (2026-11-09). Phase 4 approved and merged (PR #3, merge commit `8a904e8`).
-- **Branch:** `phase-5` (from `main` at `8a904e8`), pushed; no PR yet (CI's new `ui` and `e2e` jobs run on pull requests).
-- **Last updated:** 2026-11-09
+- **Phase:** 5 — **merged** (PR #4, `be31cab`, 2026-11-10). Phase 6 not started.
+- **Branch:** `main`. The CI `e2e` job failed on its first GitHub run (a test selector race, not an app bug); fixed in PR #5, where all 8 CI jobs are green.
+- **Last updated:** 2026-11-10
 - **Test status:** backend 603 passed, 0 failed on `make test` (fake mode): 422 unit, 172 integration, 9 sandbox (real Docker); lint, ruff format, mypy clean. UI: 64 Vitest tests (`make test-ui`), ESLint + tsc clean. Playwright walkthrough against the compose stack (`make e2e`): 1 passed, with axe on 9 pages. Not in `make test`: 1 `model` test (real fastembed), 4 `e2e` tests (real models).
 - **Real-model spend:** Phase 5 **$0.00** (fake mode only; no demo run). Cumulative AgentOps: **$0.278175**.
 
@@ -16,7 +16,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 | 2 | Vertical slice: request → plan → one specialist → review → output, fake + real model | ☑ approved, merged |
 | 3 | All specialists, scheduler waves + parallelism, review/retry, tool registry, native tools, MCP (stdio + HTTP), sandbox | ☑ approved, merged |
 | 4 | Durability: crash/restart recovery, plan/action/escalation gates, idempotent execution, memory (pgvector) | ☑ approved, merged (PR #3) |
-| 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☑ (awaiting review) |
+| 5 | UI + observability: SSE, plan DAG, approvals inbox, trace/cost, memory browser, replay | ☑ merged (PR #4; e2e fix PR #5) |
 | 6 | Hardening + evals: injection suite, scenario harness, measured metrics, docs, deploy config | ☐ |
 
 ## Done (Phase 5)
@@ -37,6 +37,7 @@ _Update at the end of every work session and every phase. Keep it short. This is
 - nginx drops server-level security headers in any `location` with its own `add_header`; caching now uses `expires`.
 - Postgres `jsonb` reorders object keys, so tool arguments showed out of order; fields follow the schema's `required` order.
 - axe: a scrollable feed wasn't keyboard-reachable.
+- CI's slower runner exposed two e2e selector races (substring label match on a page still mid-transition; duplicate identity buttons during sign-in). Reproduced with CPU throttling, fixed in PR #5.
 
 ## Done (Phase 4)
 Approved plan + the 3 user changes (side_effect_review inbox item, consolidate under budget exhaustion, expiry-vs-human race) + the decision that low final reviews escalate for partial deliverables too (ADR-029 amended).
@@ -140,7 +141,6 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Phase 4 real spend: **$0.083560**. Cumulative real-model spend on AgentOps: **$0.278175**.
 
 ## Next up
-- Review Phase 5 (branch `phase-5`). Open a PR so CI runs the new `ui` and `e2e` jobs (they have only run locally).
 - Phase 6 plan: injection suite, scenario harness (`make eval`), measured metrics, docs, deploy config.
 
 ## Known limitations / stubs (be honest)
@@ -156,7 +156,7 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Replay: forks are offered only at serial points (never inside a parallel wave). A branch reuses the original's decisions for the same action; an action the original never decided is not executed in the branch (and not asked about). Branches don't write memories.
 - Workspace snapshots (one per wave) are never pruned.
 - The UI has no pagination for approvals beyond 100 items and lists checkpoints without paging (fine at today's sizes).
-- The CI `e2e` job has not run on GitHub yet (CI triggers on PRs and `main`); it passes locally against the same compose stack.
+- The e2e walkthrough is timing-sensitive by nature (live UI). It waits on page headings and exact labels; `E2E_CPU_THROTTLE=4` reproduces slow-runner timing locally (passes 4/4).
 - Real-mode UI behavior is untested (no real-model run this phase); fake mode drives everything through the real API.
 - The Mailpit link is resolved by searching Mailpit's API at read time; if Mailpit is down the UI falls back to a search link.
 
