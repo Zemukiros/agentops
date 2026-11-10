@@ -389,6 +389,14 @@ class DemoState(TypedDict):
 
 
 @dataclass(frozen=True)
+class ReplayContext:
+    """Set when the run is a replay branch (ADR-040). `lineage` = ancestor task ids, nearest
+    first (root last): where the original decisions and side effects are looked up."""
+
+    lineage: tuple[uuid.UUID, ...]
+
+
+@dataclass(frozen=True)
 class RunContext:
     """Per-run dependencies passed via LangGraph's runtime context (not checkpointed, ADR-021)."""
 
@@ -398,6 +406,7 @@ class RunContext:
     tools: ToolRegistry | None = None  # None only for the demo graph
     memory: MemoryService | None = None  # None only for the demo graph
     owner_id: uuid.UUID | None = None  # rate-limit key; set by the worker
+    replay: ReplayContext | None = None  # a replay branch: never re-executes side effects
 
 
 CHECKPOINT_TYPES: tuple[type[BaseModel], ...] = (

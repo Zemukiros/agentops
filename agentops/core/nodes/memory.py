@@ -48,6 +48,16 @@ async def consolidate(state: TaskState, runtime: Runtime[RunContext]) -> dict[st
     outcome = state.get("outcome")
     if ctx.memory is None or ctx.owner_id is None or outcome is None:
         return {"memories_written": 0}
+    if ctx.replay is not None:
+        # A replay branch is an experiment, not experience: it writes no memories (ADR-040).
+        await node_event(
+            runtime,
+            "consolidate",
+            "skipped",
+            type_="memory.consolidated",
+            payload={"written": 0, "llm_skipped": "replay branch: no memories written"},
+        )
+        return {"memories_written": 0}
     results = state.get("results", {}) or {}
     accepted = {sid: r.output or "" for sid, r in results.items() if r.status == "accepted"}
     notes = [

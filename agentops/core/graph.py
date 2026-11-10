@@ -45,6 +45,7 @@ from agentops.core.nodes.synthesize import after_synthesize, synthesize
 from agentops.core.state import DemoState, Outcome, RunContext, TaskState
 from agentops.core.testhooks import TEST_HOOK_ENV, block_if_hooked
 from agentops.observability.events import emit, node_key
+from agentops.observability.tracing import traced_node
 
 __all__ = ["GRAPHS", "TEST_HOOK_ENV", "GraphSpec", "build_demo_graph", "build_main_graph"]
 
@@ -54,20 +55,20 @@ AnyGraph = CompiledStateGraph[Any, RunContext, Any, Any]
 # ---- main ----------------------------------------------------------------------------------
 def build_main_graph(checkpointer: BaseCheckpointSaver[Any] | None) -> AnyGraph:
     g = StateGraph(TaskState, context_schema=RunContext)
-    g.add_node("intake", intake)
-    g.add_node("recall", recall)
-    g.add_node("consolidate", consolidate)
-    g.add_node("plan", plan)
-    g.add_node("plan_gate", plan_gate)
-    g.add_node("schedule", schedule)
+    g.add_node("intake", traced_node("intake", intake))
+    g.add_node("recall", traced_node("recall", recall))
+    g.add_node("consolidate", traced_node("consolidate", consolidate))
+    g.add_node("plan", traced_node("plan", plan))
+    g.add_node("plan_gate", traced_node("plan_gate", plan_gate))
+    g.add_node("schedule", traced_node("schedule", schedule))
     g.add_node("subtask_worker", build_subtask_graph())
-    g.add_node("escalation_gate", escalation_gate)
-    g.add_node("action_gate", action_gate)
-    g.add_node("execute_actions", execute_actions)
-    g.add_node("synthesize", synthesize)
-    g.add_node("final_review", final_review)
-    g.add_node("finalize_failed", finalize_failed)
-    g.add_node("finalize_rejected", finalize_rejected)
+    g.add_node("escalation_gate", traced_node("escalation_gate", escalation_gate))
+    g.add_node("action_gate", traced_node("action_gate", action_gate))
+    g.add_node("execute_actions", traced_node("execute_actions", execute_actions))
+    g.add_node("synthesize", traced_node("synthesize", synthesize))
+    g.add_node("final_review", traced_node("final_review", final_review))
+    g.add_node("finalize_failed", traced_node("finalize_failed", finalize_failed))
+    g.add_node("finalize_rejected", traced_node("finalize_rejected", finalize_rejected))
 
     g.add_edge(START, "intake")
     g.add_edge("intake", "recall")

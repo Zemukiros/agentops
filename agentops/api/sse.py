@@ -105,7 +105,10 @@ def _to_sse(row: Any) -> dict[str, Any]:
         "payload": m["payload"],
         "created_at": m["created_at"].isoformat(),
     }
-    return {"id": str(m["id"]), "event": m["type"], "data": json.dumps(data, default=str)}
+    # No `event:` name: a browser EventSource delivers only unnamed events to `onmessage`,
+    # and listening per type would silently drop types the client doesn't know. The type is
+    # in the data.
+    return {"id": str(m["id"]), "data": json.dumps(data, default=str)}
 
 
 async def event_stream(

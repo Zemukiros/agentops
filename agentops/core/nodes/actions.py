@@ -15,6 +15,13 @@ execute_actions (serial; the only node with external side effects):
                                      side_effect_review inbox item is raised; the run ends
                                      completed_partial.
   reject  -> not executed;  take_over -> recorded as done by a human, not executed.
+
+Replay branches (ADR-040) never perform anything and never ask:
+  action_gate reuses the decision the original branch made for the same action hash; an action
+  the original never decided is recorded as rejected ("not executed in a replay").
+  execute_actions reports what the original branch did with the same action and args (done ->
+  "done in the original branch, not re-sent"), else "not executed (replay)". It never inserts a
+  side_effects row and never calls the registry.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ from langgraph.types import interrupt
 from sqlalchemy import text
 
 from agentops import approvals
+from agentops.core import replay as replay_mod
 from agentops.core.nodes.common import model_of, node_event
 from agentops.core.state import (
     ActionDecision,
@@ -77,6 +85,8 @@ async def action_gate(state: TaskState, runtime: Runtime[RunContext]) -> dict[st
     if not pending:
         return {}
     p = pending[0]
+    if runtime.context.replay is not None:
+        return await _replay_decision(runtime, p)
     registry = runtime.context.tools
     spec = registry.specs.get(p.tool) if registry is not None else None
     schema = spec.input_model.model_json_schema() if spec is not None else None
@@ -96,6 +106,34 @@ async def action_gate(state: TaskState, runtime: Runtime[RunContext]) -> dict[st
         "action_decisions": {
             p.hash: ActionDecisionRecord(hash=p.hash, key=payload["key"], decision=decision)
         }
+    }
+
+
+async def _replay_decision(runtime: Runtime[RunContext], p: ProposedAction) -> dict[str, Any]:
+    """A branch never asks about actions: reuse the original branch's decision (no interrupt)."""
+    assert runtime.context.replay is not None
+    key = f"action:{p.hash}"
+    raw = await replay_mod.original_decision(
+        runtime.context.engine, runtime.context.replay.lineage, key
+    )
+    if raw is not None:
+        decision = ActionDecision.model_validate(raw)
+        source = "original branch"
+    else:
+        decision = ActionDecision(
+            action="reject", note="not executed in a replay (never decided in the original)"
+        )
+        source = "replay default"
+    await node_event(
+        runtime,
+        "action_gate",
+        "resolved",
+        p.hash[:16],
+        type_="action.decided",
+        payload={"hash": p.hash, "tool": p.tool, "action": decision.action, "source": source},
+    )
+    return {
+        "action_decisions": {p.hash: ActionDecisionRecord(hash=p.hash, key=key, decision=decision)}
     }
 
 
@@ -137,7 +175,10 @@ async def execute_actions(state: TaskState, runtime: Runtime[RunContext]) -> dic
             )
             continue
         args = d.args if d.action == "edit" and d.args is not None else p.args
-        outcomes[h] = await _execute_one(runtime, state, p, args)
+        if runtime.context.replay is not None:
+            outcomes[h] = await _replay_outcome(runtime, p, args)
+        else:
+            outcomes[h] = await _execute_one(runtime, state, p, args)
     for h, o in outcomes.items():
         await node_event(
             runtime,
@@ -148,6 +189,47 @@ async def execute_actions(state: TaskState, runtime: Runtime[RunContext]) -> dic
             payload=o.model_dump(),
         )
     return {"action_outcomes": outcomes} if outcomes else {}
+
+
+async def _replay_outcome(
+    runtime: Runtime[RunContext], p: ProposedAction, args: dict[str, Any]
+) -> ActionOutcome:
+    """Report what the original branch did with this exact action; perform nothing."""
+    assert runtime.context.replay is not None
+    ancestors = runtime.context.replay.lineage
+    keys = [idempotency_key(str(a), p.hash, args) for a in ancestors]
+    found = await replay_mod.original_side_effect(runtime.context.engine, ancestors, keys)
+    if found is None:
+        return ActionOutcome(
+            hash=p.hash,
+            tool=p.tool,
+            status="not_considered",
+            detail="not executed (a replay never performs side effects)",
+        )
+    key, status, error = found
+    if status == "done":
+        return ActionOutcome(
+            hash=p.hash,
+            tool=p.tool,
+            status="done",
+            idempotency_key=key,
+            detail="done in the original branch (not re-sent)",
+        )
+    if status == "failed":
+        return ActionOutcome(
+            hash=p.hash,
+            tool=p.tool,
+            status="failed",
+            idempotency_key=key,
+            detail=f"failed in the original branch (not retried): {error or ''}"[:300],
+        )
+    return ActionOutcome(
+        hash=p.hash,
+        tool=p.tool,
+        status="unknown",
+        idempotency_key=key,
+        detail="outcome unknown in the original branch (not re-sent)",
+    )
 
 
 async def _execute_one(

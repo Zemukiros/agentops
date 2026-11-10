@@ -30,7 +30,7 @@ from agentops.settings import Budget, get_settings
 ROOT = Path(__file__).resolve().parents[2]
 TABLES = (
     "events, jobs, llm_calls, tool_calls, approvals, side_effects, memories, "
-    "budget_reservations, task_budgets, tasks, users, "
+    "budget_reservations, task_budgets, sse_tickets, tasks, users, "
     "checkpoints, checkpoint_blobs, checkpoint_writes"
 )
 

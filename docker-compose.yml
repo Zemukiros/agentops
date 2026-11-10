@@ -8,11 +8,17 @@ x-app: &app
   env_file:
     - path: .env
       required: false
-  environment:
+  environment: &app-env
     DATABASE_URL: postgresql+psycopg://agentops:agentops@postgres:5432/agentops  # pragma: allowlist secret
     SMTP_HOST: mailpit
     SMTP_PORT: "1025"
     OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+    # tracing: `OTEL_ENABLED=true docker compose --profile observability up -d` (ADR-019)
+    OTEL_ENABLED: ${OTEL_ENABLED:-false}
+    MAILPIT_API_URL: http://mailpit:8025  # lookups from inside the network
+    MAILPIT_UI_URL: http://localhost:${MAILPIT_UI_PORT:-8025}  # links for the browser
+    UI_ORIGINS: ${UI_ORIGINS:-http://localhost:5173}
+    FAKE_LATENCY_MS: ${FAKE_LATENCY_MS:-0}  # fake mode only: pace demo runs (0 = instant)
   networks: [default]
 
 services:
@@ -62,10 +68,7 @@ services:
     <<: *app
     command: ["python", "-m", "agentops.queue.worker"]
     environment:
-      DATABASE_URL: postgresql+psycopg://agentops:agentops@postgres:5432/agentops  # pragma: allowlist secret
-      SMTP_HOST: mailpit
-      SMTP_PORT: "1025"
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      <<: *app-env  # a service's own `environment:` replaces the anchor's; merge it back
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       # Task workspaces (ADR-031): the worker sees them at /workspaces; the sandbox containers
       # it creates through the proxy bind-mount them from the HOST path (the daemon resolves
@@ -119,6 +122,21 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [docker-proxy]
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ./ui
+      args:
+        VITE_API_URL: http://localhost:${API_PORT:-8000}
+        VITE_JAEGER_URL: ${UI_JAEGER_URL:-}
+    image: agentops-ui:dev
+    environment:
+      API_ORIGIN: http://localhost:${API_PORT:-8000}
+    ports:
+      - "127.0.0.1:${UI_PORT:-5173}:80"
+    depends_on:
+      api: {condition: service_healthy}
     restart: unless-stopped
 
   jaeger:

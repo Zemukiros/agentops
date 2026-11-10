@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_retry_base_seconds: float = 0.5
     llm_timeout_seconds: float = 120.0
+    # Fake mode only: simulated model latency, so a demo run in the UI unfolds visibly instead
+    # of finishing in milliseconds. 0 (default) in tests. Ignored in real mode.
+    fake_latency_ms: int = Field(default=0, ge=0, le=10_000)
     # A partial deliverable (some subtasks failed/blocked) needs at least this reviewer score
     # (1-5) to end completed_partial; below it the run ends failed (ADR-029).
     final_review_min_score: int = Field(default=3, ge=1, le=5)
@@ -135,6 +138,18 @@ class Settings(BaseSettings):
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_from: str = "agentops@localhost"
+    # Mailpit HTTP API as this process sees it (lookup), and its UI as the browser sees it (links)
+    mailpit_api_url: str = "http://localhost:8025"
+    mailpit_ui_url: str = "http://localhost:8025"
+
+    # Web UI (ADR-042): the only origins allowed by CORS (comma-separated).
+    ui_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
+    # Upper bounds for a budget a user sets on a new task (POST /tasks).
+    task_budget_max_usd: float = Field(default=2.0, gt=0)
+    task_budget_max_tokens: int = Field(default=2_000_000, gt=0)
+    task_budget_max_llm_calls: int = Field(default=500, gt=0)
 
     # Embeddings (ADR-010: fastembed BAAI/bge-small-en-v1.5 = 384 dims; must match migration)
     embedding_model: str = "BAAI/bge-small-en-v1.5"
@@ -155,7 +170,7 @@ class Settings(BaseSettings):
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = "http://localhost:4318"
 
-    @field_validator("mcp_servers", mode="before")
+    @field_validator("mcp_servers", "ui_origins", mode="before")
     @classmethod
     def _split_csv(cls, v: object) -> object:
         if isinstance(v, str):
