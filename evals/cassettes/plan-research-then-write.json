@@ -1,0 +1,257 @@
+{
+ "scenario": "plan-research-then-write",
+ "fingerprint": "420efe20da05",
+ "calls": [
+  {
+   "role": "supervisor",
+   "purpose": "plan/p1",
+   "response": {
+    "content": "{\"subtasks\":[{\"id\":\"research\",\"description\":\"Research how pgvector compares with dedicated vector databases (e.g., Pinecone, Weaviate, Qdrant, Milvus). Cover performance and latency at different scales, index types (HNSW, IVFFlat), filtering and hybrid search, operational complexity, cost, scalability limits, ecosystem and maintenance maturity. Cite sources and note benchmark caveats.\",\"specialist\":\"research\",\"expected_output\":\"Structured research notes with key findings, figures and cited sources comparing pgvector to dedicated vector databases across the main dimensions.\",\"complexity\":\"medium\"},{\"id\":\"analyze\",\"description\":\"Analyze the research findings to identify the decision criteria that matter most for a typical engineering team (data scale, query load, existing Postgres usage, ops burden, cost). Define thresholds where pgvector is sufficient versus where a dedicated vector DB is justified, and weigh trade-offs and risks.\",\"specialist\":\"analysis\",\"depends_on\":[\"research\"],\"expected_output\":\"A concise decision framework with trade-off summary, scale thresholds, and a preliminary recommendation with assumptions stated.\",\"complexity\":\"medium\"},{\"id\":\"write\",\"description\":\"Write a one-page (about 400-500 words) recommendation memo for the team based on the research and analysis. Include a clear recommendation up front, the key reasons, the conditions under which to revisit the decision, and suggested next steps. Keep it skimmable and note assumptions about the team's context.\",\"specialist\":\"writing\",\"depends_on\":[\"research\",\"analyze\"],\"expected_output\":\"A polished one-page recommendation memo with a clear recommendation, supporting rationale, risks, and next steps.\",\"complexity\":\"low\"}],\"confidence\":0.8,\"rationale\":\"A linear research, analysis, writing pipeline fits the request. Research gathers facts, analysis turns them into a decision framework suited to a team, and writing produces the one-page memo. Confidence is not higher because the team's specific scale and constraints are unknown, so the recommendation relies on stated assumptions.\"}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "research",
+   "purpose": "act/r0/research",
+   "response": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01VpDMa4Mun8QMVrqEu3ma8m",
+      "args": {
+       "query": "pgvector vs dedicated vector database benchmark HNSW latency throughput Qdrant Pinecone",
+       "max_results": 5
+      },
+      "name": "web_search",
+      "type": "tool_call"
+     },
+     {
+      "id": "toolu_015TZ16FAPn1LpJqGzJXFmCt",
+      "args": {
+       "query": "pgvector HNSW vs IVFFlat index build time recall filtering limitations documentation",
+       "max_results": 5
+      },
+      "name": "web_search",
+      "type": "tool_call"
+     },
+     {
+      "id": "toolu_01GLX5yozVwuJRGm1sHiTq14",
+      "args": {
+       "query": "pgvectorscale StreamingDiskANN 50 million vectors benchmark Pinecone cost comparison",
+       "max_results": 5
+      },
+      "name": "web_search",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "role": "research",
+   "purpose": "act/r0/research",
+   "response": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01Dv7zpwuM9R7nk2XUUnw4mw",
+      "args": {
+       "url": "https://github.com/pgvector/pgvector"
+      },
+      "name": "fetch_url",
+      "type": "tool_call"
+     },
+     {
+      "id": "toolu_01SmkuCnJFVtSSgkm3gmzdw5",
+      "args": {
+       "url": "https://fixtures.agentops.test/pgvector-vs-dedicated"
+      },
+      "name": "fetch_url",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "role": "research",
+   "purpose": "act/r0/research",
+   "response": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01GyucKR9bGNHfJT3jjYfHin",
+      "args": {
+       "url": "https://fixtures.agentops.test/pgvector-overview"
+      },
+      "name": "fetch_url",
+      "type": "tool_call"
+     },
+     {
+      "id": "toolu_01Eyq2f744SLSmRcRr3QF5FR",
+      "args": {
+       "query": "pgvector HNSW benchmark recall QPS Qdrant Milvus Weaviate comparison 2024",
+       "max_results": 5
+      },
+      "name": "web_search",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "role": "research",
+   "purpose": "act/r0/research",
+   "response": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01JadfB9Up1LPcThzK7gMLFA",
+      "args": {
+       "query": "ANN-benchmarks vector database benchmark pgvector Qdrant recall latency independent study",
+       "max_results": 5
+      },
+      "name": "web_search",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "role": "research",
+   "purpose": "act/r0/research",
+   "response": {
+    "content": "## Research notes: pgvector vs. dedicated vector databases\n\n**Bottom line:** I could only verify a thin slice of this. My searches returned the same two pages, both on a `fixtures.agentops.test` domain that I could not confirm as a real vendor or independent source. I found no benchmark numbers, pricing, or maintenance data. Treat the findings below as provisional. They should not support a decision on their own.\n\n### Sources used\n1. https://fixtures.agentops.test/pgvector-overview (fetched)\n   - pgvector is a PostgreSQL extension. It adds a vector column type and L2, inner-product, and cosine distance operators.\n   - It supports exact search plus two approximate indexes.\n   - HNSW: better query speed and recall, but slower builds and more memory.\n   - IVFFlat: faster builds and lower memory use.\n   - Vectors live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query.\n2. https://fixtures.agentops.test/pgvector-vs-dedicated (fetched)\n   - Suggests pgvector fits teams already running PostgreSQL, with collections up to \"tens of millions\" of vectors, and queries that mix similarity with relational filters.\n   - Benefits cited: one backup system, one access-control model, transactional consistency between rows and embeddings.\n   - Suggests dedicated vector databases fit very large collections, strict low-latency needs at high query volume, or workloads that must scale independently of the transactional database.\n\n### Findings by dimension\n- **Index types:** Consistent with general pgvector documentation (not independently verified here): HNSW is the default choice for query speed and recall; IVFFlat trades recall for build speed and memory.\n- **Filtering and hybrid search:** pgvector's main advantage is SQL joins and filters in one query. I did not verify how filtered HNSW recall degrades with selective predicates, which is a known concern to check.\n- **Operational complexity:** A single database means one backup, access model, and consistency story (source 2). Dedicated systems add a second system to run.\n- **Scale and latency:** Source 2 gives a qualitative ceiling of \"tens of millions\" for pgvector. I found no latency, QPS, or recall figures at any scale.\n- **Cost:** Not researched. No pricing for Pinecone, Qdrant Cloud, Weaviate Cloud, Zilliz/Milvus, or self-hosted Postgres.\n- **Ecosystem and maturity:** Not researched.\n\n### Not verified / gaps\n- No independent benchmarks (e.g., ANN-Benchmarks or vendor-neutral tests) with recall, latency, and throughput for pgvector vs. Qdrant, Milvus, Weaviate, or Pinecone.\n- No benchmark caveats I could cite. In general, results depend on dataset, embedding dimension, recall target, filter selectivity, and hardware, and vendor benchmarks favor the vendor. I have not verified any specific published figure.\n- No pricing, scalability-limit data, or project maintenance and release data.\n- The GitHub README for pgvector could not be fetched; the tool only allows URLs that came from search results, and search did not return it.\n\n### Suggested next steps before the recommendation\n- Run a short internal benchmark on our own data: our embedding dimension, our expected row count, our filter patterns, and a recall target. Compare pgvector HNSW against one dedicated option.\n- Pull the official pgvector README and changelog, and a current Qdrant or Milvus benchmark, from sources that can be cited directly.\n- Get our own cost model from current vendor pricing pages.",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r0/research",
+   "response": {
+    "content": "{\"verdict\":\"escalate\",\"score\":2,\"issues\":[\"The draft does not meet the expected output: no benchmark figures, pricing, scalability data, or maturity information were found, and cost and ecosystem were not researched at all.\",\"Search returned only two pages from the same unverifiable test domain across all queries, so the research cannot be completed with the available tools. This needs a human decision: supply sources, widen tool access, or accept a recommendation built on an internal benchmark.\",\"Several statements are presented as general knowledge rather than sourced, e.g. 'known concern' about filtered HNSW recall and 'vendor benchmarks favor the vendor'.\",\"The draft is honest about its gaps and labels its findings provisional, which is appropriate, but the rest of the task (a one-page recommendation) cannot be built on this.\"],\"feedback_for_specialist\":null,\"unsupported_claims\":[\"Consistent with general pgvector documentation: HNSW is the default choice for query speed and recall (no documentation was fetched to support this)\",\"Filtered HNSW recall degrades with selective predicates is a known concern (not supported by any fetched source)\",\"Vendor benchmarks favor the vendor (not sourced)\",\"Dedicated systems add a second system to run (inference, not sourced beyond source 2's general framing)\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "analysis",
+   "purpose": "act/r0/analyze",
+   "response": {
+    "content": "# Decision framework: pgvector vs. a dedicated vector DB\n\n**Evidence caveat.** The research was thin. It rests on two unverified pages and has no benchmarks, pricing or maintenance data. I did not query the demo database or run any computation, because nothing in it bears on this question. The thresholds below are my own engineering heuristics, not measured results. Validate them with the internal benchmark described at the end.\n\n## Decision criteria, ranked by importance\n\n1. **Existing Postgres usage.** If Postgres is already the system of record, pgvector adds little new to operate.\n2. **Data scale.** This is the number of vectors times the embedding dimension, which sets memory needs. HNSW indexes are memory-hungry.\n3. **Query load and latency target.** The deciding numbers are QPS and p95/p99 latency at a given recall.\n4. **Filter and hybrid-query needs.** pgvector's SQL joins, filters and transactions in one query are a real advantage. Selective filters can hurt approximate-index recall, which is unverified and needs testing.\n5. **Ops burden.** pgvector gives one backup, one access model and one consistency story. A dedicated DB adds a second system, plus sync and consistency work.\n6. **Cost.** Not researched. Build a model from current vendor pricing.\n\n## Scale thresholds (heuristic)\n\n| Vectors (about 768\u20131536 dims) | Recommendation |\n|---|---|\n| Under about 1M | pgvector, almost always sufficient |\n| 1M\u201310M | pgvector is likely fine on a right-sized instance with HNSW. Check that the index fits in RAM |\n| 10M\u201350M | Gray zone. The source says \"tens of millions\" is the ceiling. Benchmark first |\n| Over about 50M, or index well beyond RAM | A dedicated DB is likely justified |\n\nFor memory, 10M vectors at 1536 dims in float32 is about 61 GB of raw data, before index overhead.\n\nOther triggers favouring a dedicated DB:\n- Sustained high QPS with strict low-latency targets (for example, p99 in the low tens of ms) that hurt the primary OLTP workload.\n- A need to scale vector search independently of the transactional database.\n- Frequent bulk re-embedding or index rebuilds that disrupt production. HNSW builds are slow.\n- Specialised features such as advanced quantization or sharding.\n\n## Trade-offs\n\n| | pgvector | Dedicated |\n|---|---|---|\n| Ops | One system | Two systems, plus sync |\n| Consistency | Transactional | Eventual, via pipeline |\n| Filtering | Full SQL, with possible recall issues at high selectivity | Often purpose-built filtered search |\n| Scale ceiling | Bounded by a single node and its RAM | Horizontal scaling |\n| Cost | Marginal, on existing infrastructure | New spend or managed fees |\n| Lock-in | Low | Moderate |\n\n## Risks\n- **pgvector:** Vector load contends with OLTP workloads. Index builds are slow and memory-heavy. Migration is needed if you outgrow it.\n- **Dedicated:** Data drift between systems, a second security and compliance surface, and extra cost and on-call load.\n- **Both:** The vendor-benchmark bias noted in the research, and the lack of independent numbers.\n\n## Preliminary recommendation\n**Start with pgvector (HNSW)** if these assumptions hold:\n- The team already runs Postgres.\n- The collection is under about 10\u201320M vectors.\n- Queries mix similarity with relational filters.\n- Load is moderate.\n\nKeep embedding generation separate from the store so migration stays cheap. Revisit if any of these happen:\n- Vector count passes about 20\u201350M.\n- Index memory pressure appears.\n- p95 latency misses its target at the required recall.\n- Vector load degrades the primary database.\n\n## Before finalizing\n1. Run a benchmark on our own data. Use our dimension, row count and filter patterns. Test pgvector HNSW against one dedicated option such as Qdrant, and record recall, p95 latency and QPS. Include selective-filter cases.\n2. Verify the pgvector README and changelog, and one independent benchmark.\n3. Build a cost model from current pricing.\n\nIf our scale or load differs from the assumptions above, the recommendation changes.",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r0/analyze",
+   "response": {
+    "content": "{\"verdict\":\"revise\",\"score\":3,\"issues\":[\"The caveat says 'I did not query the demo database or run any computation', yet the draft includes a computed figure (61 GB). It also refers to a 'demo database' that nothing in the task mentions. This is confusing and inaccurate.\",\"The scale thresholds (1M, 1M-10M, 50M, 20-50M) are labeled heuristic but are not tied to any cited evidence. The only supported anchor is 'tens of millions' from an unverified source. The 50M boundary and the 'under 1M almost always sufficient' claim have no support.\",\"The trade-off table and risks include factual assertions not in the research or any tool result: dedicated DBs have 'eventual' consistency, 'often purpose-built filtered search', 'moderate' lock-in, 'low' pgvector lock-in, and 'advanced quantization or sharding' as dedicated-only features. These are presented as fact, not flagged as assumptions.\",\"Statements such as 'HNSW builds are slow' and 'vector load contends with OLTP' are stated as fact, and 'p99 in the low tens of ms' is an arbitrary figure with no basis. The first is supported only by the unverified research notes.\",\"The cost criterion is listed but not analyzed. It is ranked last with no trade-off discussion, even though the subtask explicitly names cost as a criterion to weigh.\",\"Assumptions are stated in the recommendation, but the 10-20M recommendation threshold sits inconsistently against the table, which calls 10M-50M a gray zone.\"],\"feedback_for_specialist\":\"Fix the caveat: remove the 'demo database' sentence and acknowledge that you did a back-of-envelope memory calculation, showing the arithmetic (10M x 1536 x 4 bytes \u2248 61 GB). Explicitly label every threshold and trade-off row (consistency model, lock-in, filtered search, quantization/sharding) as general engineering judgment not verified by the research, or drop it. Justify or soften the 1M/50M cutoffs and make the table and recommendation thresholds consistent (pick one range for 'start with pgvector' and one for 'benchmark first'). Add a brief cost trade-off paragraph using qualitative reasoning (marginal cost on existing Postgres vs. new infra or managed fees) and state that it is unquantified. Remove or flag the arbitrary p99 figure.\",\"unsupported_claims\":[\"Under about 1M vectors pgvector is almost always sufficient\",\"Over about 50M vectors a dedicated DB is likely justified\",\"pgvector is likely fine at 1M-10M on a right-sized instance with HNSW\",\"Dedicated DBs have eventual consistency via pipeline\",\"Dedicated DBs often have purpose-built filtered search\",\"Lock-in is low for pgvector and moderate for dedicated DBs\",\"Specialised features like advanced quantization or sharding are reasons to choose a dedicated DB\",\"p99 in the low tens of ms as a trigger threshold\",\"Vector load contends with OLTP workloads in pgvector deployments\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "analysis",
+   "purpose": "act/r1/analyze",
+   "response": {
+    "content": "# Decision framework: pgvector vs. a dedicated vector DB (revised)\n\n**Evidence caveat.** The research was thin. It rests on two pages on an unconfirmed domain (`fixtures.agentops.test`). It has no benchmarks, pricing or maintenance data. Only these points come from the research: pgvector's index types, SQL filtering and joins in one query, one backup and access model, and the source's \"tens of millions\" qualitative ceiling. Everything else below is **general engineering judgment, not verified by the research**. That includes the thresholds, the trade-off rows and the risks. I ran no queries or benchmarks. The one calculation is a back-of-envelope memory estimate:\n\n10,000,000 vectors \u00d7 1536 dims \u00d7 4 bytes (float32) = 61,440,000,000 bytes \u2248 61 GB of raw vectors. This excludes HNSW graph overhead, so the real index needs more.\n\n## Decision criteria, ranked (my judgment)\n1. **Existing Postgres usage.** If Postgres is already the system of record, pgvector adds little to operate.\n2. **Data scale.** Vector count \u00d7 dimension sets the memory need. HNSW is memory-hungry (the source says \"more memory\").\n3. **Query load and latency target.** The deciding numbers are QPS and p95 latency at a required recall. Our targets are not yet defined.\n4. **Filter and hybrid-query needs.** SQL filtering in one query is a pgvector strength (sourced). How recall degrades under selective filters is unverified and must be tested.\n5. **Ops burden.** One system versus two (sourced in general terms).\n6. **Cost.** See below.\n\n## Scale thresholds (heuristic; not sourced beyond \"tens of millions\")\nI use one set of ranges throughout:\n\n| Vector count (about 768\u20131536 dims) | Action |\n|---|---|\n| Up to about 10M | **Start with pgvector**, provided the index fits in RAM |\n| About 10M to 50M | **Benchmark first** against a dedicated option |\n| Above about 50M, or index well beyond one node's RAM | Dedicated DB likely justified |\n\nThese cutoffs are rough round numbers, not measured. The 10M line reflects a memory-fit judgment: the raw vectors already take about 61 GB at 1536 dims. The 50M line is a loose reading of \"tens of millions\". Both depend heavily on dimension, hardware, recall target and filters, and could reasonably move by several times in either direction.\n\nOther triggers that may favour a dedicated DB (judgment, unverified):\n- High sustained QPS against a strict latency target that we must define. I give no specific figure.\n- A need to scale vector search independently of the transactional database.\n- Frequent bulk re-embedding or index rebuilds that disrupt production.\n- Needing features such as advanced quantization or sharding. I did not check what pgvector or specific products offer here.\n\n## Trade-offs (all general judgment unless marked)\n| | pgvector | Dedicated |\n|---|---|---|\n| Ops | One system (sourced) | Two systems, plus sync |\n| Consistency | Transactional with rows (sourced) | Typically eventual via a sync pipeline (judgment) |\n| Filtered search | SQL filters and joins (sourced); recall under selective filters unverified | Often purpose-built, varies by product (judgment) |\n| Scale ceiling | Likely bounded by a single node (judgment) | Horizontal scaling (sourced in general terms) |\n| Lock-in | Likely lower (judgment) | Likely higher (judgment) |\n\n## Cost (qualitative, unquantified)\nNo pricing was researched, so I have no figures. In principle, pgvector's marginal cost on an existing Postgres is extra RAM, storage and CPU, which may mean a larger instance. A dedicated DB means new infrastructure or managed-service fees, plus the engineering time to run and sync a second system. The break-even depends on scale and vendor pricing. We need a cost model from current pricing pages before relying on this.\n\n## Risks (judgment)\n- **pgvector:** vector load may contend with OLTP. Index builds are slow and memory-heavy (sourced). Outgrowing it forces a migration.\n- **Dedicated:** data drift between systems, a second security surface, and added cost and on-call load.\n- **Both:** no independent benchmark evidence.\n\n## Preliminary recommendation\n**Start with pgvector (HNSW)** if these assumptions hold:\n- We already run Postgres.\n- We expect up to about 10M vectors.\n- Queries mix similarity with relational filters.\n- Load is moderate.\n\nKeep embedding generation separate from the store so migration stays cheap. **Benchmark before committing** if we expect 10M\u201350M vectors. Lean dedicated above that. Re-evaluate if index memory pressure appears, latency misses its target at the required recall, or vector load degrades the primary database.\n\n## Before finalizing\n1. Benchmark on our own data (dimension, row count, filter patterns, recall target). Compare pgvector HNSW against one dedicated option. Record recall, p95 latency and QPS, including selective-filter cases.\n2. Verify the pgvector README and changelog, and one independent benchmark.\n3. Build a cost model from current pricing.",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r1/analyze",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":4,\"issues\":[\"The 'Scale ceiling: Horizontal scaling (sourced in general terms)' label slightly overstates the support. Source 2 only says dedicated DBs suit very large collections or independent scaling, not horizontal scaling specifically.\",\"The 'Ops: Two systems, plus sync' cell for dedicated DBs is partly judgment. The research supports only 'a second system to run', not sync.\",\"The 10M line is justified by memory fit, but 61 GB of raw vectors is not obviously a ceiling on modern instances, so the threshold is somewhat arbitrary. The draft discloses this and says it could move several times in either direction.\",\"'Index builds are slow and memory-heavy (sourced)' is accurate for HNSW only. IVFFlat is the faster, lower-memory option, and the draft never mentions it as a mitigation.\"],\"feedback_for_specialist\":\"Optional polish: change 'horizontal scaling (sourced in general terms)' to 'judgment', and mark 'plus sync' as judgment. Mention IVFFlat as a lower-memory, faster-build option for the memory-fit concern.\",\"unsupported_claims\":[\"Dedicated DBs offer horizontal scaling (labeled 'sourced in general terms', but the research only says dedicated DBs suit very large collections and independent scaling)\",\"Dedicated DBs require sync work (the research only says 'a second system to run')\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "writing",
+   "purpose": "act/r0/write",
+   "response": {
+    "content": "# Recommendation: Start with pgvector for our vector search; benchmark before committing if scale grows\n\n**Status:** Provisional. The supporting research was thin (see Evidence below).\n\n## Recommendation\nAdopt **pgvector with an HNSW index** as the first vector store, on the condition that we already run PostgreSQL and expect to stay under about 10M vectors. Keep embedding generation separate from storage so we can migrate later at low cost. Do not adopt a dedicated vector database yet.\n\n## Why\n- **Fewer systems to run.** Vectors sit in ordinary tables next to our data, so we get one backup process, one access model, and transactional consistency between rows and embeddings. A dedicated database adds a second system and a sync pipeline to operate.\n- **Filtered queries in one statement.** Similarity search can be combined with SQL filters and joins. Our queries likely mix similarity with relational conditions, which favors this.\n- **Lower cost to start.** The marginal cost is extra RAM, storage and CPU on an existing instance. A dedicated service adds new infrastructure or managed fees, plus engineering time.\n- **Lower lock-in and easy to reverse.** Keeping embeddings in a separate pipeline means moving to a dedicated store later is a bounded task.\n\n## Evidence and its limits\n- Research relied on two pages from an unconfirmed domain (`fixtures.agentops.test`). I could not verify them as a vendor or independent source.\n- I found **no benchmarks, pricing or maintenance data**. Index behavior is consistent with general pgvector documentation, but I did not verify it.\n- Scale thresholds are my heuristic, not measured. Raw vectors alone at 10M \u00d7 1536 dims \u00d7 float32 take about 61 GB, before HNSW overhead.\n\n## Assumptions about our context\n- We already run PostgreSQL as the system of record.\n- Expected volume is up to about 10M vectors at 768\u20131536 dimensions.\n- Query load is moderate, and our latency target is not yet defined.\n- Our team can run a Postgres instance with enough RAM for the index.\n\n## Revisit this decision if\n- Volume reaches **10M\u201350M vectors**: benchmark pgvector against one dedicated option first.\n- Volume exceeds about **50M**, or the index no longer fits in one node's RAM.\n- p95 latency misses target at our required recall, or recall drops under our selective filters.\n- Sustained high QPS, or frequent full re-embedding and index rebuilds, slows the primary database.\n- We need to scale vector search independently of the transactional database.\n\n## Risks\n- **pgvector:** vector load may contend with transactional workloads; index builds are slow and memory-heavy; outgrowing it forces a migration.\n- **Dedicated (if chosen later):** data drift between systems, a second security surface, added cost and on-call load.\n\n## Next steps\n1. **Define targets** with the team: vector count, dimensions, QPS, p95 latency, and minimum recall.\n2. **Benchmark on our own data:** pgvector HNSW versus one dedicated option. Record recall, p95 latency and QPS, including selective-filter queries.\n3. **Verify sources:** read the official pgvector README and changelog, and find one independent benchmark we can cite directly.\n4. **Build a cost model** from current pricing pages for pgvector on our instance and for one managed vector service.\n5. **Decide by the end of the benchmark.** Owner: [assign]. Target date: [assign].",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r0/write",
+   "response": {
+    "content": "{\"verdict\":\"revise\",\"score\":3,\"issues\":[\"Length: the draft appears well over the 400-500 word target and is not truly one page; it needs trimming.\",\"'Lower cost to start' is stated as a flat benefit under 'Why', but the analysis says no pricing was researched and cost needs a model before relying on it. It should be hedged as an assumption.\",\"'Lower lock-in' is presented as a reason, but the analysis marks it as unverified judgment. It should be labeled as such.\",\"The 'Why' section does not separate sourced points (one backup, one access model, transactional consistency, SQL filters) from judgment points, even though the Evidence section admits the source is unconfirmed.\",\"The decision is called provisional, yet the recommendation says 'Do not adopt a dedicated vector database yet' firmly, which is stronger than the thin evidence supports.\",\"The 'Revisit if' section repeats the thresholds and triggers in a long bullet list; it could be condensed and skimmability improved.\",\"Placeholders '[assign]' for owner and date are left in the final memo.\"],\"feedback_for_specialist\":\"Cut to about 450 words. Hedge cost and lock-in as assumptions or unverified judgment, not as established reasons. Mark clearly which rationale points come from the (unconfirmed) source versus engineering judgment, and soften 'Do not adopt a dedicated database' to match the provisional status. Merge the Risks and Revisit sections to save space. Replace the [assign] placeholders with a concrete suggestion (e.g., 'tech lead, within 2 weeks') or flag them explicitly as team decisions.\",\"unsupported_claims\":[\"Lower cost to start than a dedicated service (no pricing researched)\",\"Lower lock-in with pgvector (judgment, unverified)\",\"Moving to a dedicated store later is a 'bounded task' / low-cost migration (unverified)\",\"Dedicated databases add a sync pipeline and second security surface (judgment, not sourced)\",\"The 10M and 50M thresholds as decision points (heuristic, only 'tens of millions' is sourced)\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "writing",
+   "purpose": "act/r1/write",
+   "response": {
+    "content": "# Recommendation: Start with pgvector; benchmark before committing to a dedicated vector database\n\n**Status:** Provisional. The research was thin and rests on one unconfirmed source domain.\n\n## Recommendation\nStart with **pgvector using an HNSW index**, provided we already run PostgreSQL and expect to stay under about 10M vectors. Keep embedding generation separate from storage so a later migration stays cheap. Do not commit to a dedicated vector database yet. Treat this as a provisional choice that the benchmark below will confirm or overturn.\n\n## Why\n- **One system to run (source + judgment).** The source says vectors in ordinary tables give one backup process, one access model, and transactional consistency between rows and embeddings. Running a second system with a sync pipeline is additional operational work.\n- **Filtered queries in one statement (source).** The source says similarity search can combine with SQL filters and joins. Our queries likely mix similarity with relational conditions. How recall holds under selective filters is unverified.\n- **Likely lower starting cost (judgment, unverified).** On an existing instance, the marginal cost is probably extra RAM, storage and CPU. We have no pricing data, so this needs a cost model.\n- **Easier to reverse (judgment).** Separating embeddings from the store should bound the cost of a later move.\n\n## Evidence limits\n- The two sources are on `fixtures.agentops.test`, which I could not confirm as a vendor or independent source.\n- No benchmarks, pricing or maintenance data were found.\n- The 10M threshold is my heuristic. Raw vectors alone at 10M \u00d7 1536 dims \u00d7 float32 take about 61 GB, before HNSW overhead.\n\n## Assumptions\n- PostgreSQL is already our system of record.\n- Volume is up to about 10M vectors at 768\u20131536 dimensions.\n- Query load is moderate. Our latency target is not yet defined.\n- We can provision enough RAM for the index.\n\n## Revisit if\n- Volume reaches **10M\u201350M**: benchmark pgvector against one dedicated option.\n- Volume exceeds about **50M**, or the index no longer fits one node's RAM.\n- p95 latency misses target at our required recall, or recall drops under selective filters.\n- Sustained high QPS or frequent re-embedding slows the primary database.\n- We need vector search to scale independently of the transactional database.\n\n**Risks:** pgvector may contend with transactional load, index builds are slow and memory-heavy, and outgrowing it forces a migration. A dedicated database brings data drift, a second security surface, and more cost and on-call load.\n\n## Next steps\n1. **Define targets** (volume, dimensions, QPS, p95 latency, minimum recall). *Owner: tech lead, within 1 week.*\n2. **Benchmark** pgvector HNSW against one dedicated option on our own data, including selective-filter queries. *Owner: [team decision: named engineer], within 2 weeks.*\n3. **Verify sources:** read the official pgvector README and changelog, and find one independent benchmark. *Owner: [team decision], within 1 week.*\n4. **Build a cost model** from current pricing for our instance and one managed service. *Owner: [team decision], within 2 weeks.*\n5. **Decide** after the benchmark. *Owner: tech lead, within 3 weeks.*",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r1/write",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":4,\"issues\":[\"Length is likely somewhat over the 400-500 word target, roughly 500-550 words, but it is skimmable and close to one page.\",\"Owner placeholders '[team decision]' remain in steps 2-4, though they are explicitly flagged as team decisions, which is acceptable.\",\"The 'One system to run' bullet labeled 'source + judgment' blends sourced and judgment claims; the sync-pipeline point is judgment and could be separated.\",\"Risks are condensed into one paragraph; fine for skimming, but less scannable than bullets.\"],\"feedback_for_specialist\":\"Optional polish: trim a few lines to land within 500 words, and note explicitly that the sync pipeline and second security surface are judgment, not sourced. Otherwise ready to send.\",\"unsupported_claims\":[\"Dedicated databases require a sync pipeline, add a second security surface, and increase on-call load (general judgment, not sourced; partly labeled as judgment)\",\"The 10M and 50M thresholds (heuristic; labeled as such in the memo, only 'tens of millions' is sourced)\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "supervisor",
+   "purpose": "synthesize",
+   "response": {
+    "content": "# Recommendation: Start with pgvector, benchmark before committing to a dedicated vector database\n\n**Status: provisional.** The research was thin. It rests on two pages from an unconfirmed domain (`fixtures.agentops.test`) and found no benchmarks, pricing, or maintenance data. Points marked \"judgment\" are general engineering reasoning, not verified findings.\n\n## Recommendation\nStart with **pgvector using an HNSW index**, provided we already run PostgreSQL and expect to stay under about 10M vectors. Keep embedding generation separate from storage so a later migration stays cheap. Do not commit to a dedicated vector database yet. The benchmark below should confirm or overturn this choice.\n\n## Why\n- **One system to run (source).** Vectors live in ordinary tables, so we get one backup process, one access-control model, and transactional consistency between rows and embeddings. A dedicated database adds a second system and a sync pipeline (judgment).\n- **Filtered queries in one statement (source).** Similarity search can be combined with SQL filters and joins. Our queries likely mix similarity with relational conditions. How recall holds under selective filters is unverified.\n- **Likely lower starting cost (judgment).** On an existing instance, the marginal cost is probably extra RAM, storage, and CPU. We have no pricing data, so this needs a cost model.\n- **Easier to reverse (judgment).** Keeping embedding generation separate from the store should bound the cost of a later move.\n\n## Index trade-off (source)\n- **HNSW:** better query speed and recall, but slower builds and more memory.\n- **IVFFlat:** faster builds and lower memory, with lower recall (general pgvector knowledge, not verified here).\n\n## Scale thresholds (heuristic)\nThese cutoffs are rough and could move several times in either direction depending on dimension, hardware, recall target, and filters. The only sourced figure is a qualitative ceiling of \"tens of millions\" of vectors.\n\n| Vector count (about 768\u20131536 dims) | Action |\n|---|---|\n| Up to about 10M | Start with pgvector, provided the index fits in RAM |\n| About 10M to 50M | Benchmark first against a dedicated option |\n| Above about 50M, or index well beyond one node's RAM | Dedicated database likely justified |\n\nMemory check: 10M vectors \u00d7 1536 dims \u00d7 4 bytes (float32) \u2248 61 GB of raw vectors, before HNSW graph overhead.\n\n## Assumptions\n- PostgreSQL is already our system of record.\n- Volume is up to about 10M vectors at 768\u20131536 dimensions.\n- Query load is moderate. Our latency target is not yet defined.\n- We can provision enough RAM for the index.\n\n## Revisit if\n- Volume reaches 10M\u201350M (benchmark against one dedicated option), or exceeds about 50M.\n- The index no longer fits one node's RAM.\n- p95 latency misses target at our required recall, or recall drops under selective filters.\n- Sustained high QPS or frequent re-embedding or index rebuilds slow the primary database.\n- We need vector search to scale independently of the transactional database.\n\n## Risks (judgment unless noted)\n- **pgvector:** vector load may contend with transactional load. Index builds are slow and memory-heavy (sourced). Outgrowing it forces a migration.\n- **Dedicated database:** data drift between systems, a second security surface, and more cost and on-call load.\n- **Both:** we have no independent benchmark evidence yet.\n\n## Next steps\n1. **Define targets:** volume, dimensions, QPS, p95 latency, minimum recall. *Owner: tech lead, within 1 week.*\n2. **Benchmark** pgvector HNSW against one dedicated option on our own data, including selective-filter queries. Record recall, p95 latency, and QPS. *Owner: [team decision: named engineer], within 2 weeks.*\n3. **Verify sources:** read the official pgvector README and changelog, and find one independent benchmark. *Owner: [team decision], within 1 week.*\n4. **Build a cost model** from current pricing for our instance and one managed service. *Owner: [team decision], within 2 weeks.*\n5. **Decide** after the benchmark. *Owner: tech lead, within 3 weeks.*",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "final_review",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":4,\"issues\":[\"Research base is thin: two pages from an unconfirmed domain, with no benchmarks, pricing or maintenance data, so the comparison across dimensions is mostly judgment.\",\"Scale thresholds (10M and 50M) are heuristics rather than sourced figures, which the memo discloses.\",\"Likely exceeds one page given the number of sections, tables and lists.\",\"Several next-step owners are placeholders ([team decision]) instead of named people.\",\"Dedicated databases are not named or compared concretely (for example Pinecone, Qdrant, Milvus or Weaviate), so the comparison lacks specificity.\"],\"feedback_for_specialist\":null,\"unsupported_claims\":[\"IVFFlat has faster builds, lower memory and lower recall (marked as general knowledge, not verified)\",\"Thresholds of about 10M and 50M vectors (flagged as heuristic)\",\"pgvector likely has lower starting cost (flagged as judgment)\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "supervisor",
+   "purpose": "consolidate",
+   "response": {
+    "content": "{\"memories\":[{\"kind\":\"lesson\",\"text\":\"When research returns thin or unverifiable sources, clearly label which claims are sourced versus general judgment, and mark the recommendation as provisional with a benchmark plan.\",\"importance\":0.7},{\"kind\":\"lesson\",\"text\":\"The research searches for pgvector versus dedicated vector databases returned only two pages from one unconfirmed domain, with no benchmarks, pricing, or maintenance data, so future similar research should seek independent sources early.\",\"importance\":0.6},{\"kind\":\"fact\",\"text\":\"Per the accepted research, pgvector supports HNSW (faster queries and better recall but more memory and slower builds) and IVFFlat (faster builds and lower memory), and allows combining similarity search with SQL filters, joins, and transactions.\",\"importance\":0.4}]}",
+    "tool_calls": []
+   }
+  }
+ ],
+ "expected": {
+  "checks": {
+   "status_in": true,
+   "plan_has_specialists": true,
+   "plan_has_dependency": true,
+   "tool_used": true,
+   "bounded": true
+  },
+  "judge": {
+   "model": "claude-opus-5-5",
+   "criteria": [
+    {
+     "criterion": "States a clear recommendation (pgvector or a dedicated vector database).",
+     "pass": true,
+     "reason": "Clearly recommends starting with pgvector (HNSW) and not committing to a dedicated database yet."
+    },
+    {
+     "criterion": "Gives at least two concrete trade-offs between the options.",
+     "pass": true,
+     "reason": "Gives multiple concrete trade-offs: one system vs second system plus sync pipeline, filtered SQL queries, cost, and scale/RAM limits."
+    },
+    {
+     "criterion": "Every factual claim is consistent with a pgvector vs dedicated-database comparison (no invented benchmarks or numbers).",
+     "pass": true,
+     "reason": "No invented benchmarks. Numeric thresholds are explicitly labeled heuristic, and the memory figure is simple arithmetic (10M\u00d71536\u00d74 \u2248 61 GB)."
+    }
+   ],
+   "pass": true,
+   "cost_usd": 0.013124,
+   "input_tokens": 2206,
+   "output_tokens": 215
+  },
+  "passed": true
+ }
+}

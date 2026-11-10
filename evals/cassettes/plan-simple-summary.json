@@ -1,0 +1,87 @@
+{
+ "scenario": "plan-simple-summary",
+ "fingerprint": "64777ba4cc15",
+ "calls": [
+  {
+   "role": "supervisor",
+   "purpose": "plan/p1",
+   "response": {
+    "content": "{\"subtasks\":[{\"id\":\"draft\",\"description\":\"Write a summary of what pgvector is, in exactly about 120 words, aimed at a product manager. Explain that pgvector is an open-source PostgreSQL extension that adds a vector data type and similarity search (nearest-neighbor with exact and approximate indexes such as HNSW and IVFFlat). Cover business value in plain language: enabling semantic search, recommendations, and retrieval-augmented generation for AI features using the existing Postgres database, avoiding a separate vector database. Briefly note trade-offs such as scale and performance limits versus dedicated vector stores. Avoid heavy jargon. Verify the final word count is close to 120.\",\"specialist\":\"writing\",\"depends_on\":[],\"expected_output\":\"A single paragraph of approximately 120 words summarizing pgvector for a product manager.\",\"complexity\":\"low\"}],\"confidence\":0.93,\"rationale\":\"This is a short, self-contained writing task that the writing specialist can do directly from general knowledge, so one subtask is enough and extra research or analysis steps would add overhead without improving quality.\"}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "writing",
+   "purpose": "act/r0/draft",
+   "response": {
+    "content": "pgvector is an open-source extension for PostgreSQL, the widely used relational database. It lets a team store \"embeddings,\" which are numerical representations of text, images, or other content that capture meaning, and then quickly find items that are similar in meaning. This powers features such as semantic search (finding results by intent rather than exact keywords), product or content recommendations, and retrieval-augmented generation, where an AI assistant pulls relevant company data before answering. Its main business advantage is that it works inside the existing Postgres database, so teams avoid adopting, paying for, and synchronizing a separate specialized vector database. The trade-off is scale: for very large datasets or demanding real-time workloads, dedicated vector stores may offer better performance, so product teams should benchmark against their expected volume.",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r0/draft",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":4,\"issues\":[\"The draft runs about 127 words, slightly over the 120 target but close enough to count as approximately 120.\",\"It leaves out the HNSW/IVFFlat index detail that the subtask brief mentioned. That is acceptable for a product manager audience that should avoid jargon.\"],\"feedback_for_specialist\":null,\"unsupported_claims\":[]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "supervisor",
+   "purpose": "synthesize",
+   "response": {
+    "content": "pgvector is an open-source extension for PostgreSQL, the widely used relational database. It lets a team store \"embeddings,\" which are numerical representations of text, images, or other content that capture meaning, and then quickly find items that are similar in meaning. This powers features such as semantic search (finding results by intent rather than exact keywords), product or content recommendations, and retrieval-augmented generation, where an AI assistant pulls relevant company data before answering. Its main business advantage is that it works inside the existing Postgres database, so teams avoid adopting, paying for, and synchronizing a separate specialized vector database. The trade-off is scale: for very large datasets or demanding real-time workloads, dedicated vector stores may offer better performance, so product teams should benchmark against their expected volume.",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "final_review",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":4,\"issues\":[\"The summary is about 127 words, slightly over the 120-word target. This is within a reasonable tolerance but not exact.\"],\"feedback_for_specialist\":null,\"unsupported_claims\":[]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "supervisor",
+   "purpose": "consolidate",
+   "response": {
+    "content": "{\"memories\":[{\"kind\":\"fact\",\"text\":\"pgvector is an open-source PostgreSQL extension that stores embeddings and finds semantically similar items, supporting semantic search, recommendations, and retrieval-augmented generation.\",\"importance\":0.5},{\"kind\":\"fact\",\"text\":\"pgvector's main business advantage is that it runs inside an existing Postgres database, avoiding a separate vector database, though very large or real-time workloads may need dedicated vector stores and benchmarking.\",\"importance\":0.5},{\"kind\":\"lesson\",\"text\":\"For product manager audiences, a summary that defines technical terms in plain language and ends with a business trade-off was accepted without revisions.\",\"importance\":0.4}]}",
+    "tool_calls": []
+   }
+  }
+ ],
+ "expected": {
+  "checks": {
+   "status_in": true,
+   "plan_size": true,
+   "plan_valid_first_try": true,
+   "bounded": true
+  },
+  "judge": {
+   "model": "claude-opus-5-5",
+   "criteria": [
+    {
+     "criterion": "Explains that pgvector adds vector storage and similarity search to PostgreSQL.",
+     "pass": true,
+     "reason": "States it is a PostgreSQL extension that stores embeddings and finds similar items."
+    },
+    {
+     "criterion": "Is roughly 120 words (between 80 and 170 words).",
+     "pass": true,
+     "reason": "Roughly 130 words, within the 80\u2013170 range."
+    },
+    {
+     "criterion": "Is understandable by a non-specialist product manager (no unexplained jargon).",
+     "pass": true,
+     "reason": "Defines embeddings, semantic search, and RAG in plain language suitable for a PM."
+    }
+   ],
+   "pass": true,
+   "cost_usd": 0.006464,
+   "input_tokens": 921,
+   "output_tokens": 139
+  },
+  "passed": true
+ }
+}

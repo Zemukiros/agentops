@@ -1,0 +1,76 @@
+{
+ "scenario": "cost-simple",
+ "fingerprint": "0d5239548b09",
+ "calls": [
+  {
+   "role": "supervisor",
+   "purpose": "plan/p1",
+   "response": {
+    "content": "{\"subtasks\":[{\"id\":\"explain\",\"description\":\"Write exactly three sentences explaining why teams use pgvector (the PostgreSQL extension for vector similarity search). Cover: keeping embeddings in the same database as existing relational data, avoiding a separate vector database and its operational overhead, and support for similarity search (cosine, L2, inner product) with indexes like HNSW and IVFFlat for AI use cases such as semantic search and RAG.\",\"specialist\":\"writing\",\"depends_on\":[],\"expected_output\":\"A three-sentence explanation of why teams use pgvector.\",\"complexity\":\"low\"}],\"confidence\":0.95,\"rationale\":\"The request is a short, well-known explanatory task that a single writing specialist can complete without research or analysis.\"}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "writing",
+   "purpose": "act/r0/explain",
+   "response": {
+    "content": "Teams use pgvector because it stores embeddings in the same PostgreSQL database as their existing relational data, so they can join vectors with business records and use familiar tools, transactions, and access controls. It avoids the cost and complexity of running a separate vector database, along with the data synchronization and extra operations that come with it. It also supports cosine, L2, and inner product distance, with HNSW and IVFFlat indexes for fast approximate nearest-neighbor search, which powers AI use cases such as semantic search and retrieval-augmented generation (RAG).",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "review/r0/explain",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":5,\"issues\":[],\"feedback_for_specialist\":null,\"unsupported_claims\":[]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "supervisor",
+   "purpose": "synthesize",
+   "response": {
+    "content": "Teams use pgvector because it stores embeddings in the same PostgreSQL database as their existing relational data, so they can join vectors with business records and use familiar tools, transactions, and access controls. It avoids the cost and complexity of running a separate vector database, along with the data synchronization and extra operations that come with it. It also supports cosine, L2, and inner product distance, with HNSW and IVFFlat indexes for fast approximate nearest-neighbor search, which powers AI use cases such as semantic search and retrieval-augmented generation (RAG).",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "reviewer",
+   "purpose": "final_review",
+   "response": {
+    "content": "{\"verdict\":\"accept\",\"score\":5,\"issues\":[],\"feedback_for_specialist\":null,\"unsupported_claims\":[]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "role": "supervisor",
+   "purpose": "consolidate",
+   "response": {
+    "content": "{\"memories\":[{\"kind\":\"fact\",\"text\":\"pgvector keeps embeddings in the same PostgreSQL database as relational data, so teams can join vectors with business records and reuse existing tools, transactions, and access controls.\",\"importance\":0.5},{\"kind\":\"fact\",\"text\":\"pgvector supports cosine, L2, and inner product distance with HNSW and IVFFlat indexes for approximate nearest-neighbor search, powering semantic search and retrieval-augmented generation.\",\"importance\":0.5},{\"kind\":\"lesson\",\"text\":\"For short explanatory requests with a sentence limit, a response that follows the exact sentence count (three sentences here) was accepted without any revisions.\",\"importance\":0.3}]}",
+    "tool_calls": []
+   }
+  }
+ ],
+ "expected": {
+  "checks": {
+   "status_in": true,
+   "cost_max": true,
+   "latency_max": true
+  },
+  "judge": {
+   "model": "claude-opus-5-5",
+   "criteria": [
+    {
+     "criterion": "Three sentences with correct reasons.",
+     "pass": true,
+     "reason": "The deliverable has exactly three sentences with accurate reasons: colocation with relational data, avoiding a separate vector DB, and support for distance metrics with HNSW/IVFFlat indexes."
+    }
+   ],
+   "pass": true,
+   "cost_usd": 0.00498,
+   "input_tokens": 775,
+   "output_tokens": 94
+  },
+  "passed": true
+ }
+}

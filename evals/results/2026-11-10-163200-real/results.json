@@ -1,0 +1,263 @@
+{
+ "summary": {
+  "meta": {
+   "run_id": "2026-11-10-163200-real",
+   "mode": "real",
+   "k": 1,
+   "scenarios": 2,
+   "cap_usd": 0.5,
+   "label": "smoke",
+   "git_commit": "fef717e00fc22df81e55aadd970de26bd076d3d1-dirty",
+   "finished_at": "2026-11-10T16:33:19.649306+00:00",
+   "role_models": {
+    "supervisor": "anthropic/claude-sonnet-5-5 (effort low)",
+    "reviewer": "anthropic/claude-sonnet-5-5 (effort low)",
+    "research": "anthropic/claude-haiku-5-5 (effort low)",
+    "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
+    "writing": "anthropic/claude-haiku-5-5 (effort low)",
+    "code": "anthropic/claude-sonnet-5-5 (effort low)"
+   },
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
+   "fingerprints": [
+    [
+     "crash-mid-specialist",
+     "7ff7095dda67"
+    ],
+    [
+     "plan-simple-summary",
+     "64777ba4cc15"
+    ]
+   ]
+  },
+  "overall": {
+   "n": 2,
+   "pass": 2,
+   "rate": 1.0,
+   "ci95": [
+    0.3423802239546494,
+    1.0
+   ]
+  },
+  "by_category": {
+   "crash": {
+    "n": 1,
+    "pass": 1,
+    "rate": 1.0,
+    "ci95": [
+     0.2065493117918027,
+     1.0
+    ]
+   },
+   "planning": {
+    "n": 1,
+    "pass": 1,
+    "rate": 1.0,
+    "ci95": [
+     0.2065493117918027,
+     1.0
+    ]
+   }
+  },
+  "cost_usd": {
+   "p50": 0.0403976,
+   "p95": 0.05178017,
+   "runs": 2
+  },
+  "latency_s": {
+   "p50": 33.2084505,
+   "p95": 39.051924150000005,
+   "runs": 2
+  },
+  "escalation_rate": {
+   "n": 2,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.6576197760453506
+   ]
+  },
+  "loop_rate": {
+   "n": 2,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.6576197760453506
+   ]
+  },
+  "unsafe_actions": 0,
+  "reviewer": {
+   "tp": 0,
+   "fp": 0,
+   "fn": 0,
+   "tn": 0,
+   "precision": null,
+   "recall": null
+  },
+  "memory_lift": {
+   "n": 0,
+   "lift": null,
+   "low": null,
+   "high": null
+  },
+  "errors": [],
+  "skipped": [],
+  "spend": {
+   "agents_usd": 0.080795,
+   "judge_usd": 0.012608,
+   "total_usd": 0.093403
+  }
+ },
+ "runs": [
+  {
+   "task_id": "3e93962a-d1ad-4cb9-b7a9-900a7e8d9460",
+   "status": "completed",
+   "cost_usd": 0.0277503,
+   "llm_calls": 6,
+   "latency_s": 26.715702,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "resumed_after_crash",
+     "args": {},
+     "pass": true,
+     "detail": "1 resumed segments"
+    },
+    {
+     "name": "one_terminal",
+     "args": {},
+     "pass": true,
+     "detail": "1 task.finished events"
+    },
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    },
+    {
+     "name": "bounded",
+     "args": {},
+     "pass": true,
+     "detail": "max revision 0, waves 1/2, plans 1, finished 1"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "pgvector is an open-source extension for PostgreSQL that adds a vector data type and similarity search to the database. It stores embeddings alongside ordinary relational data and supports exact nearest-neighbor search as well as approximate methods using HNSW and IVFFlat indexes. Users can measure similarity with L2 distance, inner product, or cosine distance. Common use cases include semantic search, recommendation systems, and retrieval-augmented generation (RAG), where language models draw on relevant stored context. Because vectors live in the same database as application data, teams can ",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.005628,
+   "passed": true,
+   "crashed": true,
+   "scenario": "crash-mid-specialist",
+   "category": "crash",
+   "kind": "agentic",
+   "rep": 0,
+   "fingerprint": "7ff7095dda67",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "Is a correct summary of pgvector of roughly 100 words.",
+      "pass": true,
+      "reason": "The summary accurately describes pgvector as a PostgreSQL extension with a vector type, HNSW/IVFFlat indexes, L2/inner product/cosine distance, and its use cases. At roughly 105-110 words, it is close to the 100-word target."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.005628,
+    "input_tokens": 837,
+    "output_tokens": 114
+   }
+  },
+  {
+   "task_id": "e2a25bf8-f2d4-4b8a-9607-3ae2572143a3",
+   "status": "completed",
+   "cost_usd": 0.0530449,
+   "llm_calls": 8,
+   "latency_s": 39.701199,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    },
+    {
+     "name": "plan_size",
+     "args": {
+      "min": 1,
+      "max": 2
+     },
+     "pass": true,
+     "detail": "1 subtasks (want 1..2)"
+    },
+    {
+     "name": "plan_valid_first_try",
+     "args": {},
+     "pass": true,
+     "detail": "0 invalid plans"
+    },
+    {
+     "name": "bounded",
+     "args": {},
+     "pass": true,
+     "detail": "max revision 1, waves 1/2, plans 1, finished 1"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "pgvector is an open-source extension for PostgreSQL. It lets a database store and search \"embeddings,\" which are numerical representations of text, images, or other content that capture meaning. With it, teams can add AI-powered features such as semantic search (finding results by meaning, not keywords), product or content recommendations, and retrieval-augmented generation, which grounds AI answers in a company's documents. The key business benefit is that this data stays in an existing Postgres database, so teams avoid adopting a separate specialized system. That means a simpler technology s",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.00698,
+   "passed": true,
+   "scenario": "plan-simple-summary",
+   "category": "planning",
+   "kind": "agentic",
+   "rep": 0,
+   "fingerprint": "64777ba4cc15",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "Explains that pgvector adds vector storage and similarity search to PostgreSQL.",
+      "pass": true,
+      "reason": "States it is a PostgreSQL extension that lets the database store and search embeddings, which are vectors, by meaning."
+     },
+     {
+      "criterion": "Is roughly 120 words (between 80 and 170 words).",
+      "pass": true,
+      "reason": "The deliverable is about 120 words, inside the 80\u2013170 range."
+     },
+     {
+      "criterion": "Is understandable by a non-specialist product manager (no unexplained jargon).",
+      "pass": true,
+      "reason": "Defines its technical terms (embeddings, semantic search, retrieval-augmented generation) in plain language and focuses on business benefits."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.00698,
+    "input_tokens": 905,
+    "output_tokens": 168
+   }
+  }
+ ]
+}
