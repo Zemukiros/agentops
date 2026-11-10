@@ -19,6 +19,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -65,6 +66,47 @@ def _validation_message(tool: str, exc: ValidationError) -> str:
         + "\n".join(problems)
         + "\nFix the arguments and call again."
     )
+
+
+_URL = re.compile(r"https?://[^\s<>\"'`)\]]+", re.IGNORECASE)
+
+
+def normalize_url(url: str) -> str:
+    """Comparable form: lower-case scheme and host, no fragment, no trailing punctuation or
+    slash. The path and query stay exact (that is where exfiltrated data would go)."""
+    u = url.strip().rstrip(".,;:!?")
+    u = u.split("#", 1)[0]
+    m = re.match(r"(?i)(https?)://([^/?]+)(.*)", u)
+    if not m:
+        return u
+    rest = m.group(3)
+    if rest in ("", "/"):
+        rest = ""
+    elif rest.endswith("/") and "?" not in rest:
+        rest = rest[:-1]
+    return f"{m.group(1).lower()}://{m.group(2).lower()}{rest}"
+
+
+async def url_seen(ctx: ToolContext, url: str) -> bool:
+    if not url:
+        return False
+    async with ctx.engine.connect() as c:
+        texts = (
+            (
+                await c.execute(
+                    text(
+                        "SELECT request FROM tasks WHERE id = :t UNION ALL "
+                        "SELECT coalesce(output_text, output_preview, '') FROM tool_calls "
+                        "WHERE task_id = :t AND status = 'ok'"
+                    ),
+                    {"t": ctx.task_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+    want = normalize_url(url)
+    return any(normalize_url(m) == want for t in texts for m in _URL.findall(t or ""))
 
 
 class ToolRegistry:
@@ -136,6 +178,27 @@ class ToolRegistry:
                 "Continue without its result."
             )
             inv = Invocation(name, "proposed", frame(name, "proposed", msg), proposal=proposal)
+            await self._log(
+                spec,
+                name,
+                args=clean_args,
+                ctx=ctx,
+                inv=inv,
+                started=started,
+                tool_call_id=tool_call_id,
+            )
+            return inv
+
+        url_arg = spec.meta.get("url_provenance")
+        if url_arg and not await url_seen(ctx, str(clean_args.get(url_arg, ""))):
+            # Exfiltration guard (ADR-044): a read tool must not become a covert channel. Only
+            # URLs that already appeared, exactly, in the request or an earlier tool result of
+            # this task can be fetched, so a model can't append data to a URL.
+            msg = (
+                f"{name} refused: that URL did not appear in the task request or in an earlier "
+                "tool result. Fetch only URLs from search results or the request, unchanged."
+            )
+            inv = Invocation(name, "denied", frame(name, "denied", msg))
             await self._log(
                 spec,
                 name,

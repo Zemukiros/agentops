@@ -276,6 +276,10 @@ async def fetch_url(args: FetchIn, ctx: ToolContext) -> ToolOutput:
             raise FetchBlockedError("page not available (fixture mode serves recorded pages only)")
         html: bytes | str = (FIXTURES / page["file"]).read_text()
         final_url, status = args.url, 200
+        if not page["file"].endswith(".html"):
+            # like a real text/plain response: returned as-is, no HTML extraction
+            body = str(html)[:MAX_TEXT_CHARS]
+            return ToolOutput(text=f"URL: {final_url}\n\n{body}", data={"url": final_url})
     else:
         fetched = await guarded_fetch(args.url)
         html, final_url, status = fetched.body, fetched.url, fetched.status
@@ -311,5 +315,6 @@ WEB_TOOLS = [
         risk="read",
         timeout_s=15,
         rate_per_min=20,
+        meta={"url_provenance": "url"},  # ADR-044: no fetching of model-invented URLs
     ),
 ]

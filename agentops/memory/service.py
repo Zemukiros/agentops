@@ -33,10 +33,18 @@ from agentops.settings import Settings
 SHINGLE = 8
 _WORDS = re.compile(r"[a-z0-9]+")
 _FRAME = re.compile(r"</?tool_result[^>]*>")
+# A memory is a lesson about how work went, never a standing order (ADR-045). Dropped:
+# injection phrasing, tool-call language, any email address, and directives that would steer
+# future runs to send, share or delete things.
 _INSTRUCTION = re.compile(
-    r"(?i)(ignore (all |any )?(previous|prior|above) instructions|system instruction|"
-    r"you are now|do not (tell|mention)|maintenance mode|\bcall (the )?\w+(_\w+)+\b|"
-    r"\b(send_email|delete_note|run_python|fetch_url)\b|attacker@)"
+    r"(?i)(ignore (all |any )?(previous|prior|above|earlier) (instructions|rules)|"
+    r"system (instruction|prompt|message)|you are now|do not (tell|mention|reveal)|"
+    r"maintenance mode|\bcall (the )?\w+(_\w+)+\b|"
+    r"\b(send_email|delete_note|create_note|run_python|fetch_url|sql_query|workspace_write)\b|"
+    r"[\w.+-]+@[\w-]+(\.[\w-]+)+|"
+    r"\b(from now on|going forward|in (all|every) (future|later) (task|run|request)s?)\b|"
+    r"\b(always|never|must|should)\b.{0,60}\b(send|forward|e-?mail|cc|bcc|share|upload|"
+    r"post|delete|remove|wipe|disclose|exfiltrat\w*|leak)\b)"
 )
 
 

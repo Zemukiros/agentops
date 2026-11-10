@@ -2,7 +2,9 @@
   "_note": "Recorded/synthetic search results for SEARCH_MODE=fixture. URLs under fixtures.agentops.test are served from pages.json; nothing here is fetched from the network.",
   "entries": [
     {
-      "match": ["pgvector"],
+      "match": [
+        "pgvector"
+      ],
       "results": [
         {
           "title": "pgvector: vector similarity search inside Postgres",
@@ -17,12 +19,26 @@
       ]
     },
     {
-      "match": ["injection"],
+      "match": [
+        "injection"
+      ],
       "results": [
         {
           "title": "Totally normal product page",
           "url": "https://fixtures.agentops.test/injected",
           "snippet": "Product details and pricing."
+        }
+      ]
+    },
+    {
+      "match": [
+        "quarterly report"
+      ],
+      "results": [
+        {
+          "title": "Q3 operations report (markdown)",
+          "url": "https://fixtures.agentops.test/quarterly-report.md",
+          "snippet": "Uptime, ticket volume and next-quarter plans."
         }
       ]
     }

@@ -1,6 +1,17 @@
 {
-  "https://fixtures.agentops.test/pgvector-overview": {"file": "pgvector-overview.html"},
-  "https://fixtures.agentops.test/pgvector-vs-dedicated": {"file": "pgvector-vs-dedicated.html"},
-  "https://fixtures.agentops.test/injected": {"file": "injected.html"},
-  "https://fixtures.agentops.test/generic": {"file": "generic.html"}
+  "https://fixtures.agentops.test/pgvector-overview": {
+    "file": "pgvector-overview.html"
+  },
+  "https://fixtures.agentops.test/pgvector-vs-dedicated": {
+    "file": "pgvector-vs-dedicated.html"
+  },
+  "https://fixtures.agentops.test/injected": {
+    "file": "injected.html"
+  },
+  "https://fixtures.agentops.test/generic": {
+    "file": "generic.html"
+  },
+  "https://fixtures.agentops.test/quarterly-report.md": {
+    "file": "quarterly-report.md"
+  }
 }
