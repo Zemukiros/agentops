@@ -103,6 +103,88 @@ async def insert(
     return mid
 
 
+async def find_duplicate(
+    conn: AsyncConnection,
+    *,
+    user_id: uuid.UUID,
+    kind: str,
+    text_: str,
+    embedding: list[float],
+    threshold: float,
+) -> uuid.UUID | None:
+    """An existing live memory of this user and kind with the same text or near-identical
+    meaning (cosine >= threshold), if any."""
+    row = (
+        await conn.execute(
+            text(
+                "SELECT id FROM memories WHERE user_id = :u AND kind = :k AND NOT superseded "
+                "AND (text = :x OR 1 - (embedding <=> CAST(:e AS vector)) >= :thr) "
+                "ORDER BY created_at DESC LIMIT 1"
+            ),
+            {"u": user_id, "k": kind, "x": text_, "e": vec(embedding), "thr": threshold},
+        )
+    ).first()
+    return row[0] if row else None
+
+
+async def refresh(
+    conn: AsyncConnection,
+    memory_id: uuid.UUID,
+    *,
+    text_: str,
+    embedding: list[float],
+    importance: float,
+    outcome: str | None,
+    source_task_id: uuid.UUID | None,
+) -> None:
+    """A duplicate was seen again: keep ONE memory and make it the latest occurrence (newest
+    text, outcome and source task, so the UI links to the run that produced it)."""
+    await conn.execute(
+        text(
+            "UPDATE memories SET created_at = now(), text = :x, embedding = CAST(:e AS vector), "
+            "importance = GREATEST(importance, :imp), outcome = COALESCE(:o, outcome), "
+            "source_task_id = COALESCE(:src, source_task_id) WHERE id = :id"
+        ),
+        {
+            "id": memory_id,
+            "x": text_,
+            "e": vec(embedding),
+            "imp": max(0.0, min(1.0, importance)),
+            "o": outcome,
+            "src": source_task_id,
+        },
+    )
+
+
+def _parse_vec(raw: Any) -> list[float]:
+    if isinstance(raw, str):
+        return [float(x) for x in raw.strip("[]").split(",") if x]
+    return [float(x) for x in raw]
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
+def dedupe(rows: list[tuple[Any, list[float]]], threshold: float, k: int) -> list[Any]:
+    """Greedy: keep rows in rank order, skipping any near-duplicate of one already kept."""
+    kept: list[tuple[Any, list[float]]] = []
+    for r, v in rows:
+        norm = " ".join(str(r.text).lower().split())
+        if any(
+            norm == " ".join(str(o.text).lower().split()) or _cosine(v, ov) >= threshold
+            for o, ov in kept
+        ):
+            continue
+        kept.append((r, v))
+        if len(kept) == k:
+            break
+    return [r for r, _ in kept]
+
+
 async def recall(
     engine: AsyncEngine,
     settings: Settings,
@@ -117,7 +199,7 @@ async def recall(
     sql = text(
         f"""
         WITH scored AS (
-            SELECT {_COLS},
+            SELECT {_COLS}, embedding::text AS emb,
                    1 - (embedding <=> CAST(:q AS vector)) AS sim,
                    power(0.5, extract(epoch FROM now() - created_at) / 86400.0 / :hl) AS recency
             FROM memories
@@ -126,7 +208,7 @@ async def recall(
         SELECT *, (:a * sim + :b * importance + :g * recency) AS score
         FROM scored WHERE sim >= :min
         ORDER BY score DESC, created_at DESC
-        LIMIT :k
+        LIMIT :fetch
         """  # noqa: S608  (columns are constants)
     )
     async with engine.connect() as conn:
@@ -141,11 +223,12 @@ async def recall(
                     "b": settings.memory_beta,
                     "g": settings.memory_gamma,
                     "min": min_sim,
-                    "k": k,
+                    "fetch": k * 4,  # over-fetch, then drop near-duplicates
                 },
             )
         ).all()
-    return [_row(r._mapping, sim=float(r.sim), score=float(r.score)) for r in rows]
+    unique = dedupe([(r, _parse_vec(r.emb)) for r in rows], settings.memory_dedupe_similarity, k)
+    return [_row(r._mapping, sim=float(r.sim), score=float(r.score)) for r in unique]
 
 
 async def touch(engine: AsyncEngine, ids: list[uuid.UUID]) -> None:

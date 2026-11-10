@@ -1,5 +1,5 @@
 // Replay (ADR-040): pick a checkpoint, edit what may be edited there, fork, run, compare.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "../../api/client";
@@ -189,14 +189,23 @@ export function ReplayPanel({ taskId }: { taskId: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [compareWith, setCompareWith] = useState<string>("");
-  const cps = useQuery({
+  const pages = useInfiniteQuery({
     queryKey: ["task", taskId, "checkpoints"],
-    queryFn: () => api<CheckpointList>(`/tasks/${taskId}/checkpoints`),
+    queryFn: ({ pageParam }) =>
+      api<CheckpointList & { next_cursor: string | null }>(`/tasks/${taskId}/checkpoints`, {
+        query: { limit: 100, cursor: pageParam },
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor,
   });
   const lineage = useQuery({ queryKey: ["task", taskId, "lineage"], queryFn: () => api<Lineage>(`/tasks/${taskId}/lineage`) });
 
-  if (cps.isPending) return <Skeleton className="h-64" />;
-  if (cps.isError) return <ErrorState error={cps.error} onRetry={() => void cps.refetch()} />;
+  if (pages.isPending) return <Skeleton className="h-64" />;
+  if (pages.isError) return <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />;
+  // one merged view; pages arrive newest first
+  const cps = {
+    data: { ...pages.data.pages[0]!, checkpoints: pages.data.pages.flatMap((p) => p.checkpoints) },
+  };
   const list = [...cps.data.checkpoints].reverse(); // oldest first, like a timeline
   const shown = showAll ? list : list.filter((c) => c.forkable);
   const others = (lineage.data?.tasks ?? []).filter((t) => t.id !== taskId);
@@ -223,6 +232,14 @@ export function ReplayPanel({ taskId }: { taskId: string }) {
           {shown.length === 0 ? (
             <EmptyState icon="branch" title="No fork points yet" />
           ) : (
+            <>
+            {pages.hasNextPage && (
+              <div className="border-b border-line px-4 py-2 text-center">
+                <Button size="sm" variant="ghost" onClick={() => void pages.fetchNextPage()} busy={pages.isFetchingNextPage}>
+                  Load earlier steps
+                </Button>
+              </div>
+            )}
             <ol className="relative py-2" aria-label="Checkpoints">
               {shown.map((c) => {
                 const accepted = Object.values(c.subtasks).filter((s) => s === "accepted").length;
@@ -258,6 +275,7 @@ export function ReplayPanel({ taskId }: { taskId: string }) {
                 );
               })}
             </ol>
+            </>
           )}
         </Card>
 

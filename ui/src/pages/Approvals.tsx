@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { ApiError, api } from "../api/client";
+import { ApiError, api, apiWithHeaders } from "../api/client";
 import { useSession } from "../api/session";
 import type { Approval } from "../api/types";
 import { Icon } from "../components/Icon";
@@ -164,12 +164,17 @@ export function Approvals() {
   const tab = params.get("state") === "decided" ? "decided" : "pending";
   const selectedId = params.get("id");
   const { active } = useSession();
-  const list = useQuery({
-    queryKey: ["approvals", tab],
-    queryFn: ({ signal }) => api<Approval[]>("/approvals", { signal, query: { state: tab, limit: 100 } }),
+  const list = useInfiniteQuery({
+    // Not ["approvals", "pending"]: the nav badge's usePendingApprovals caches a plain array
+    // there, and an infinite query on the same key would read it as {pages} and crash.
+    queryKey: ["approvals", "list", tab],
+    queryFn: ({ signal, pageParam }) =>
+      apiWithHeaders<Approval[]>("/approvals", { signal, query: { state: tab, limit: 50, cursor: pageParam } }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.headers.get("X-Next-Cursor"),
     refetchInterval: tab === "pending" ? 5000 : false,
   });
-  const items = list.data ?? [];
+  const items = list.data?.pages.flatMap((p) => p.data) ?? [];
   const selected = items.find((a) => a.id === selectedId) ?? (selectedId ? undefined : items[0]);
   const one = useQuery({
     queryKey: ["approval", selectedId],
@@ -233,13 +238,22 @@ export function Approvals() {
               {tab === "pending" ? "New items appear here as soon as a run pauses for a human." : undefined}
             </EmptyState>
           ) : (
-            <ul className="max-h-[70vh] divide-y divide-line overflow-y-auto">
-              {items.map((a) => (
-                <li key={a.id}>
-                  <ApprovalRow a={a} selected={current?.id === a.id} onSelect={() => select(a.id)} />
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="max-h-[70vh] divide-y divide-line overflow-y-auto">
+                {items.map((a) => (
+                  <li key={a.id}>
+                    <ApprovalRow a={a} selected={current?.id === a.id} onSelect={() => select(a.id)} />
+                  </li>
+                ))}
+              </ul>
+              {list.hasNextPage && (
+                <div className="border-t border-line p-3 text-center">
+                  <Button size="sm" onClick={() => void list.fetchNextPage()} busy={list.isFetchingNextPage}>
+                    Load more
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </Card>
 

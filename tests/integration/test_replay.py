@@ -504,3 +504,28 @@ async def test_checkpoint_fields_prefill_the_fork_form(
     assert (
         await client.get(f"/tasks/{root}/checkpoints/{late}", headers=bob.headers)
     ).status_code == 404
+
+
+async def test_a_failed_snapshot_never_fails_the_task(
+    client: httpx.AsyncClient,
+    engine: AsyncEngine,
+    saver: Any,
+    alice: SeededUser,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-046 (found by the eval dry run): a snapshot directory written by a worker running as
+    another user raised PermissionError and failed the user's task."""
+
+    def denied(*_a: Any, **_k: Any) -> Any:
+        raise PermissionError("[Errno 13] Permission denied: '.snapshots/x'")
+
+    monkeypatch.setattr(replay, "snapshot_workspace", denied)
+    tid = await submit(client, alice)
+    await process(engine, saver)
+    assert await scalar(engine, "SELECT status::text FROM tasks WHERE id=:t", t=tid) == "completed"
+    n = await scalar(
+        engine,
+        "SELECT count(*) FROM events WHERE task_id=:t AND type='replay.snapshot_failed'",
+        t=tid,
+    )
+    assert n >= 1

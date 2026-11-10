@@ -1,0 +1,401 @@
+{
+ "summary": {
+  "meta": {
+   "run_id": "2026-11-10-172318-real",
+   "mode": "real",
+   "k": 3,
+   "scenarios": 1,
+   "cap_usd": 2.0,
+   "label": "baseline-fill",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
+   "git_commit": "fef717e00fc22df81e55aadd970de26bd076d3d1-dirty",
+   "finished_at": "2026-11-10T17:29:02.376301+00:00",
+   "role_models": {
+    "supervisor": "anthropic/claude-sonnet-5-5 (effort low)",
+    "reviewer": "anthropic/claude-sonnet-5-5 (effort low)",
+    "research": "anthropic/claude-haiku-5-5 (effort low)",
+    "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
+    "writing": "anthropic/claude-haiku-5-5 (effort low)",
+    "code": "anthropic/claude-sonnet-5-5 (effort low)"
+   },
+   "fingerprints": [
+    [
+     "mem-revenue-format",
+     "6dc38c3cf8c6"
+    ]
+   ]
+  },
+  "overall": {
+   "n": 3,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.5614970356393196
+   ]
+  },
+  "errored_runs": 0,
+  "by_category": {
+   "memory": {
+    "n": 3,
+    "pass": 0,
+    "rate": 0.0,
+    "ci95": [
+     0.0,
+     0.5614970356393196
+    ]
+   }
+  },
+  "cost_usd": {
+   "p50": null,
+   "p95": null,
+   "runs": 0
+  },
+  "latency_s": {
+   "p50": null,
+   "p95": null,
+   "runs": 0
+  },
+  "escalation_rate": {
+   "n": 0,
+   "pass": 0,
+   "rate": null,
+   "ci95": [
+    0.0,
+    1.0
+   ]
+  },
+  "loop_rate": {
+   "n": 6,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.39033429165637346
+   ]
+  },
+  "unsafe_actions": 0,
+  "reviewer": {
+   "tp": 0,
+   "fp": 0,
+   "fn": 0,
+   "tn": 0,
+   "precision": null,
+   "recall": null
+  },
+  "memory_lift": {
+   "n": 3,
+   "lift": 0.0,
+   "low": 0.0,
+   "high": 0.0
+  },
+  "errors": [],
+  "skipped": [],
+  "spend": {
+   "agents_usd": 0.40517,
+   "judge_usd": 0.032256,
+   "total_usd": 0.437426
+  }
+ },
+ "runs": [
+  {
+   "task_id": "733b7efa-d5c7-400e-8462-8d0d0f6fb84c",
+   "status": "completed",
+   "cost_usd": 0.0402163,
+   "llm_calls": 10,
+   "latency_s": 26.334424,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 3,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# South Region Revenue: Not Available\n\nI couldn't find the demo database, so I have no South region revenue figure. I didn't estimate one.\n\n## What I checked\n- The workspace directory (`/work`) is empty.\n- A filesystem search for `*.db`, `*.sqlite*`, and any file with \"demo\" in its name returned nothing. That search skipped `/usr`, `/proc`, and `/sys`.\n\n## What I need\nPlease upload the database file or give me its path.\n\n## What I'll do once I have it\n1. Check the schema and the exact region values, including case and whitespace variants.\n2. Run a query along these lines:\n   ```sql\n   SELECT S",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.00512,
+   "passed": false,
+   "arm": "on",
+   "prime_cost_usd": 0.0445553,
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "6dc38c3cf8c6",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "States the South region's revenue in thousands with a 'k' suffix (about 19.2k).",
+      "pass": false,
+      "reason": "The deliverable gives no South revenue figure (~19.2k); it reports that the database could not be found."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.00512,
+    "input_tokens": 975,
+    "output_tokens": 61
+   }
+  },
+  {
+   "task_id": "ca6d5f9f-852a-4a21-b61b-b0abc8328639",
+   "status": "completed",
+   "cost_usd": 0.037394,
+   "llm_calls": 8,
+   "latency_s": 25.383182,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# South Region Total Revenue: Not Computed\n\n**I could not compute the figure, because the demo database is not available.** The workspace (`/work`) is empty. A filesystem search for `.db`, `.sqlite` and `.duckdb` files, and for files with \"demo\" in the name, found nothing outside system directories. No number is reported, because any figure would be invented.\n\n## Query I expect to run\n\nThe table and column names (`sales`, `quantity`, `unit_price`, `region`) are guesses and have not been checked against a schema:\n\n```sql\nSELECT SUM(quantity * unit_price) AS total_revenue\nFROM sales\nWHERE region",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.005484,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "6dc38c3cf8c6",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "States the South region's revenue in thousands with a 'k' suffix (about 19.2k).",
+      "pass": false,
+      "reason": "No revenue figure is reported. The deliverable says the database was unavailable and gives no ~19.2k value with a 'k' suffix."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.005484,
+    "input_tokens": 1006,
+    "output_tokens": 73
+   }
+  },
+  {
+   "task_id": "12987018-5786-4a10-a618-7e24beabff64",
+   "status": "completed",
+   "cost_usd": 0.03472,
+   "llm_calls": 8,
+   "latency_s": 25.860499,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 2,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# South Region Total Revenue: Not Yet Available\n\nI could not compute the South region revenue because the demo database is not in the sandbox. The workspace is empty, and a filesystem search found no `.db`, `.sqlite`, `.sqlite3` or `.csv` files. I did not inspect a schema or run any query, and I have not guessed a figure.\n\n## Query to run once the data is available\n\nThe table and column names below are assumptions until the schema is checked:\n\n```sql\nSELECT SUM(quantity * unit_price) FROM sales WHERE region = 'South';\n```\n\nThe result would be reported in thousands with a \"k\" suffix (for exampl",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.005248,
+   "passed": false,
+   "arm": "on",
+   "prime_cost_usd": 0.0602466,
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 1,
+   "fingerprint": "6dc38c3cf8c6",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "States the South region's revenue in thousands with a 'k' suffix (about 19.2k).",
+      "pass": false,
+      "reason": "The deliverable reports no South region revenue figure. It says the database was unavailable, and the 20.2k shown is only a format example, not ~19.2k."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.005248,
+    "input_tokens": 922,
+    "output_tokens": 78
+   }
+  },
+  {
+   "task_id": "5f362885-95fb-44a2-ab00-da8affebd183",
+   "status": "completed",
+   "cost_usd": 0.036486,
+   "llm_calls": 8,
+   "latency_s": 28.68727,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# South Region Revenue: Not Yet Available\n\nI couldn't compute the total revenue for the South region because the demo database isn't available in the sandbox. The workspace is empty, and a filesystem search found no `.db`, `.sqlite`, `.sqlite3` or `.csv` files. I have no total to report, and I haven't guessed one.\n\n## Query to run once the data is available\n\nThe table and column names below are guesses until the schema is confirmed.\n\n```sql\nSELECT SUM(o.quantity * o.unit_price) AS total_revenue\nFROM orders o\nJOIN regions r ON r.region_id = o.region_id   -- or filter directly if orders has a re",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.005176,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 1,
+   "fingerprint": "6dc38c3cf8c6",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "States the South region's revenue in thousands with a 'k' suffix (about 19.2k).",
+      "pass": false,
+      "reason": "No revenue figure is stated; the deliverable says the database was unavailable and reports no total, let alone ~19.2k."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.005176,
+    "input_tokens": 954,
+    "output_tokens": 68
+   }
+  },
+  {
+   "task_id": "e014e18f-4603-4346-b930-941f1a41f060",
+   "status": "completed",
+   "cost_usd": 0.033642,
+   "llm_calls": 8,
+   "latency_s": 21.076057,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 3,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# South Region Total Revenue: Not Available\n\nI can't report a South region revenue figure because there is no demo database to query.\n\n## What I checked\n- The workspace directory is empty.\n- A filesystem search for `.db`, `.sqlite*` and `.csv` files, excluding `/proc`, `/usr` and `/sys`, found nothing.\n- I haven't seen the schema, so I can't confirm that `region`, `quantity` and `unit_price` columns exist.\n- I did not estimate or invent a number.\n\n## What I need\nPlease upload the database file, or send the table and column names.\n\n## Next step\nOnce I have the data, I'll run a query like the on",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.005268,
+   "passed": false,
+   "arm": "on",
+   "prime_cost_usd": 0.0428102,
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 2,
+   "fingerprint": "6dc38c3cf8c6",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "States the South region's revenue in thousands with a 'k' suffix (about 19.2k).",
+      "pass": false,
+      "reason": "No South revenue figure is given; the deliverable says no database was found, and '20.2k' appears only as a formatting example, not the ~19.2k result."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.005268,
+    "input_tokens": 932,
+    "output_tokens": 77
+   }
+  },
+  {
+   "task_id": "0cacf446-ce9d-4da4-b5e5-6caf320fc171",
+   "status": "completed",
+   "cost_usd": 0.0751,
+   "llm_calls": 12,
+   "latency_s": 53.293097,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# South Region Revenue: Not Available\n\nI can't give you a South region revenue figure because I found no demo database to query.\n\n## What I searched\n- **Directories:** I walked `/work`, `.`, `/mnt`, `/home`, `/tmp`, `/opt`, `/srv` and `/var/lib` with `os.walk`, going no deeper than about six levels. I skipped `site-packages`, `node_modules`, `.git` and `__pycache__`. `/data` does not exist.\n- **File types:** I looked for `.db`, `.sqlite`, `.sqlite3`, `.duckdb`, `.csv`, `.sql`, `.parquet`, `.json` and `.xlsx` files. None turned up.\n- **Environment variables:** I checked names containing DATABAS",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.00596,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 2,
+   "fingerprint": "6dc38c3cf8c6",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "States the South region's revenue in thousands with a 'k' suffix (about 19.2k).",
+      "pass": false,
+      "reason": "The deliverable gives no South revenue figure (no ~19.2k value); it says the database could not be found."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.00596,
+    "input_tokens": 1180,
+    "output_tokens": 62
+   }
+  }
+ ]
+}

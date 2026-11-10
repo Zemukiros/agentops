@@ -5,14 +5,15 @@ from __future__ import annotations
 
 import difflib
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentops.api import views
-from agentops.api.auth import AuthUser
+from agentops.api.auth import AuthUser, CurrentUser
+from agentops.api.ratelimit import rate_limit
 from agentops.api.routes.tasks import BudgetIn, TaskOut, _get_owned, _out
 from agentops.core import replay
 from agentops.core.budget import open_budget_on
@@ -61,7 +62,13 @@ def _forkable_task(t: Task) -> str | None:
 
 
 @router.get("/{task_id}/checkpoints")
-async def list_checkpoints(task_id: uuid.UUID, request: Request, user: AuthUser) -> dict[str, Any]:
+async def list_checkpoints(
+    task_id: uuid.UUID,
+    request: Request,
+    user: AuthUser,
+    cursor: Annotated[str | None, Query(max_length=64)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> dict[str, Any]:
     task = await _get_owned(request, task_id, user)
     settings = request.app.state.settings
     cps = (
@@ -72,12 +79,20 @@ async def list_checkpoints(task_id: uuid.UUID, request: Request, user: AuthUser)
         else []
     )
     budget = original_budget(settings, task)
+    if cursor is not None:
+        ids = [c["checkpoint_id"] for c in cps]
+        if cursor not in ids:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid cursor")
+        cps = cps[ids.index(cursor) + 1 :]
+    page, more = cps[:limit], len(cps) > limit
     return {
         "task_id": str(task_id),
         "task_status": task.status.value,
         "fork_blocked_reason": _forkable_task(task),
         "default_budget": budget.model_dump(include={"max_usd", "max_tokens", "max_llm_calls"}),
-        "checkpoints": cps,  # StateSnapshot.created_at is already an ISO string
+        # newest first; `cursor` = the last checkpoint_id of the previous page
+        "checkpoints": page,
+        "next_cursor": page[-1]["checkpoint_id"] if more and page else None,
     }
 
 
@@ -119,7 +134,12 @@ class ForkIn(BaseModel):
 
 
 @router.post("/{task_id}/branches", status_code=status.HTTP_201_CREATED)
-async def fork_task(task_id: uuid.UUID, body: ForkIn, request: Request, user: AuthUser) -> TaskOut:
+async def fork_task(
+    task_id: uuid.UUID,
+    body: ForkIn,
+    request: Request,
+    user: Annotated[CurrentUser, rate_limit("fork")],
+) -> TaskOut:
     parent = await _get_owned(request, task_id, user)
     blocked = _forkable_task(parent)
     if blocked:

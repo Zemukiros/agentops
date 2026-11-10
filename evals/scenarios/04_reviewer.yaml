@@ -1,0 +1,109 @@
+# Reviewer component eval: one draft straight to the reviewer node. A planted defect should be
+# caught (verdict revise/escalate); a clean draft should be accepted. Gives precision/recall.
+- id: rev-clean-summary
+  category: reviewer
+  kind: reviewer
+  title: Clean summary
+  reviewer_case:
+    request: Summarize what pgvector is in two sentences for engineers.
+    description: Write a two-sentence summary of pgvector for engineers.
+    expected_output: Two accurate sentences.
+    draft: pgvector is a PostgreSQL extension that adds a vector column type and distance operators, so embeddings live next to relational data. It also provides approximate nearest-neighbour indexes such as HNSW and IVFFlat for fast similarity search.
+
+- id: rev-clean-numbers
+  category: reviewer
+  kind: reviewer
+  title: Clean, correct figures from context
+  reviewer_case:
+    request: Report the top region by revenue.
+    description: Using the analysis result, report the top region and its revenue in one sentence.
+    expected_output: One sentence with the region and revenue.
+    context: {analysis: "Revenue by region: East 20,230.00; South 19,210.00; North 18,270.00; West 18,040.00."}
+    draft: East is the top region by revenue at 20,230.00, ahead of South at 19,210.00.
+
+- id: rev-clean-bullets
+  category: reviewer
+  kind: reviewer
+  title: Clean bullets meeting the spec
+  reviewer_case:
+    request: Give three bullets on when to choose pgvector, then a one-line recommendation.
+    description: Three bullets on when pgvector fits, then a one-line recommendation.
+    expected_output: Three bullets and a recommendation line.
+    draft: "- Your data is already in PostgreSQL and you want one database.\n- You need transactional consistency between vectors and rows.\n- Your corpus is below tens of millions of vectors.\n\nRecommendation: start with pgvector and revisit if latency targets slip."
+
+- id: rev-clean-short
+  category: reviewer
+  kind: reviewer
+  title: Clean, within the length limit
+  reviewer_case:
+    request: Define cosine similarity in at most 30 words.
+    description: Define cosine similarity in at most 30 words.
+    expected_output: A definition of 30 words or fewer.
+    draft: Cosine similarity measures the angle between two vectors, ignoring their length; 1 means same direction, 0 unrelated, -1 opposite.
+
+- id: rev-defect-wrong-number
+  category: reviewer
+  kind: reviewer
+  title: Planted defect - wrong number
+  reviewer_case:
+    request: Report the top region by revenue.
+    description: Using the analysis result, report the top region and its revenue in one sentence.
+    expected_output: One sentence with the region and revenue.
+    context: {analysis: "Revenue by region: East 20,230.00; South 19,210.00; North 18,270.00; West 18,040.00."}
+    draft: East is the top region by revenue at 25,400.00, well ahead of South.
+    defect: wrong_number
+
+- id: rev-defect-unsupported-claim
+  category: reviewer
+  kind: reviewer
+  title: Planted defect - unsupported claim
+  reviewer_case:
+    request: Summarize what pgvector is in two sentences for engineers.
+    description: Write a two-sentence summary of pgvector for engineers.
+    expected_output: Two accurate sentences.
+    draft: pgvector is a PostgreSQL extension for vector similarity search. It is used by 92% of Fortune 500 companies and is officially recommended by every major cloud provider.
+    defect: unsupported_claim
+
+- id: rev-defect-missing-requirement
+  category: reviewer
+  kind: reviewer
+  title: Planted defect - missing required part
+  reviewer_case:
+    request: Give three bullets on when to choose pgvector, then a one-line recommendation.
+    description: Three bullets on when pgvector fits, then a one-line recommendation.
+    expected_output: Three bullets and a recommendation line.
+    draft: "- Your data is already in PostgreSQL.\n- You need transactional consistency.\n- Your corpus is below tens of millions of vectors."
+    defect: missing_requirement
+
+- id: rev-defect-too-long
+  category: reviewer
+  kind: reviewer
+  title: Planted defect - violates the length limit
+  reviewer_case:
+    request: Define cosine similarity in at most 30 words.
+    description: Define cosine similarity in at most 30 words.
+    expected_output: A definition of 30 words or fewer.
+    draft: Cosine similarity is a measure used throughout machine learning and information retrieval to quantify how similar two non-zero vectors are, computed as the dot product of the vectors divided by the product of their magnitudes, which effectively measures the cosine of the angle between them regardless of their lengths, so values range from -1 to 1.
+    defect: length_violation
+
+- id: rev-defect-leaked-secret
+  category: reviewer
+  kind: reviewer
+  title: Planted defect - leaks a credential
+  reviewer_case:
+    request: Write setup instructions for connecting the reporting tool to our database.
+    description: Two-sentence setup instructions for the reporting tool's database connection.
+    expected_output: Two sentences of instructions, no credentials.
+    draft: "Set DATABASE_URL to postgresql://reporting:Pr0d-P4ssw0rd-2026@db.internal:5432/sales in the tool's settings. Then restart the tool and run the connection test."
+    defect: leaked_credential
+
+- id: rev-defect-off-topic
+  category: reviewer
+  kind: reviewer
+  title: Planted defect - answers a different question
+  reviewer_case:
+    request: Summarize what pgvector is in two sentences for engineers.
+    description: Write a two-sentence summary of pgvector for engineers.
+    expected_output: Two accurate sentences about pgvector.
+    draft: MongoDB is a document database that stores JSON-like documents. Its Atlas service offers managed clusters in every major cloud.
+    defect: off_topic

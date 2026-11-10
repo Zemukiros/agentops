@@ -15,6 +15,7 @@ import json
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from agentops.core.state import (
+    ActionOutcome,
     AttemptRecord,
     MemoryHit,
     Plan,
@@ -26,8 +27,15 @@ from agentops.core.state import (
 PLANNER_SYSTEM = """You are the supervisor of a team of specialist agents.
 Break the user's request into a small plan of subtasks that specialists can carry out.
 
+Specialists (give each subtask to the specialist whose tools it needs):
+{specialists}
+
 Rules:
-- Use only these specialists: {specialists}.
+- Use only the specialists listed above.
+- If the request asks for something to be emailed, a writing subtask must propose the email
+  (it is sent only after a human approves it); say so in that subtask's description.
+- If the past examples show this user's preferences (format, audience, length) and they fit
+  this request, write them into the descriptions of the subtasks that produce the deliverable.
 - At most {max_subtasks} subtasks. Prefer the fewest that do the job well; one is fine.
 - Subtask ids are short lowercase slugs. depends_on lists ids of subtasks whose output this
   subtask needs. Dependencies must form a DAG (no cycles).
@@ -50,8 +58,31 @@ needed. Show the numbers and how you got them.""",
     "code": """You are the code specialist. Write and run Python in the sandbox to produce the
 subtask's result. Keep code small, run it, and report the code and its actual output.""",
     "writing": """You are the writing specialist. Produce the deliverable described in the
-subtask, in plain markdown, without preamble. Use the provided context from earlier subtasks.""",
+subtask, in plain markdown, without preamble. Use the provided context from earlier subtasks.
+If the subtask or the request asks for something to be emailed, propose it with send_email
+(to, subject, body): nothing is sent until a human approves it. Your answer is still the text.""",
 }
+
+# What each specialist is for, shown to the planner with its actual tools (ADR-047). The
+# planner once saw only the names and gave database work to `code`, which has no database.
+ROLE_SUMMARY = {
+    "research": "finds and checks information on the web and in notes; cites sources",
+    "analysis": "answers questions from the demo database (read-only SQL) and computes with Python",
+    "code": "writes and runs Python in an isolated sandbox (no database, no web)",
+    "writing": "writes the text deliverable; can propose an email (sent only after a human "
+    "approves)",
+}
+
+
+def specialist_catalog(specialists: list[str], tools: dict[str, list[str]] | None) -> str:
+    lines = []
+    for name in specialists:
+        t = (tools or {}).get(name)
+        lines.append(
+            f"- {name}: {ROLE_SUMMARY.get(name, name)}" + (f" (tools: {', '.join(t)})" if t else "")
+        )
+    return "\n".join(lines)
+
 
 SPECIALIST_RULES = """You have at most {max_steps} tool calls for this attempt; when you have
 enough, stop calling tools and give your final answer as plain text. If a reviewer gave
@@ -72,7 +103,11 @@ claims that neither a tool result nor the context supports."""
 
 SYNTH_SYSTEM = """You are the supervisor. Compose the final deliverable for the user from the
 accepted subtask outputs. Keep their substance; remove duplication; add nothing unsupported.
-Output only the deliverable, in markdown."""
+If past examples show this user's preferences for format, audience or length and they fit this
+request, follow them. The <actions> block (if any) is what actually happened to the actions
+proposed during the task, after human review: report them exactly as listed there (e.g. an
+email marked done WAS sent), even where a subtask output, written before approval, says
+otherwise. Output only the deliverable, in markdown."""
 
 SYNTH_PARTIAL_NOTE = """Some subtasks did not complete. Use ONLY the outputs provided; do not
 invent the missing parts. A "What's missing" section is appended automatically after your text,
@@ -107,11 +142,15 @@ def planner_messages(
     max_subtasks: int,
     previous: list[tuple[str, list[str]]],
     memories: list[MemoryHit] | None = None,
+    tools: dict[str, list[str]] | None = None,
 ) -> list[BaseMessage]:
-    """`previous`: earlier (raw plan json, validation errors) attempts, oldest first."""
+    """`previous`: earlier (raw plan json, validation errors) attempts, oldest first.
+    `tools`: each specialist's tool names, from the registry (ADR-047)."""
     msgs: list[BaseMessage] = [
         SystemMessage(
-            PLANNER_SYSTEM.format(specialists=", ".join(specialists), max_subtasks=max_subtasks)
+            PLANNER_SYSTEM.format(
+                specialists=specialist_catalog(specialists, tools), max_subtasks=max_subtasks
+            )
         ),
         HumanMessage(
             f"<request>\n{request}\n</request>{memory_block(memories or [])}\n\nReturn the plan."
@@ -218,9 +257,40 @@ def reviewer_messages(
     return msgs
 
 
+ACTION_WORDS = {
+    "done": "done",
+    "human_done": "done by a human",
+    "rejected": "rejected, not performed",
+    "failed": "failed, not performed",
+    "unknown": "outcome unknown (flagged for human review)",
+    "not_considered": "not performed",
+}
+
+
+def actions_block(actions: list[ActionOutcome]) -> str:
+    """What happened to proposed actions (ADR-052), so the deliverable reports outcomes, not
+    the pre-approval drafts' guesses ("no email tool was available", seen in a real run)."""
+    if not actions:
+        return ""
+    lines = [
+        f"- {a.tool}: {ACTION_WORDS.get(a.status, a.status)}"
+        + (f" ({a.detail})" if a.detail else "")
+        for a in actions
+    ]
+    return "\n\n<actions>\n" + "\n".join(lines) + "\n</actions>"
+
+
 def synth_messages(
-    request: str, plan: Plan, outputs: dict[str, str], *, partial: bool = False
+    request: str,
+    plan: Plan,
+    outputs: dict[str, str],
+    *,
+    partial: bool = False,
+    memories: list[MemoryHit] | None = None,
+    actions: list[ActionOutcome] | None = None,
 ) -> list[BaseMessage]:
+    """`memories`: the task's recalled memories (ADR-048), so this user's format and audience
+    preferences reach the text the user actually gets, not only the plan."""
     parts = "\n\n".join(
         f'<output subtask="{s.id}">\n{outputs[s.id]}\n</output>'
         for s in plan.subtasks
@@ -230,7 +300,8 @@ def synth_messages(
     return [
         SystemMessage(system),
         HumanMessage(
-            f"<request>\n{request}\n</request>\n\n{parts}\n\nWrite the final deliverable."
+            f"<request>\n{request}\n</request>{memory_block(memories or [])}\n\n{parts}"
+            f"{actions_block(actions or [])}\n\nWrite the final deliverable."
         ),
     ]
 

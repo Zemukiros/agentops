@@ -35,7 +35,12 @@ const REFRESH_ON = new Set([
 
 export function TaskDetailPage() {
   const { id } = useParams();
-  return <TaskDetailView key={id} id={id!} />;
+  // list pages use the full width; a detail page stays readable on very wide screens
+  return (
+    <div className="mx-auto max-w-[1600px]">
+      <TaskDetailView key={id} id={id!} />
+    </div>
+  );
 }
 
 function CopyId({ id }: { id: string }) {

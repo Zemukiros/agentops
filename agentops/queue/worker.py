@@ -40,11 +40,13 @@ from agentops.core import replay
 from agentops.core.budget import BudgetExceededError, BudgetLedger
 from agentops.core.graph import GRAPHS
 from agentops.core.state import ReplayContext, RunContext
+from agentops.core.testhooks import slow_checkpoint_writes
 from agentops.db.checkpointer import open_checkpointer
 from agentops.db.models import TERMINAL_TASK_STATUSES
 from agentops.db.session import get_sessionmaker, make_engine
 from agentops.memory.service import MemoryService
 from agentops.models.client import ChatFactory, ModelClient, fake_factory
+from agentops.models.fake import FakeScript, topic_of
 from agentops.models.scenarios import DEFAULT_SCENARIO, SCENARIOS
 from agentops.observability import tracing
 from agentops.observability.events import emit_on
@@ -108,9 +110,11 @@ class Worker:
         *,
         chat_factory: ChatFactory | None = None,
         tools: ToolRegistry | None = None,
+        fake_script: FakeScript | None = None,
     ) -> None:
         """`chat_factory` overrides model selection (tests); otherwise fake mode uses the
-        task's scripted scenario and real mode the provider factory."""
+        task's scripted scenario (from `fake_script`, default the built-in scenarios; the eval
+        harness passes recorded cassettes here) and real mode the provider factory."""
         self.settings = settings
         self.engine = engine
         self.checkpointer = checkpointer
@@ -119,6 +123,7 @@ class Worker:
         self._sessionmaker = get_sessionmaker(engine)
         self._ledger = BudgetLedger(self._sessionmaker)
         self._chat_factory = chat_factory
+        self._fake_script = fake_script
         self._real_factory: ChatFactory | None = None
         self._tools = tools if tools is not None else build_registry(settings)
         self._memory = MemoryService(settings, engine)
@@ -211,12 +216,12 @@ class Worker:
                 run.cancel()
                 return
 
-    def _model_client(self, task_config: dict[str, Any]) -> ModelClient:
+    def _model_client(self, task_config: dict[str, Any], request: str = "") -> ModelClient:
         factory = self._chat_factory
         if factory is None:
             if self.settings.llm_mode is LLMMode.FAKE:
                 scenario = str(task_config.get("scenario") or DEFAULT_SCENARIO)
-                factory = fake_factory(SCENARIOS, scenario)
+                factory = fake_factory(self._fake_script or SCENARIOS, scenario, topic_of(request))
             else:
                 if self._real_factory is None:
                     from agentops.models.anthropic import real_factory  # noqa: PLC0415
@@ -277,7 +282,7 @@ class Worker:
                     "orphaned_reservations_charged": orphans,
                 },
             )
-        model = self._model_client(dict(task_config or {})) if spec.needs_model else None
+        model = self._model_client(dict(task_config or {}), request) if spec.needs_model else None
         replay_ctx = None
         if task_kind == "replay":
             replay_ctx = ReplayContext(lineage=await replay.lineage(self.engine, task_id))
@@ -303,7 +308,9 @@ class Worker:
                     "agentops.replay": replay_ctx is not None,
                 },
             ):
-                await graph.ainvoke(graph_input, config, context=ctx)
+                # sync: a step's checkpoint is committed before the next step starts (ADR-051);
+                # LangGraph's default "async" can lose it if the worker is killed mid-step.
+                await graph.ainvoke(graph_input, config, context=ctx, durability="sync")
         except BudgetExceededError as exc:
             # Can happen inside a parallel branch, where interrupt() is forbidden: pause at the
             # worker level instead (ADR-035). The graph resumes from its last checkpoint.
@@ -586,6 +593,7 @@ async def main(
     engine = make_engine(pool_size=4)
     async with open_checkpointer() as saver:
         await saver.setup()
+        slow_checkpoint_writes(saver)  # test-only; inert in normal runs
         factory: ChatFactory | None = None
         if settings.llm_mode is LLMMode.REAL:
             from agentops.models.anthropic import real_factory  # noqa: PLC0415

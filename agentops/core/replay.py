@@ -19,6 +19,7 @@ point, so it never writes into the original's workspace and never misses a file.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import uuid
@@ -265,7 +266,12 @@ def snapshot_workspace(settings: Settings, task_id: uuid.UUID, wave: int) -> Pat
     src = settings.workspace_root.resolve() / str(task_id)
     dest = snapshots_root(settings) / str(task_id) / f"w{wave}"
     tmp = dest.with_name(f".{dest.name}.{uuid.uuid4().hex[:8]}")
-    tmp.parent.mkdir(parents=True, exist_ok=True)
+    # Writable by any worker (container root, host user, sandbox uid) sharing the volume, like
+    # the task workspaces themselves (ADR-046).
+    for d in (snapshots_root(settings), tmp.parent):
+        d.mkdir(parents=True, exist_ok=True)
+        with contextlib.suppress(PermissionError):
+            os.chmod(d, 0o777)  # noqa: S103
     if src.is_dir():
         shutil.copytree(src, tmp, symlinks=True)
     else:

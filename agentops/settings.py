@@ -134,17 +134,33 @@ class Settings(BaseSettings):
     mcp_servers: Annotated[list[str], NoDecode] = Field(default_factory=list)
     mcp_data_dir: Path = Path("var/mcp")
 
-    # Mail (Mailpit in dev: captures, sends nothing out)
+    # Mail (Mailpit in dev: captures, sends nothing out). An EMPTY smtp_host means no relay is
+    # configured: send_email is then disabled and proposals are refused with that reason
+    # (ADR-050), never silently dropped. The prod compose profile has no Mailpit.
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_from: str = "agentops@localhost"
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_starttls: bool = False
     # Mailpit HTTP API as this process sees it (lookup), and its UI as the browser sees it (links)
     mailpit_api_url: str = "http://localhost:8025"
-    mailpit_ui_url: str = "http://localhost:8025"
+    mailpit_ui_url: str = "http://localhost:8025"  # empty: no Mailpit (prod), no links
 
     # Web UI (ADR-042): the only origins allowed by CORS (comma-separated).
     ui_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"]
+    )
+    # API rate limits per user and route group, requests per minute (0 = off). Phase 6.
+    api_rate_limits: dict[str, int] = Field(
+        default_factory=lambda: {
+            "create_task": 30,
+            "decide": 60,
+            "fork": 20,
+            "stream_ticket": 120,
+            "memory_search": 60,
+            "delete": 30,
+        }
     )
     # Upper bounds for a budget a user sets on a new task (POST /tasks).
     task_budget_max_usd: float = Field(default=2.0, gt=0)
@@ -162,6 +178,9 @@ class Settings(BaseSettings):
     # them by alpha*sim + beta*importance + gamma*recency (half-life in days), keeps top_k.
     memory_min_similarity: float = Field(default=0.6, ge=-1, le=1)
     memory_top_k: int = Field(default=5, ge=1, le=20)
+    # Near-duplicates (same user + kind, cosine >= this, or identical text) are not stored twice
+    # and are collapsed at recall (Phase 6: repeated requests recalled the same task N times).
+    memory_dedupe_similarity: float = Field(default=0.95, gt=0, le=1)
     memory_alpha: float = 0.7
     memory_beta: float = 0.2
     memory_gamma: float = 0.1
@@ -199,6 +218,13 @@ class Settings(BaseSettings):
 
     def model_for(self, role: str) -> RoleModel:
         return self.role_models.get(role, RoleModel())
+
+    @property
+    def email_disabled_reason(self) -> str | None:
+        """Why send_email can't be used in this deployment, or None if it can (ADR-050)."""
+        if not self.smtp_host.strip():
+            return "email is disabled in this deployment: no SMTP relay is configured"
+        return None
 
     @property
     def sqlalchemy_url(self) -> str:

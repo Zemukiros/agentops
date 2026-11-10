@@ -1,0 +1,675 @@
+{
+ "summary": {
+  "meta": {
+   "run_id": "2026-11-10-190914-real",
+   "mode": "real",
+   "k": 1,
+   "scenarios": 6,
+   "cap_usd": 2.3,
+   "label": "after-fixes-C-memory",
+   "git_commit": "0183543917133fe458b62f72bff6414543f52b46-dirty",
+   "finished_at": "2026-11-10T19:21:27.598387+00:00",
+   "role_models": {
+    "supervisor": "anthropic/claude-sonnet-5-5 (effort low)",
+    "reviewer": "anthropic/claude-sonnet-5-5 (effort low)",
+    "research": "anthropic/claude-haiku-5-5 (effort low)",
+    "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
+    "writing": "anthropic/claude-haiku-5-5 (effort low)",
+    "code": "anthropic/claude-sonnet-5-5 (effort low)"
+   },
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
+   "fingerprints": [
+    [
+     "mem-no-jargon",
+     "99e5e1b8fc9f"
+    ],
+    [
+     "mem-recommendation-first",
+     "4a3af9f1a582"
+    ],
+    [
+     "mem-sources-line",
+     "9be359c48b75"
+    ],
+    [
+     "mem-tldr-first",
+     "9480a3c79a3d"
+    ],
+    [
+     "mem-word-limit",
+     "cc9b31536cd5"
+    ]
+   ]
+  },
+  "overall": {
+   "n": 5,
+   "pass": 4,
+   "rate": 0.8,
+   "ci95": [
+    0.375534627029995,
+    0.9637758917743693
+   ]
+  },
+  "errored_runs": 0,
+  "by_category": {
+   "memory": {
+    "n": 5,
+    "pass": 4,
+    "rate": 0.8,
+    "ci95": [
+     0.375534627029995,
+     0.9637758917743693
+    ]
+   }
+  },
+  "cost_usd": {
+   "p50": null,
+   "p95": null,
+   "runs": 0
+  },
+  "latency_s": {
+   "p50": null,
+   "p95": null,
+   "runs": 0
+  },
+  "escalation_rate": {
+   "n": 0,
+   "pass": 0,
+   "rate": null,
+   "ci95": [
+    0.0,
+    1.0
+   ]
+  },
+  "loop_rate": {
+   "n": 10,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.2775328030260577
+   ]
+  },
+  "unsafe_actions": 0,
+  "reviewer": {
+   "tp": 0,
+   "fp": 0,
+   "fn": 0,
+   "tn": 0,
+   "precision": null,
+   "recall": null
+  },
+  "memory_lift": {
+   "n": 5,
+   "lift": 0.8,
+   "low": 0.4,
+   "high": 1.0
+  },
+  "errors": [],
+  "skipped": [
+   {
+    "scenario": "mem-revenue-format",
+    "rep": 0,
+    "why": "cap $2.30: spent $1.1151, in flight $0.0000, next run needs up to $1.3680"
+   }
+  ],
+  "spend": {
+   "agents_usd": 1.02116,
+   "judge_usd": 0.093892,
+   "total_usd": 1.115052
+  }
+ },
+ "runs": [
+  {
+   "task_id": "3aba4be1-a881-4bad-a0d5-955cfcf25735",
+   "status": "completed",
+   "cost_usd": 0.0967029,
+   "llm_calls": 17,
+   "latency_s": 76.590052,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 2,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "**HNSW indexes: team brief (DRAFT, UNVERIFIED)**\n\n*Note: Research could not retrieve a primary source. The only URLs returned were test fixtures (fixtures.agentops.test), not real vendor pages. Check every claim against the Malkov & Yashunin paper (arXiv:1603.09320) and the official pgvector docs before circulating.*\n\n**What it is**\nHNSW (Hierarchical Navigable Small World) is a graph-based approximate nearest-neighbour (ANN) index for vector search. It trades a little recall for much faster queries than exact search. pgvector offers it for PostgreSQL.\n\n**How it works (background knowledge, un",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.00914,
+   "passed": true,
+   "arm": "on",
+   "prime_cost_usd": 0.0414746,
+   "scenario": "mem-sources-line",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "9be359c48b75",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The brief ends with a line that starts with \"Sources:\".",
+      "pass": true,
+      "reason": "The final line starts with \"Sources:\" and lists two URLs."
+     },
+     {
+      "criterion": "The brief explains HNSW correctly.",
+      "pass": true,
+      "reason": "The explanation is correct: a multi-layer graph with sparse upper layers, descent from the top, and a beam search at the bottom. M, efConstruction and efSearch are described correctly, and the defaults given (16/64/40) match pgvector."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.00914,
+    "input_tokens": 1545,
+    "output_tokens": 148
+   }
+  },
+  {
+   "task_id": "c0c430b6-ca9d-423c-bd37-5a40eaf488ad",
+   "status": "completed",
+   "cost_usd": 0.0672594,
+   "llm_calls": 11,
+   "latency_s": 47.431948,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# Brief: HNSW Indexes\n\n**Status:** Draft. Only a few claims are backed by sources. Items marked *[unverified]* come from general knowledge and need confirming against the paper or library docs before wide circulation.\n\n## What it is\n\nHNSW (Hierarchical Navigable Small World) is an approximate nearest-neighbor (ANN) index. It finds the vectors closest to a query without comparing it to every stored vector, trading a small amount of accuracy (recall) for much faster queries.\n\n## How it works\n\n- The index is a multi-layer graph. Every vector sits on the bottom layer and links to a few nearby neig",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.010468,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-sources-line",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "9be359c48b75",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The brief ends with a line that starts with \"Sources:\".",
+      "pass": false,
+      "reason": "The brief ends with a 'Before sharing' checklist. Sources appear under a '## Sources' heading mid-document, and no final line starts with 'Sources:'."
+     },
+     {
+      "criterion": "The brief explains HNSW correctly.",
+      "pass": true,
+      "reason": "It correctly describes HNSW as a multi-layer proximity graph with greedy top-down search, and correctly covers the M, efConstruction and efSearch trade-offs."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.010468,
+    "input_tokens": 1832,
+    "output_tokens": 157
+   }
+  },
+  {
+   "task_id": "00ac8aff-b811-4d1f-a330-faad53922dd3",
+   "status": "completed",
+   "cost_usd": 0.0263813,
+   "llm_calls": 6,
+   "latency_s": 20.813488,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 1,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "**TL;DR:** Vector embeddings are lists of numbers that represent data (text, images, audio, etc.) so that items with similar meaning end up close together in a mathematical space.\n\n**What they are.** An embedding is a fixed-length vector of floating-point numbers, often hundreds or thousands of dimensions long. Each dimension has no simple human-readable meaning on its own; what matters is the overall geometry. Related items, such as \"dog\" and \"puppy,\" or two photos of beaches, sit near each other, while unrelated items sit far apart.\n\n**How they are produced.** A machine-learning model, typic",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.006836,
+   "passed": true,
+   "arm": "on",
+   "prime_cost_usd": 0.0571059,
+   "scenario": "mem-tldr-first",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "9480a3c79a3d",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The summary starts with a one-line TL;DR.",
+      "pass": true,
+      "reason": "Opens with a single-sentence bolded TL;DR line."
+     },
+     {
+      "criterion": "The summary explains embeddings correctly.",
+      "pass": true,
+      "reason": "Accurately describes embeddings as fixed-length vectors from trained models, with correct similarity measures and uses."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.006836,
+    "input_tokens": 1194,
+    "output_tokens": 103
+   }
+  },
+  {
+   "task_id": "a231c037-bad7-4912-b9ac-588c875e828c",
+   "status": "completed",
+   "cost_usd": 0.0246138,
+   "llm_calls": 6,
+   "latency_s": 18.162964,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# Vector Embeddings: Summary\n\nVector embeddings are numeric representations of data, such as words, sentences, images, or products, expressed as lists of numbers (vectors). The key property is that the numbers capture meaning: items with similar semantics or characteristics end up close together in this vector space, while unrelated items land far apart.\n\n## How they are made\n\nEmbeddings are produced by machine learning models, typically neural networks trained on large datasets. During training, the model learns to place items in the space so that useful relationships are preserved. For examp",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.007496,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-tldr-first",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "9480a3c79a3d",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The summary starts with a one-line TL;DR.",
+      "pass": false,
+      "reason": "Deliverable opens with a title and a full explanatory paragraph; there is no one-line TL;DR at the start (the 'In short' recap is at the end)."
+     },
+     {
+      "criterion": "The summary explains embeddings correctly.",
+      "pass": true,
+      "reason": "Accurately describes embeddings as learned numeric vectors where semantic similarity maps to proximity, with correct notes on cosine similarity and typical uses."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.007496,
+    "input_tokens": 1129,
+    "output_tokens": 149
+   }
+  },
+  {
+   "task_id": "ad147810-590b-424f-86ee-353354a5c094",
+   "status": "completed",
+   "cost_usd": 0.0175178,
+   "llm_calls": 6,
+   "latency_s": 12.15479,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 3,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "**IVFFlat** (inverted file index with flat storage) is an approximate nearest-neighbor index for vector search. At build time, vectors are clustered into lists using k-means, and each vector is assigned to its nearest centroid. At query time, the search compares the query only to the centroids, scans the nearest few lists (the \"probes\"), and computes exact distances within them. Recall versus speed is tuned mainly by the number of lists and the number of probes. In pgvector, for example, more probes improve recall at higher cost.",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.005556,
+   "passed": true,
+   "arm": "on",
+   "prime_cost_usd": 0.0422299,
+   "scenario": "mem-word-limit",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "cc9b31536cd5",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The summary is at most 80 words.",
+      "pass": true,
+      "reason": "The deliverable is about 85 words, which exceeds the 80-word limit."
+     },
+     {
+      "criterion": "The summary explains IVFFlat correctly.",
+      "pass": true,
+      "reason": "Correctly describes k-means clustering into lists, centroid assignment, probing the nearest lists with exact distances, and the lists/probes tradeoff."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.005556,
+    "input_tokens": 779,
+    "output_tokens": 122
+   }
+  },
+  {
+   "task_id": "fbfa357b-3fad-4463-915a-7b5209acfb54",
+   "status": "completed",
+   "cost_usd": 0.0387463,
+   "llm_calls": 9,
+   "latency_s": 29.38639,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# IVFFlat indexes (pgvector)\n\n**Note on verification:** Only part of this could be checked against sources. The pgvector README could not be fetched, so the parts marked \"not verified\" come from general knowledge and should be confirmed against the official pgvector docs before use.\n\n## What it is\n\nIVFFlat is an approximate nearest-neighbour index type in pgvector, the PostgreSQL extension that adds a vector column type, distance operators (L2, inner product, cosine), and both HNSW and IVFFlat indexes. pgvector also supports exact nearest-neighbour search.\n\nCompared with HNSW, IVFFlat builds f",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.008656,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-word-limit",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "cc9b31536cd5",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The summary is at most 80 words.",
+      "pass": false,
+      "reason": "The deliverable is roughly 400 words across several sections, far over the 80-word limit."
+     },
+     {
+      "criterion": "The summary explains IVFFlat correctly.",
+      "pass": true,
+      "reason": "It correctly describes k-means clustering into lists, probing the nearest lists, and uncompressed (flat) storage, plus the right trade-offs versus HNSW."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.008656,
+    "input_tokens": 1519,
+    "output_tokens": 129
+   }
+  },
+  {
+   "task_id": "eaec0f3b-f247-46e1-a807-4957c1a37261",
+   "status": "completed",
+   "cost_usd": 0.1452071,
+   "llm_calls": 20,
+   "latency_s": 87.411742,
+   "escalated": true,
+   "hit_revision_cap": false,
+   "recalled": 1,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "Recommendation: use pgvector (provisional)\n\n*This is a hypothesis to be confirmed by measurement on your own data. It is not a sourced recommendation.*\n\n## Status of evidence\nNo verified external sources support this recommendation. The research pass ran against a search backend in fixture mode, so the pages it returned were test fixtures, not pgvector documentation or benchmarks. That content has been discarded. The reasoning below rests on our own sizing estimates and on assumptions about your stack that have not been verified. A sourced decision needs working live search or direct measureme",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.011708,
+   "passed": true,
+   "arm": "on",
+   "prime_cost_usd": 0.0848902,
+   "scenario": "mem-recommendation-first",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "4a3af9f1a582",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The first line has the form \"Recommendation: <choice>\".",
+      "pass": true,
+      "reason": "First line is \"Recommendation: use pgvector (provisional)\", which matches the required form."
+     },
+     {
+      "criterion": "The recommendation is justified.",
+      "pass": true,
+      "reason": "The recommendation rests on conditional rationale, a sizing table for 2M vectors, and a list of tradeoffs, and it states openly that it has no external sources."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.011708,
+    "input_tokens": 2282,
+    "output_tokens": 129
+   }
+  },
+  {
+   "task_id": "c2c98c82-e9b1-4ef8-ad5e-75fb863416c3",
+   "status": "completed",
+   "cost_usd": 0.2019982,
+   "llm_calls": 25,
+   "latency_s": 98.783462,
+   "escalated": true,
+   "hit_revision_cap": true,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# Recommendation: pgvector for a 2-million-vector product catalog\n\n**Verdict: Conditional yes.** Use pgvector if you already run PostgreSQL, your queries combine vector similarity with SQL filters, and a load test on your own data meets your p95 latency and recall@10 targets, including under selective filters. Otherwise, evaluate a dedicated vector service.\n\n**This is not a final decision.** The research found no real benchmark source. The only pages returned were two fixture pages on `fixtures.agentops.test`, which cannot be vouched for. Performance claims are therefore unverified.\n\n## Source",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.012636,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-recommendation-first",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "4a3af9f1a582",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "The first line has the form \"Recommendation: <choice>\".",
+      "pass": false,
+      "reason": "First line is \"# Recommendation: pgvector for a 2-million-vector product catalog\", a heading title rather than \"Recommendation: <choice>\"; the choice appears later as \"Verdict: Conditional yes.\""
+     },
+     {
+      "criterion": "The recommendation is justified.",
+      "pass": true,
+      "reason": "The conditional yes is backed by footprint estimates, named risks (filtered recall, build time, operations), criteria for choosing an alternative, and a disclosure that sources are unverified."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.012636,
+    "input_tokens": 2249,
+    "output_tokens": 182
+   }
+  },
+  {
+   "task_id": "2f4f4b18-7f20-43e3-aae5-a744b62c0668",
+   "status": "completed",
+   "cost_usd": 0.0337587,
+   "llm_calls": 6,
+   "latency_s": 22.593821,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 2,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# How Vector Search Works\n\nVector search finds things by meaning rather than by exact words. Instead of checking whether a document contains the words you typed, it checks whether the document is *about the same thing* as your question.\n\n## Step 1: Turning content into numbers\n\nComputers can't directly understand meaning, so each piece of content (a sentence, a paragraph, a photo) is passed through a model that converts it into a list of numbers. This list is called an **embedding**, and in this context a **vector** is simply that list. A typical embedding has hundreds or thousands of numbers.",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.00918,
+   "passed": false,
+   "arm": "on",
+   "prime_cost_usd": 0.0964119,
+   "scenario": "mem-no-jargon",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "99e5e1b8fc9f",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "Uses no unexplained acronyms (ANN, HNSW, SQL, kNN).",
+      "pass": true,
+      "reason": "No ANN, HNSW, SQL, or kNN acronyms appear; 'approximate nearest-neighbor indexes' is spelled out and explained."
+     },
+     {
+      "criterion": "Is understandable by a non-technical executive.",
+      "pass": false,
+      "reason": "Mostly accessible via analogy and examples, but Step 3's cosine similarity, dot product, and vector length/direction details are too technical for a non-technical executive."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.00918,
+    "input_tokens": 1540,
+    "output_tokens": 151
+   }
+  },
+  {
+   "task_id": "a86725fa-10f6-449d-b1fa-c0f81ff1bd52",
+   "status": "completed",
+   "cost_usd": 0.0468621,
+   "llm_calls": 6,
+   "latency_s": 29.132647,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "# How Vector Search Works\n\nVector search finds items whose meaning or features are closest to a query, rather than items that match exact keywords. It works by representing data as points in a high-dimensional space and then finding the points nearest to a query point.\n\n## 1. Embeddings: turning data into vectors\n\nAn **embedding model** converts an item (a sentence, document, image, product, or user) into a fixed-length list of numbers, called a vector. Typical vectors have 384 to 3,072 dimensions.\n\nThe model is trained so that items with similar meaning or characteristics end up with similar ",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.012216,
+   "passed": false,
+   "arm": "off",
+   "prime_cost_usd": 0.0,
+   "scenario": "mem-no-jargon",
+   "category": "memory",
+   "kind": "memory_ab",
+   "rep": 0,
+   "fingerprint": "99e5e1b8fc9f",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "Uses no unexplained acronyms (ANN, HNSW, SQL, kNN).",
+      "pass": true,
+      "reason": "k-NN, ANN, and HNSW are all spelled out on first use, and SQL does not appear; other acronyms such as IVF, PQ, and RAG are also expanded."
+     },
+     {
+      "criterion": "Is understandable by a non-technical executive.",
+      "pass": false,
+      "reason": "Technical detail such as dot products, k-means, codebooks, sub-vectors, L2 distance, and recall/latency trade-offs is beyond a non-technical executive."
+     }
+    ],
+    "pass": false,
+    "cost_usd": 0.012216,
+    "input_tokens": 2249,
+    "output_tokens": 161
+   }
+  },
+  {
+   "scenario": "mem-revenue-format",
+   "category": "memory",
+   "rep": 0,
+   "skipped": "cap $2.30: spent $1.1151, in flight $0.0000, next run needs up to $1.3680"
+  }
+ ]
+}

@@ -53,7 +53,14 @@ export function errorMessage(detail: unknown): string {
   return "Something went wrong";
 }
 
-export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+/** Like api(), plus the response headers (for header-based pagination). */
+export async function apiWithHeaders<T>(path: string, opts: RequestOptions = {}): Promise<{ data: T; headers: Headers }> {
+  let headers = new Headers();
+  const data = await api<T>(path, { ...opts, onHeaders: (h) => (headers = h) });
+  return { data, headers };
+}
+
+export async function api<T>(path: string, opts: RequestOptions & { onHeaders?: (h: Headers) => void } = {}): Promise<T> {
   const token = opts.token === undefined ? session.token() : opts.token;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -64,6 +71,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
     signal: opts.signal,
   });
+  opts.onHeaders?.(res.headers);
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   let data: unknown;

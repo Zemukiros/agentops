@@ -132,8 +132,14 @@ async def test_ranking_uses_importance_and_recency(engine: AsyncEngine, alice: S
     low = await add(engine, alice, txt + " (a)", importance=0.1)
     high = await add(engine, alice, txt + " (b)", importance=0.9)
     old = await add(engine, alice, txt + " (c)", importance=0.9, age_days=365)
+    # These three texts are near-identical on purpose (only ranking differs), so recall-time
+    # dedupe (tested separately below) is switched to exact-vector-only here.
     svc = MemoryService(
-        get_settings().model_copy(update={"memory_min_similarity": 0.5}), engine, HashEmbedder()
+        get_settings().model_copy(
+            update={"memory_min_similarity": 0.5, "memory_dedupe_similarity": 1.0}
+        ),
+        engine,
+        HashEmbedder(),
     )
     order = [h.id for h in await svc.recall(alice.id, txt)]
     assert order.index(high) < order.index(low)  # importance
@@ -331,3 +337,64 @@ async def test_memory_api_scoping_search_and_deletes(
     assert (await client.delete("/memories", headers=alice.headers)).json() == {"deleted": 1}
     assert await memories(engine, alice) == []
     assert len(await memories(engine, bob)) == 1  # untouched
+
+
+async def test_repeated_requests_keep_one_episode_and_recall_collapses_duplicates(
+    engine: AsyncEngine, alice: SeededUser
+) -> None:
+    """Phase 6 fix: the same request run three times used to store three identical episodes,
+    and recall returned all three."""
+    svc = MemoryService(
+        get_settings().model_copy(update={"memory_min_similarity": 0.3}), engine, HashEmbedder()
+    )
+    for _ in range(3):
+        tid = await create_task(engine, alice, "Summarize pgvector for the team")
+        await svc.write_episode(
+            task_id=tid,
+            user_id=alice.id,
+            request="Summarize pgvector for the team",
+            status="completed",
+            reason=None,
+        )
+    async with engine.connect() as c:
+        n = (
+            await c.execute(
+                text("SELECT count(*) FROM memories WHERE user_id=:u AND kind='episode'"),
+                {"u": alice.id},
+            )
+        ).scalar_one()
+    assert n == 1  # stored once, refreshed twice
+    async with engine.connect() as c:
+        src = (
+            await c.execute(
+                text("SELECT source_task_id FROM memories WHERE user_id=:u AND kind='episode'"),
+                {"u": alice.id},
+            )
+        ).scalar_one()
+    assert src == tid  # points at the latest occurrence
+
+    # rows that slipped in as duplicates (e.g. written before dedupe) collapse at recall
+    for _ in range(3):
+        await add(engine, alice, "Lesson: cite the pgvector docs when comparing indexes.")
+    await add(engine, alice, "Lesson: pgvector HNSW suits under ten million vectors.")
+    hits = await svc.recall(alice.id, "pgvector lesson cite docs indexes")
+    texts = [h.text for h in hits]
+    assert len(texts) == len(set(texts))
+    assert "Lesson: cite the pgvector docs when comparing indexes." in texts
+
+
+def test_dedupe_keeps_rank_order_and_skips_near_duplicates() -> None:
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    def r(t: str) -> Any:
+        return SimpleNamespace(text=t)
+
+    rows = [
+        (r("A one"), [1.0, 0.0]),
+        (r("a ONE "), [0.0, 1.0]),  # same normalized text
+        (r("A two"), [0.999, 0.01]),  # near-identical vector
+        (r("B"), [0.0, 1.0]),
+        (r("C"), [0.7, 0.7]),
+    ]
+    assert [x.text for x in store.dedupe(rows, 0.95, k=5)] == ["A one", "B", "C"]
+    assert [x.text for x in store.dedupe(rows, 0.95, k=2)] == ["A one", "B"]

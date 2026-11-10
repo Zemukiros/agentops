@@ -26,9 +26,21 @@ async def schedule(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, 
     # Wave boundary: the workspace now holds exactly what waves 1..wave wrote. Keep a copy so a
     # replay branch forked here starts from the same files (ADR-040). Internal and idempotent:
     # a re-run of this pass copies the same files again; nothing outside the task changes.
-    await asyncio.to_thread(
-        replay.snapshot_workspace, model_of(runtime).settings, runtime.context.task_id, wave
-    )
+    try:
+        await asyncio.to_thread(
+            replay.snapshot_workspace, model_of(runtime).settings, runtime.context.task_id, wave
+        )
+    except OSError as exc:
+        # A snapshot only serves future replays: never fail the task over it (ADR-046). A fork
+        # at this wave then fails with "snapshot missing" instead of guessing.
+        await node_event(
+            runtime,
+            "schedule",
+            "snapshot_failed",
+            f"w{wave}",
+            type_="replay.snapshot_failed",
+            payload={"wave": wave, "error": f"{type(exc).__name__}: {exc}"[:300]},
+        )
     decision = scheduler.decide(plan, results, wave)
     rounds = len(state.get("escalations", []))
     out: dict[str, Any] = {"decision": decision}

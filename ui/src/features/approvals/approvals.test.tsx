@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { session } from "../../api/session";
 import type { Approval } from "../../api/types";
-import { Approvals } from "../../pages/Approvals";
+import { Approvals, usePendingApprovals } from "../../pages/Approvals";
 import { buildDecision, initialForm } from "./DecisionForm";
 
 const EMAIL_SCHEMA = {
@@ -86,11 +86,17 @@ describe("buildDecision", () => {
   });
 });
 
-function renderInbox() {
+function Badge() {
+  const q = usePendingApprovals(true); // what the app shell's nav renders for reviewers
+  return <span data-testid="badge">{q.data?.length ?? "…"}</span>;
+}
+
+function renderInbox({ withBadge = false } = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/approvals"]}>
+        {withBadge && <Badge />}
         <Approvals />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -129,6 +135,14 @@ describe("Approvals inbox", () => {
     renderInbox();
     expect(await screen.findByText("A reviewer decides this")).toBeInTheDocument();
     expect(screen.queryByRole("radio")).toBeNull();
+  });
+
+  it("works next to the nav badge's pending query (regression: shared cache key crashed the page)", async () => {
+    session.add({ id: "r", name: "demo-reviewer", role: "reviewer", token: "t" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([approval()]))));
+    renderInbox({ withBadge: true });
+    expect(await screen.findByRole("radio", { name: "Edit & approve" })).toBeInTheDocument();
+    expect(await screen.findByTestId("badge")).toHaveTextContent("1");
   });
 
   it("shows an empty state", async () => {

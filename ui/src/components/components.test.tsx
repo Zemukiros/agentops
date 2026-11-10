@@ -105,7 +105,17 @@ describe("NewTask", () => {
   it("requires a request, then submits and opens the task", async () => {
     session.add({ id: "u", name: "demo-user", role: "user", token: "t" });
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url.endsWith("/tasks/scenarios")) return new Response(JSON.stringify({ fake_mode: true, scenarios: ["default", "ui_demo"] }));
+      if (url.endsWith("/tasks/scenarios"))
+        return new Response(
+          JSON.stringify({
+            fake_mode: true,
+            default: "ui_demo",
+            scenarios: [
+              { name: "ui_demo", description: "Full walkthrough" },
+              { name: "default", description: "One writing subtask" },
+            ],
+          }),
+        );
       expect(JSON.parse(String(init?.body))).toEqual({ request: "Write a brief", scenario: "ui_demo" });
       return new Response(JSON.stringify({ id: "t-1" }), { status: 201 });
     });
@@ -114,7 +124,10 @@ describe("NewTask", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start task" }));
     expect(await screen.findByText("Describe what you want done.")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Request"), "Write a brief");
-    await userEvent.selectOptions(await screen.findByLabelText("Demo scenario (fake mode)"), "ui_demo");
+    // ui_demo is preselected (no choice needed) and its description is shown
+    const select = await screen.findByLabelText("Demo scenario (fake mode)");
+    expect(select).toHaveValue("ui_demo");
+    expect(screen.getByText("Full walkthrough", { selector: "p" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Start task" }));
     await waitFor(() => expect(screen.getByText("detail page")).toBeInTheDocument());
   });

@@ -204,3 +204,49 @@ async def test_each_action_gets_its_own_approval_in_turn(
             )
         ).scalar_one()
     assert decided == 2
+
+
+async def test_without_an_smtp_relay_email_is_refused_with_a_reason_never_dropped(
+    engine: AsyncEngine, saver: Any, alice: SeededUser, settings: Settings
+) -> None:
+    """ADR-050 (prod profile without SMTP_HOST): the specialist's send_email is refused with
+    the reason at proposal time; nothing is proposed, nothing is sent, and the trace says why."""
+    subject = f"norelay {uuid.uuid4().hex[:8]}"
+    script = email_script(mail(subject))
+    norelay = settings.model_copy(update={"smtp_host": ""})
+    tid = await start(engine, saver, alice, script, norelay)
+    status, _result, _ = await task(engine, tid)
+    assert status == "completed"  # no approval was asked for an action that can't happen
+    async with engine.connect() as c:
+        st, out = (
+            await c.execute(
+                text("SELECT status, error FROM tool_calls WHERE task_id=:t AND tool='send_email'"),
+                {"t": tid},
+            )
+        ).one()
+        n_effects = (
+            await c.execute(text("SELECT count(*) FROM side_effects WHERE task_id=:t"), {"t": tid})
+        ).scalar_one()
+    assert st == "disabled" and "no SMTP relay is configured" in (out or "")
+    assert n_effects == 0 and await mailpit(subject) == []
+    assert not (await graph_state_values(tid)).get("proposed_actions")
+
+
+async def test_an_approved_email_is_rejected_with_the_reason_when_the_relay_is_gone(
+    engine: AsyncEngine, saver: Any, alice: SeededUser, settings: Settings
+) -> None:
+    """Proposed while a relay existed, approved after it was removed: rejected with the reason
+    in the deliverable's 'not performed' list; no side_effects row, nothing sent."""
+    subject = f"gone {uuid.uuid4().hex[:8]}"
+    script = email_script(mail(subject))
+    tid = await start(engine, saver, alice, script, settings)
+    await decide(engine, tid, "approve_action", {"action": "approve"})
+    await resume(engine, saver, script, settings.model_copy(update={"smtp_host": ""}))
+    status, result, _ = await task(engine, tid)
+    assert status == "completed_partial"
+    assert "`send_email` (rejected): email is disabled in this deployment" in result["final"]
+    assert await mailpit(subject) == []
+    async with engine.connect() as c:
+        assert (
+            await c.execute(text("SELECT count(*) FROM side_effects WHERE task_id=:t"), {"t": tid})
+        ).scalar_one() == 0

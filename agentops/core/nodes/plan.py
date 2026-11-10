@@ -17,6 +17,13 @@ from agentops.models.client import ModelCallError
 MAX_PLAN_ATTEMPTS = 2  # first plan + one re-plan
 
 
+def _tool_names(runtime: Runtime[RunContext]) -> dict[str, list[str]] | None:
+    reg = runtime.context.tools
+    if reg is None:
+        return None
+    return {sp: [t.name for t in reg.tools_for(sp)] for sp in scheduler.ENABLED_SPECIALISTS}
+
+
 async def plan(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]:
     attempt = state.get("plan_attempts", 0) + 1
     await node_event(runtime, "plan", "started", f"p{attempt}")
@@ -27,6 +34,7 @@ async def plan(state: TaskState, runtime: Runtime[RunContext]) -> dict[str, Any]
         max_subtasks=scheduler.MAX_SUBTASKS,
         previous=previous,
         memories=state.get("memories") or [],
+        tools=_tool_names(runtime),
     )
     try:
         res = await model_of(runtime).invoke(

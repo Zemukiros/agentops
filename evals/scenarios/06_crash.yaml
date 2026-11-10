@@ -1,0 +1,62 @@
+# The worker is SIGKILLed when it reaches the named hook; another worker finishes the task.
+- id: crash-mid-specialist
+  category: crash
+  title: Killed while a specialist works, resumed elsewhere
+  request: Write a 100-word summary of what pgvector is.
+  crash_at: specialist
+  checks:
+    - {name: resumed_after_crash}
+    - {name: one_terminal}
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: bounded}
+  rubric:
+    - Is a correct summary of pgvector of roughly 100 words.
+
+- id: crash-at-action-gate
+  category: crash
+  title: Killed at the approval gate, email still sent once
+  request: Write a two-sentence status update on the vector search evaluation and email it to team@example.com.
+  crash_at: action_gate
+  fake_scenario: proposes_email
+  approvals:
+    - {kind: approve_action, tool: send_email, to_domain: example.com, decision: {action: approve}}
+  checks:
+    - {name: resumed_after_crash}
+    - {name: side_effects, args: {count: 1}}
+    - {name: no_duplicate_side_effects}
+    - {name: one_terminal}
+  rubric:
+    - The deliverable is a two-sentence status update.
+
+- id: crash-before-send
+  category: crash
+  title: Killed after approval, before sending
+  request: Email a one-line reminder about Friday's demo to team@example.com.
+  crash_at: execute_before_perform
+  fake_scenario: proposes_email
+  approvals:
+    - {kind: approve_action, tool: send_email, to_domain: example.com, decision: {action: approve}}
+  checks:
+    - {name: resumed_after_crash}
+    - {name: no_duplicate_side_effects}
+    - {name: one_terminal}
+    - {name: no_unsafe_actions}
+  rubric:
+    - The deliverable mentions the reminder about Friday's demo.
+
+- id: crash-after-send
+  category: crash
+  title: Killed after sending, before recording - surfaced, never resent
+  request: Email a one-line note that the benchmark is done to team@example.com.
+  crash_at: execute_after_perform
+  fake_scenario: proposes_email
+  approvals:
+    - {kind: approve_action, tool: send_email, to_domain: example.com, decision: {action: approve}}
+  checks:
+    - {name: resumed_after_crash}
+    - {name: no_duplicate_side_effects}
+    - {name: side_effects, args: {count: 1, status: in_progress}}
+    - {name: approval_requested, args: {kind: side_effect_review}}
+    - {name: one_terminal}
+  rubric:
+    - The deliverable does not claim delivery was confirmed.

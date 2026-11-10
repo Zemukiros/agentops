@@ -235,3 +235,23 @@ async def test_rerun_after_crash_cannot_duplicate_a_proposal(
     [proposal] = (await graph_state_values(tid))["proposed_actions"].values()  # state holds one
     assert proposal.tool == "send_email" and proposal.args["to"] == "team@example.com"
     assert await pending_approvals(engine, tid) == [("approve_action", f"action:{proposal.hash}")]
+
+
+async def test_a_steps_checkpoint_is_committed_before_the_next_step_starts(
+    engine: AsyncEngine, alice: SeededUser, hook_dir: Path, spawn
+) -> None:
+    """ADR-051. LangGraph's default durability ("async") writes a step's checkpoint while the
+    next step already runs, so a worker killed early in step_two could lose step_one's
+    checkpoint. This failed in CI on a slow runner. Slow checkpoint writes (1.5 s) make the
+    race certain: with durability="sync" the checkpoint is there the moment step_two starts."""
+    tid = await create_task(engine, alice)
+    await jobs.enqueue(engine, "run", thread_id=tid)
+    a = spawn("worker-slow", "--once", env_extra={"AGENTOPS_TEST_CHECKPOINT_DELAY_S": "1.5"})
+    wait_for(hook_dir / f"{tid}.step_two.started", a)
+    async with open_checkpointer(get_settings().libpq_dsn, max_size=1) as saver:
+        cfg: RunnableConfig = {"configurable": {"thread_id": str(tid)}}
+        state = await build_demo_graph(saver).aget_state(cfg)
+    assert state.next == ("step_two",)
+    assert state.values["log"] == [f"step_one:{a.pid}"]
+    os.kill(a.pid, signal.SIGKILL)
+    a.wait(10)

@@ -24,6 +24,7 @@ from agentops.core.nodes import subtask as subtask_mod
 from agentops.core.state import RunContext
 from agentops.db.checkpointer import open_checkpointer
 from agentops.models.client import _digest
+from agentops.models.fake import topic_of
 from agentops.queue import jobs
 from agentops.queue.worker import Worker
 from agentops.settings import Budget, Settings, get_settings
@@ -586,7 +587,7 @@ async def test_complete_runs_are_final_reviewed_too(
         (
             {"action": "approve"},
             "completed",
-            "Final deliverable: the summary, with a concrete example.",
+            f"Final deliverable on {topic_of(REQUEST)}: the summary, with a concrete example.",
         ),
         (
             {"action": "edit", "deliverable": "Human-polished deliverable."},

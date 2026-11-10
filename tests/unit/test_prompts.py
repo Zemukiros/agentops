@@ -3,9 +3,19 @@
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from agentops.core import prompts
-from agentops.core.state import AttemptRecord, ReviewVerdict, Subtask, ToolLogEntry
+from agentops.core import prompts, scheduler
+from agentops.core.state import (
+    ActionOutcome,
+    AttemptRecord,
+    MemoryHit,
+    Plan,
+    ReviewVerdict,
+    Subtask,
+    ToolLogEntry,
+)
 from agentops.models.fake import turns_since_last_human
+from agentops.settings import Settings
+from agentops.tools.catalog import build_registry
 
 pytestmark = pytest.mark.unit
 
@@ -52,3 +62,59 @@ def test_reviewer_sees_the_dependency_context_the_specialist_had() -> None:
         SUB, "req", history=history, draft="d2", tool_log=[], context=ctx
     )
     assert "North revenue: 12,345" in later[1].text
+
+
+def test_planner_sees_what_each_specialist_can_do_from_the_real_registry() -> None:
+    """ADR-047: the baseline planner, shown only names, gave SQL work to `code` (no database).
+    The catalog lists each specialist's actual tools, and its summaries agree with them."""
+    reg = build_registry(Settings())
+    tools = {sp: [t.name for t in reg.tools_for(sp)] for sp in scheduler.ENABLED_SPECIALISTS}
+    who = {
+        name: {sp for sp, ts in tools.items() if name in ts} for name in ("sql_query", "send_email")
+    }
+    assert who == {"sql_query": {"analysis"}, "send_email": {"writing"}}  # the summaries say so
+    system = prompts.planner_messages(
+        "q", specialists=sorted(tools), max_subtasks=6, previous=[], tools=tools
+    )[0].content
+    assert isinstance(system, str)
+    for sp, ts in tools.items():
+        assert f"- {sp}: {prompts.ROLE_SUMMARY[sp]}" in system
+        assert all(t in system for t in ts)
+
+
+def test_recalled_memories_reach_the_synthesizer() -> None:
+    """ADR-048: a remembered format preference must reach the text the user gets."""
+    plan = Plan(
+        subtasks=[Subtask(id="a", description="d", specialist="writing", expected_output="e")],
+        confidence=0.9,
+        rationale="r",
+    )
+    hit = MemoryHit(
+        id="m1",
+        kind="episode",
+        text="Team format: first line is 'Recommendation: X'",
+        score=0.7,
+        outcome="completed",
+        similarity=0.8,
+    )
+    human = prompts.synth_messages("req", plan, {"a": "out"}, memories=[hit])[1].content
+    assert "Recommendation: X" in str(human) and 'note="past example, may not apply"' in str(human)
+    assert "past example" not in str(prompts.synth_messages("req", plan, {"a": "out"})[1].content)
+
+
+def test_the_synthesizer_is_told_what_actually_happened_to_actions() -> None:
+    """ADR-052: in the real UI walkthrough the email was approved and sent, but the deliverable
+    said "Status: not sent. No email tool was available" (from the pre-approval draft)."""
+    plan = Plan(
+        subtasks=[Subtask(id="a", description="d", specialist="writing", expected_output="e")],
+        confidence=0.9,
+        rationale="r",
+    )
+    done = ActionOutcome(hash="h1", tool="send_email", status="done", detail="sent to t@x.io")
+    rejected = ActionOutcome(hash="h2", tool="send_email", status="rejected", detail="not now")
+    msgs = prompts.synth_messages("req", plan, {"a": "draft"}, actions=[done, rejected])
+    human = str(msgs[1].content)
+    assert "- send_email: done (sent to t@x.io)" in human
+    assert "- send_email: rejected, not performed (not now)" in human
+    assert "<actions>" in str(msgs[0].content)
+    assert "<actions>" not in str(prompts.synth_messages("req", plan, {"a": "x"})[1].content)

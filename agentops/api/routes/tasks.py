@@ -19,10 +19,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from agentops.api import tickets, views
 from agentops.api.auth import AuthUser, CurrentUser, get_current_user, owned_by
+from agentops.api.ratelimit import rate_limit
 from agentops.api.sse import event_stream
 from agentops.core.budget import open_budget_on
 from agentops.db.models import Task, User
-from agentops.models.scenarios import SCENARIO_NAMES
+from agentops.models.scenarios import SCENARIO_DESCRIPTIONS, SCENARIO_NAMES
 from agentops.observability.events import emit_on
 from agentops.queue.jobs import enqueue_on
 from agentops.settings import Budget, LLMMode, Settings
@@ -42,6 +43,14 @@ class CreateTask(BaseModel):
     # Fake mode only: which scripted scenario drives the models (models/scenarios.py).
     scenario: str | None = Field(default=None, max_length=64)
     budget: BudgetIn | None = None
+    # e.g. ["e2e"]: test and eval runs tag their tasks so the history hides them by default
+    tags: list[Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,23}$")]] = Field(
+        default_factory=list, max_length=5
+    )
+
+
+# Tags hidden from the task list unless asked for (test / eval traffic, not real work).
+HIDDEN_TAGS = ("e2e", "eval")
 
 
 class TaskOut(BaseModel):
@@ -104,7 +113,11 @@ def task_budget(settings: Settings, body: BudgetIn | None) -> Budget:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_task(body: CreateTask, request: Request, user: AuthUser) -> TaskOut:
+async def create_task(
+    body: CreateTask,
+    request: Request,
+    user: Annotated[CurrentUser, rate_limit("create_task")],
+) -> TaskOut:
     settings = request.app.state.settings
     config: dict[str, Any] = {}
     if body.scenario is not None:
@@ -122,6 +135,8 @@ async def create_task(body: CreateTask, request: Request, user: AuthUser) -> Tas
     # The original limits, kept even if a reviewer later raises them: a replay fork defaults
     # to these (ADR-040), not to whatever is left.
     config["budget"] = limits.model_dump(include={"max_usd", "max_tokens", "max_llm_calls"})
+    if body.tags:
+        config["tags"] = sorted(set(body.tags))
     async with request.app.state.sessionmaker() as s, s.begin():
         task = Task(owner_id=user.id, request=body.request, graph=body.graph, config=config)
         s.add(task)
@@ -137,7 +152,12 @@ async def create_task(body: CreateTask, request: Request, user: AuthUser) -> Tas
 async def list_scenarios(request: Request, user: AuthUser) -> dict[str, Any]:
     """Fake-mode scenarios the UI may offer (empty list in real mode)."""
     fake = request.app.state.settings.llm_mode is LLMMode.FAKE
-    return {"fake_mode": fake, "scenarios": sorted(SCENARIO_NAMES) if fake else []}
+    names = sorted(SCENARIO_NAMES, key=lambda n: (n != "ui_demo", n)) if fake else []
+    return {
+        "fake_mode": fake,
+        "default": "ui_demo" if fake else None,
+        "scenarios": [{"name": n, "description": SCENARIO_DESCRIPTIONS.get(n, "")} for n in names],
+    }
 
 
 class TaskListItem(BaseModel):
@@ -177,6 +197,7 @@ async def list_tasks(
     root_task_id: uuid.UUID | None = None,
     created_after: datetime | None = None,
     created_before: datetime | None = None,
+    include_hidden: bool = False,
     cursor: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> TaskList:
@@ -190,6 +211,9 @@ async def list_tasks(
     elif kind != "all":
         where.append("t.kind = :kind")
         p["kind"] = kind
+    if not include_hidden:
+        where.append("NOT (COALESCE(t.config->'tags', '[]'::jsonb) ?| :hidden)")
+        p["hidden"] = list(HIDDEN_TAGS)
     if status_:
         where.append("t.status::text = ANY(:statuses)")
         p["statuses"] = status_
@@ -241,6 +265,51 @@ async def get_task(task_id: uuid.UUID, request: Request, user: AuthUser) -> Task
     return _out(await _get_owned(request, task_id, user))
 
 
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(
+    task_id: uuid.UUID, request: Request, user: Annotated[CurrentUser, rate_limit("delete")]
+) -> None:
+    """Dev/test only: remove a finished task and everything derived from it (replay branches,
+    events, calls, approvals, side effects, checkpoints, memories). Refused in production,
+    where those records are the audit trail."""
+    settings = request.app.state.settings
+    if settings.env == "prod":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "deleting tasks is disabled in production (audit records)"
+        )
+    task = await _get_owned(request, task_id, user)
+    if task.status.value not in TERMINAL_STATUSES:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"task is {task.status.value}; not deleted")
+    await purge_tasks(request.app.state.engine, [task_id])
+
+
+TERMINAL_STATUSES = frozenset(
+    {"completed", "completed_partial", "failed", "rejected", "budget_exceeded", "cancelled"}
+)
+
+
+async def purge_tasks(engine: Any, ids: list[uuid.UUID]) -> int:
+    """Delete tasks with their replay trees. FKs cascade every table except memories (SET NULL)
+    and LangGraph's checkpoint tables (no FK), which are cleared explicitly."""
+    async with engine.begin() as c:
+        tree = [
+            r[0]
+            for r in await c.execute(
+                text("SELECT id FROM tasks WHERE id = ANY(:ids) OR root_task_id = ANY(:ids)"),
+                {"ids": ids},
+            )
+        ]
+        threads = [str(t) for t in tree]
+        await c.execute(text("DELETE FROM memories WHERE source_task_id = ANY(:t)"), {"t": tree})
+        for tbl in ("checkpoint_writes", "checkpoint_blobs", "checkpoints"):
+            await c.execute(
+                text(f"DELETE FROM {tbl} WHERE thread_id = ANY(:t)"),  # noqa: S608
+                {"t": threads},
+            )
+        res = await c.execute(text("DELETE FROM tasks WHERE id = ANY(:t)"), {"t": tree})
+    return int(res.rowcount or 0)
+
+
 @router.get("/{task_id}/detail")
 async def task_detail(task_id: uuid.UUID, request: Request, user: AuthUser) -> dict[str, Any]:
     task = await _get_owned(request, task_id, user)
@@ -286,7 +355,11 @@ class TicketOut(BaseModel):
 
 
 @router.post("/{task_id}/stream-ticket", status_code=status.HTTP_201_CREATED)
-async def stream_ticket(task_id: uuid.UUID, request: Request, user: AuthUser) -> TicketOut:
+async def stream_ticket(
+    task_id: uuid.UUID,
+    request: Request,
+    user: Annotated[CurrentUser, rate_limit("stream_ticket")],
+) -> TicketOut:
     await _get_owned(request, task_id, user)
     ticket, expires = await tickets.issue(request.app.state.engine, user.id, task_id)
     return TicketOut(ticket=ticket, expires_at=expires)

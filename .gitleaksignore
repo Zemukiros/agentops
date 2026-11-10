@@ -1,0 +1,8 @@
+# gitleaks allow-list (Phase 6 security pass). Each entry was reviewed: test fixtures for the
+# redactor, or the detect-secrets baseline (hashes only). Nothing here is a real credential.
+# jwt: jwt.io sample token used to test redaction
+7fe0204816adec62b0e318c6436eb2625c8fd9cd:tests/unit/test_ui_views.py:jwt:25
+# aws-access-token: synthetic AKIA... string used to test redaction
+7fe0204816adec62b0e318c6436eb2625c8fd9cd:tests/unit/test_ui_views.py:aws-access-token:23
+# generic-api-key: detect-secrets baseline stores hashes, not secrets
+53a771252a5ea13ff80e133b6a5b8afc7dc6d8b3:.secrets.baseline:generic-api-key:136

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -103,6 +104,33 @@ def _prompt_text(messages: Sequence[BaseMessage], tools: Sequence[dict[str, Any]
     return "".join(m.text for m in messages) + json.dumps(list(tools), sort_keys=True)
 
 
+TOPIC = "{topic}"
+
+
+def topic_of(request: str, limit: int = 80) -> str:
+    """A short topic for scripted text: the request's first sentence, cut at a word."""
+    first = re.split(r"(?<=[.!?])\s", " ".join(request.split()), maxsplit=1)[0].rstrip(".!?")
+    if len(first) <= limit:
+        return first or "the request"
+    return first[:limit].rsplit(" ", 1)[0] + "…"
+
+
+def _fill(value: Any, topic: str) -> Any:
+    if isinstance(value, str):
+        return value.replace(TOPIC, topic)
+    if isinstance(value, list):
+        return [_fill(v, topic) for v in value]
+    if isinstance(value, dict):
+        return {k: _fill(v, topic) for k, v in value.items()}
+    return value
+
+
+def render_topic(turn: ScriptedTurn, topic: str) -> ScriptedTurn:
+    if TOPIC not in turn.model_dump_json():
+        return turn
+    return ScriptedTurn.model_validate(_fill(turn.model_dump(), topic))
+
+
 class ScriptedChatModel(BaseChatModel):
     role: str
     scenario: str = "default"
@@ -111,6 +139,8 @@ class ScriptedChatModel(BaseChatModel):
     model_name: str = "fake-scripted-v1"
     # Like a provider's max_tokens: reported output usage never exceeds it.
     max_tokens: int | None = None
+    # Scripted text may say "{topic}"; it becomes the task's request topic (demo realism).
+    topic: str = "the request"
 
     @property
     def _llm_type(self) -> str:
@@ -151,6 +181,7 @@ class ScriptedChatModel(BaseChatModel):
             turn = ScriptedTurn(content=f"[fake:{self.role}] {last[:200]}")
         if turn.error:
             raise FakeProviderError(turn.error)
+        turn = render_topic(turn, self.topic)
 
         tool_calls: list[dict[str, Any]] = []
         if turn.structured is not None:

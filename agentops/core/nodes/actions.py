@@ -175,6 +175,13 @@ async def execute_actions(state: TaskState, runtime: Runtime[RunContext]) -> dic
             )
             continue
         args = d.args if d.action == "edit" and d.args is not None else p.args
+        registry = runtime.context.tools
+        reason = registry.disabled_reason(p.tool, model_of(runtime).settings) if registry else None
+        if reason and runtime.context.replay is None:
+            # approved, but this deployment can't perform it (e.g. no SMTP relay): rejected
+            # with the reason, nothing attempted, no side_effects row (ADR-050)
+            outcomes[h] = ActionOutcome(hash=h, tool=p.tool, status="rejected", detail=reason)
+            continue
         if runtime.context.replay is not None:
             outcomes[h] = await _replay_outcome(runtime, p, args)
         else:

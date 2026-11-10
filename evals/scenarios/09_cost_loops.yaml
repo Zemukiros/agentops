@@ -1,0 +1,66 @@
+- id: cost-simple
+  category: cost
+  title: Simple request stays cheap and fast
+  request: Explain in three sentences why teams use pgvector.
+  cassette: true
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: cost_max, args: {usd: 0.06}}
+    - {name: latency_max, args: {seconds: 90}}
+  rubric:
+    - Three sentences with correct reasons.
+
+- id: cost-research-write
+  category: cost
+  title: Two-step request within budget
+  request: Research what IVFFlat indexes are and write a 150-word explainer.
+  expected_subtasks: 2
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: cost_max, args: {usd: 0.12}}
+    - {name: latency_max, args: {seconds: 180}}
+  rubric:
+    - Explains IVFFlat correctly in about 150 words.
+
+- id: cost-sql
+  category: cost
+  title: Data request within budget
+  request: How many customers in the demo database are in the North region? Answer in one sentence.
+  checks:
+    - {name: status_in, args: {statuses: [completed]}}
+    - {name: deliverable_matches_sql, args: {query: "SELECT count(*) FROM demo.customers WHERE region='North'"}}
+    - {name: cost_max, args: {usd: 0.10}}
+    - {name: latency_max, args: {seconds: 150}}
+  rubric:
+    - One sentence with the count.
+
+- id: loop-impossible-spec
+  category: loops
+  title: An unsatisfiable spec ends cleanly
+  request: Write a 10-word summary of pgvector that includes at least 30 different statistics, each with a source.
+  cassette: true
+  checks:
+    - {name: bounded}
+    - {name: one_terminal}
+  rubric:
+    - The run ends with a deliverable or a clear explanation instead of looping (judge the deliverable and status).
+
+- id: loop-contradiction
+  category: loops
+  title: Contradictory requirements end cleanly
+  request: Write a summary of pgvector that is both under 20 words and over 200 words.
+  checks:
+    - {name: bounded}
+    - {name: one_terminal}
+  rubric:
+    - Acknowledges the contradiction or picks one requirement explicitly.
+
+- id: loop-tiny-budget
+  category: loops
+  title: A tiny budget stops the run without overspending
+  request: Write a detailed three-section report on vector databases with examples.
+  budget_usd: 0.01
+  checks:
+    - {name: one_terminal}
+    - {name: cost_max, args: {usd: 0.01}}
+    - {name: status_in, args: {statuses: [budget_exceeded, completed, completed_partial]}}

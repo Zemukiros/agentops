@@ -1,0 +1,320 @@
+{
+ "summary": {
+  "meta": {
+   "run_id": "2026-11-10-190749-real",
+   "mode": "real",
+   "k": 3,
+   "scenarios": 1,
+   "cap_usd": 0.6,
+   "label": "after-fixes-B-fill",
+   "git_commit": "0183543917133fe458b62f72bff6414543f52b46-dirty",
+   "finished_at": "2026-11-10T19:08:57.028534+00:00",
+   "role_models": {
+    "supervisor": "anthropic/claude-sonnet-5-5 (effort low)",
+    "reviewer": "anthropic/claude-sonnet-5-5 (effort low)",
+    "research": "anthropic/claude-haiku-5-5 (effort low)",
+    "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
+    "writing": "anthropic/claude-haiku-5-5 (effort low)",
+    "code": "anthropic/claude-sonnet-5-5 (effort low)"
+   },
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
+   "fingerprints": [
+    [
+     "cost-sql",
+     "8e49f4434b54"
+    ]
+   ]
+  },
+  "overall": {
+   "n": 3,
+   "pass": 3,
+   "rate": 1.0,
+   "ci95": [
+    0.43850296436068037,
+    1.0
+   ]
+  },
+  "errored_runs": 0,
+  "by_category": {
+   "cost": {
+    "n": 3,
+    "pass": 3,
+    "rate": 1.0,
+    "ci95": [
+     0.43850296436068037,
+     1.0
+    ]
+   }
+  },
+  "cost_usd": {
+   "p50": 0.028392,
+   "p95": 0.049245,
+   "runs": 3
+  },
+  "latency_s": {
+   "p50": 15.645388,
+   "p95": 27.4284094,
+   "runs": 3
+  },
+  "escalation_rate": {
+   "n": 3,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.5614970356393196
+   ]
+  },
+  "loop_rate": {
+   "n": 3,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.5614970356393196
+   ]
+  },
+  "unsafe_actions": 0,
+  "reviewer": {
+   "tp": 0,
+   "fp": 0,
+   "fn": 0,
+   "tn": 0,
+   "precision": null,
+   "recall": null
+  },
+  "memory_lift": {
+   "n": 0,
+   "lift": null,
+   "low": null,
+   "high": null
+  },
+  "errors": [],
+  "skipped": [],
+  "spend": {
+   "agents_usd": 0.106612,
+   "judge_usd": 0.011488,
+   "total_usd": 0.1181
+  }
+ },
+ "runs": [
+  {
+   "task_id": "8f4fce0c-cc7b-4300-8e4b-12bad38bb4ee",
+   "status": "completed",
+   "cost_usd": 0.051562,
+   "llm_calls": 13,
+   "latency_s": 28.737634,
+   "escalated": false,
+   "hit_revision_cap": true,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    },
+    {
+     "name": "deliverable_matches_sql",
+     "args": {
+      "query": "SELECT count(*) FROM demo.customers WHERE region='North'"
+     },
+     "pass": true,
+     "detail": "expected '12' in deliverable"
+    },
+    {
+     "name": "cost_max",
+     "args": {
+      "usd": 0.1
+     },
+     "pass": true,
+     "detail": "$0.0516 (max $0.1)"
+    },
+    {
+     "name": "latency_max",
+     "args": {
+      "seconds": 150
+     },
+     "pass": true,
+     "detail": "28.7s (max 150s)"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "The demo database has 12 customers in the North region.",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.003704,
+   "passed": true,
+   "scenario": "cost-sql",
+   "category": "cost",
+   "kind": "agentic",
+   "rep": 0,
+   "fingerprint": "8e49f4434b54",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "One sentence with the count.",
+      "pass": true,
+      "reason": "The deliverable is a single sentence stating the count: 12 customers in the North region."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.003704,
+    "input_tokens": 651,
+    "output_tokens": 55
+   }
+  },
+  {
+   "task_id": "6754a4cd-6e2b-4225-8c69-6d750f412fb7",
+   "status": "completed",
+   "cost_usd": 0.028392,
+   "llm_calls": 8,
+   "latency_s": 15.645388,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    },
+    {
+     "name": "deliverable_matches_sql",
+     "args": {
+      "query": "SELECT count(*) FROM demo.customers WHERE region='North'"
+     },
+     "pass": true,
+     "detail": "expected '12' in deliverable"
+    },
+    {
+     "name": "cost_max",
+     "args": {
+      "usd": 0.1
+     },
+     "pass": true,
+     "detail": "$0.0284 (max $0.1)"
+    },
+    {
+     "name": "latency_max",
+     "args": {
+      "seconds": 150
+     },
+     "pass": true,
+     "detail": "15.6s (max 150s)"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "There are 12 customers in the North region of the demo database.",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.003732,
+   "passed": true,
+   "scenario": "cost-sql",
+   "category": "cost",
+   "kind": "agentic",
+   "rep": 1,
+   "fingerprint": "8e49f4434b54",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "One sentence with the count.",
+      "pass": true,
+      "reason": "The deliverable is a single sentence that gives the count: 12 customers in the North region."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.003732,
+    "input_tokens": 653,
+    "output_tokens": 56
+   }
+  },
+  {
+   "task_id": "d581e406-d6fb-44fe-980d-5094628fc608",
+   "status": "completed",
+   "cost_usd": 0.026658,
+   "llm_calls": 8,
+   "latency_s": 14.791468,
+   "escalated": false,
+   "hit_revision_cap": false,
+   "recalled": 0,
+   "checks": [
+    {
+     "name": "status_in",
+     "args": {
+      "statuses": [
+       "completed"
+      ]
+     },
+     "pass": true,
+     "detail": "status completed"
+    },
+    {
+     "name": "deliverable_matches_sql",
+     "args": {
+      "query": "SELECT count(*) FROM demo.customers WHERE region='North'"
+     },
+     "pass": true,
+     "detail": "expected '12' in deliverable"
+    },
+    {
+     "name": "cost_max",
+     "args": {
+      "usd": 0.1
+     },
+     "pass": true,
+     "detail": "$0.0267 (max $0.1)"
+    },
+    {
+     "name": "latency_max",
+     "args": {
+      "seconds": 150
+     },
+     "pass": true,
+     "detail": "14.8s (max 150s)"
+    }
+   ],
+   "checks_pass": true,
+   "final_excerpt": "There are 12 customers in the North region of the demo database (counted with `SELECT count(*) FROM demo.customers WHERE region='North'`).",
+   "unsafe": false,
+   "loop": false,
+   "judge_cost_usd": 0.004052,
+   "passed": true,
+   "scenario": "cost-sql",
+   "category": "cost",
+   "kind": "agentic",
+   "rep": 2,
+   "fingerprint": "8e49f4434b54",
+   "judge": {
+    "model": "claude-opus-5-5",
+    "criteria": [
+     {
+      "criterion": "One sentence with the count.",
+      "pass": true,
+      "reason": "Single sentence stating the count of 12 North-region customers; the parenthetical SQL is part of the same sentence."
+     }
+    ],
+    "pass": true,
+    "cost_usd": 0.004052,
+    "input_tokens": 683,
+    "output_tokens": 66
+   }
+  }
+ ]
+}

@@ -1,0 +1,152 @@
+{
+ "summary": {
+  "meta": {
+   "run_id": "2026-11-10-162938-real",
+   "mode": "real",
+   "k": 1,
+   "scenarios": 2,
+   "cap_usd": 0.5,
+   "label": "smoke",
+   "git_commit": "d0513bced88dd9941321b09c15ae9ef463b10e40",
+   "finished_at": "2026-11-10T16:30:54.483201+00:00",
+   "role_models": {
+    "supervisor": "anthropic/claude-sonnet-5-5 (effort low)",
+    "reviewer": "anthropic/claude-sonnet-5-5 (effort low)",
+    "research": "anthropic/claude-haiku-5-5 (effort low)",
+    "analysis": "anthropic/claude-sonnet-5-5 (effort low)",
+    "writing": "anthropic/claude-haiku-5-5 (effort low)",
+    "code": "anthropic/claude-sonnet-5-5 (effort low)"
+   },
+   "judge": {
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "prompt_version": "4acd9112afef",
+    "bias_note": null
+   },
+   "fingerprints": [
+    [
+     "crash-mid-specialist",
+     "7ff7095dda67"
+    ],
+    [
+     "plan-simple-summary",
+     "64777ba4cc15"
+    ]
+   ]
+  },
+  "overall": {
+   "n": 2,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.6576197760453506
+   ]
+  },
+  "by_category": {
+   "crash": {
+    "n": 1,
+    "pass": 0,
+    "rate": 0.0,
+    "ci95": [
+     0.0,
+     0.7934506882081973
+    ]
+   },
+   "planning": {
+    "n": 1,
+    "pass": 0,
+    "rate": 0.0,
+    "ci95": [
+     0.0,
+     0.7934506882081973
+    ]
+   }
+  },
+  "cost_usd": {
+   "p50": null,
+   "p95": null,
+   "runs": 0
+  },
+  "latency_s": {
+   "p50": null,
+   "p95": null,
+   "runs": 0
+  },
+  "escalation_rate": {
+   "n": 0,
+   "pass": 0,
+   "rate": null,
+   "ci95": [
+    0.0,
+    1.0
+   ]
+  },
+  "loop_rate": {
+   "n": 2,
+   "pass": 0,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.6576197760453506
+   ]
+  },
+  "unsafe_actions": 0,
+  "reviewer": {
+   "tp": 0,
+   "fp": 0,
+   "fn": 0,
+   "tn": 0,
+   "precision": null,
+   "recall": null
+  },
+  "memory_lift": {
+   "n": 0,
+   "lift": null,
+   "low": null,
+   "high": null
+  },
+  "errors": [
+   {
+    "scenario": "crash-mid-specialist",
+    "rep": 0,
+    "error": "TypeError: \"Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for the `Authorization` header to be explicitly omitted\""
+   },
+   {
+    "scenario": "plan-simple-summary",
+    "rep": 0,
+    "error": "TypeError: \"Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for the `Authorization` header to be explicitly omitted\""
+   }
+  ],
+  "skipped": [],
+  "spend": {
+   "agents_usd": 0.0,
+   "judge_usd": 0.0,
+   "total_usd": 0.0
+  }
+ },
+ "runs": [
+  {
+   "error": "TypeError: \"Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for the `Authorization` header to be explicitly omitted\"",
+   "passed": false,
+   "cost_usd": 0.0,
+   "judge_cost_usd": 0.0,
+   "scenario": "crash-mid-specialist",
+   "category": "crash",
+   "kind": "agentic",
+   "rep": 0,
+   "fingerprint": "7ff7095dda67"
+  },
+  {
+   "error": "TypeError: \"Could not resolve authentication method. Expected one of api_key, auth_token, or credentials to be set. Or for the `Authorization` header to be explicitly omitted\"",
+   "passed": false,
+   "cost_usd": 0.0,
+   "judge_cost_usd": 0.0,
+   "scenario": "plan-simple-summary",
+   "category": "planning",
+   "kind": "agentic",
+   "rep": 0,
+   "fingerprint": "64777ba4cc15"
+  }
+ ]
+}

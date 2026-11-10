@@ -1,0 +1,60 @@
+# Production profile (ADR-050). Layer it over the base file, with its own env file:
+#   cp .env.prod.example .env.prod   # fill in; untracked, never committed
+#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# The dev .env is not read: .env.prod is used for interpolation AND as the containers' env file.
+# Required (compose refuses to start without them): POSTGRES_PASSWORD, API_TOKEN_PEPPER,
+#   SQL_TOOL_PASSWORD
+# Optional: SMTP_HOST (+ SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_STARTTLS, SMTP_FROM).
+#   With no SMTP_HOST, send_email is DISABLED: proposals are refused with that reason, never
+#   silently dropped. There is no Mailpit in this profile.
+# What changes vs dev: ENV=prod (dev-only endpoints and `make reset-demo` refuse; the settings
+# validator refuses dev secrets), no Mailpit, no Postgres host port, real secrets required.
+# Not included (see docs/DEPLOYMENT.md): TLS termination / reverse proxy, backups, log shipping.
+
+x-prod-env-file: &prod-env-file !override
+  - path: .env.prod
+    required: true
+
+x-prod-env: &prod-env
+  ENV: prod
+  DATABASE_URL: postgresql+psycopg://agentops:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/agentops
+  API_TOKEN_PEPPER: ${API_TOKEN_PEPPER:?set API_TOKEN_PEPPER}
+  SQL_TOOL_PASSWORD: ${SQL_TOOL_PASSWORD:?set SQL_TOOL_PASSWORD}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_FROM: ${SMTP_FROM:-agentops@localhost}
+  MAILPIT_API_URL: ""
+  MAILPIT_UI_URL: ""
+  FAKE_LATENCY_MS: "0"
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    ports: !reset []
+    restart: unless-stopped
+
+  mailpit:
+    profiles: [dev-only]  # never started by this profile
+
+  migrate:
+    env_file: *prod-env-file
+    environment: *prod-env
+
+  api:
+    env_file: *prod-env-file
+    environment: *prod-env
+    depends_on: !override
+      migrate: {condition: service_completed_successfully}
+
+  worker:
+    env_file: *prod-env-file
+    environment:
+      <<: *prod-env
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      WORKSPACE_ROOT: /workspaces
+      WORKSPACE_HOST_ROOT: ${AGENTOPS_WORKSPACES_HOST_DIR:-${PWD}/var/workspaces}
+      MCP_SERVERS: notes,notes_http
+      MCP_DATA_DIR: /var/lib/agentops/mcp

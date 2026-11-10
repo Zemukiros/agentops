@@ -59,7 +59,7 @@ ONE_SUBTASK = _plan(_subtask("draft"))
 THREE_WITH_DEPENDENT = _plan(_subtask("intro"), _subtask("facts"), _subtask("summary", ["facts"]))
 ACCEPT = _verdict("accept", 5)
 REVISE = _verdict("revise", 2, "Add a concrete example.")
-FINAL = ScriptedTurn(content="Final deliverable: the summary, with a concrete example.")
+FINAL = ScriptedTurn(content="Final deliverable on {topic}: the summary, with a concrete example.")
 PROVIDER_DOWN = ScriptedTurn(error="provider 529 overloaded")
 
 
@@ -218,7 +218,7 @@ def _ui_demo(s: FakeScript) -> None:
         "name": "send_email",
         "args": {
             "to": "team@example.com",
-            "subject": "Recommendation: start with pgvector",
+            "subject": "Recommendation: {topic}",
             "body": "The brief recommends pgvector for our current scale. Details attached.",
         },
     }
@@ -234,7 +234,7 @@ def _ui_demo(s: FakeScript) -> None:
         sc,
         ScriptedTurn(
             content=(
-                "## Recommendation: start with pgvector\n\n"
+                "## Recommendation: {topic}\n\n"
                 "**Why:** our data is relational and well under 10M vectors; one database "
                 "means one backup and transactional consistency.\n\n"
                 "**When to revisit:** sustained ANN latency above budget, or growth past "
@@ -256,7 +256,7 @@ def _ui_demo(s: FakeScript) -> None:
         sc,
         ScriptedTurn(
             content=(
-                "# Vector search: pgvector or a dedicated database?\n\n"
+                "# {topic}\n\n"
                 "**Recommendation:** start with **pgvector**.\n\n"
                 "| | pgvector | Dedicated vector DB |\n"
                 "|---|---|---|\n"
@@ -271,6 +271,24 @@ def _ui_demo(s: FakeScript) -> None:
         purpose="synthesize",
     )
 
+
+SCENARIO_DESCRIPTIONS: dict[str, str] = {
+    "ui_demo": "Full walkthrough: research, a brief revised once, an email waiting for approval",
+    DEFAULT_SCENARIO: "One writing subtask, accepted first time",
+    "revise_once": "Reviewer asks for one revision, then accepts",
+    "revisions_exhausted": "Reviewer never accepts; escalates to a human after 2 revisions",
+    "reviewer_escalates": "Reviewer escalates immediately; a human decides",
+    "chain": "Two subtasks, the second depends on the first",
+    "bad_plan_then_fixed": "First plan has a cycle; the re-plan is valid",
+    "bad_plan_twice": "Both plans invalid; the task fails cleanly",
+    "specialist_error": "The model provider keeps failing; the task fails",
+    "partial_ok": "One subtask fails, the rest is delivered as a partial result",
+    "partial_low_score": "Partial result that the final review scores too low",
+    "partial_with_escalation": "Partial result plus an escalation for one subtask",
+    "proposes_email": "Writer proposes an email; nothing is sent until approved",
+    "low_confidence_plan": "Low-confidence plan that needs a human's approval",
+    "final_low": "Final review scores low; a human decides on the deliverable",
+}
 
 SCENARIOS = build_scenarios()
 SCENARIO_NAMES = frozenset(

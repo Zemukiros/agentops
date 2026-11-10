@@ -68,7 +68,9 @@ class _Attempt:
     usd: float | None
 
 
-def fake_factory(script: FakeScript | None = None, scenario: str = "default") -> ChatFactory:
+def fake_factory(
+    script: FakeScript | None = None, scenario: str = "default", topic: str = "the request"
+) -> ChatFactory:
     def make(role: str, purpose: str, cfg: RoleModel) -> BaseChatModel:
         return ScriptedChatModel(
             role=role,
@@ -77,6 +79,7 @@ def fake_factory(script: FakeScript | None = None, scenario: str = "default") ->
             script=script or FakeScript(),
             model_name=cfg.model,
             max_tokens=cfg.max_output_tokens,
+            topic=topic,
         )
 
     return make
@@ -205,8 +208,19 @@ class ModelClient:
         else:
             runnable, bound_tools = model, None
 
-        # Worst case for this attempt: exact input tokens + the hard output cap.
-        in_est = await asyncio.to_thread(model.get_num_tokens_from_messages, convo, bound_tools)
+        # Worst case for this attempt: exact input tokens + the hard output cap. Counting is an
+        # API call in real mode (count_tokens); a transient failure there is retried like a
+        # failed model call (ADR-049). Nothing was reserved or billed, so nothing is recorded.
+        try:
+            in_est = await asyncio.to_thread(model.get_num_tokens_from_messages, convo, bound_tools)
+        except Exception as exc:
+            return _Attempt(
+                raw=None,
+                parsed=None,
+                error=f"token count failed: {type(exc).__name__}: {exc}",
+                tokens=0,
+                usd=0.0,
+            )
         worst_usd = pricing.cost_usd(cfg.provider, cfg.model, in_est, cfg.max_output_tokens)
         reservation = await self._ledger.reserve(
             task_id, usd=worst_usd or 0.0, tokens=in_est + cfg.max_output_tokens
