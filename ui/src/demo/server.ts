@@ -1,6 +1,7 @@
 // In-browser stand-in for the API in the recorded demo (ADR-053). api() routes here when the
 // app is built with VITE_DEMO=1; no request ever leaves the browser.
 import { ApiError, type RequestOptions } from "../api/client";
+import { session } from "../api/session";
 import type { Approval, Page, TaskListItem } from "../api/types";
 import * as pb from "./playback";
 import { DEMO_TASK_ID, demo, recording } from "./store";
@@ -22,15 +23,21 @@ export async function demoApi<T>(path: string, opts: RequestOptions & { onHeader
   const p = path.replace(/^\//, "").split("?")[0]!.split("/");
   const v = demo.view();
   const out = (x: unknown) => Promise.resolve(x as T);
+  const token = opts.token === undefined ? session.token() : opts.token;
+  const me = recording.identities.find((i) => i.id === token);
 
   if (p[0] === "me") {
-    const who = recording.identities.find((i) => i.id === (opts.token ?? "")) ?? recording.identities[1]!;
-    return out(who);
+    if (!me) throw new ApiError(401, "Not signed in.");
+    return out(me);
   }
 
   if (p[0] === "tasks") {
     if (p.length === 1 && method === "GET") {
-      const page: Page<TaskListItem> = { items: [pb.listItem(v)], next_cursor: null };
+      const item = pb.listItem(v);
+      const status = q(opts, "status");
+      const text = q(opts, "q")?.toLowerCase();
+      const match = (!status || item.status === status) && (!text || item.request.toLowerCase().includes(text));
+      const page: Page<TaskListItem> = { items: match ? [item] : [], next_cursor: null };
       return out(page);
     }
     if (p.length === 1 || p[1] === "scenarios") throw new ApiError(403, LIVE_ONLY);
@@ -63,18 +70,19 @@ export async function demoApi<T>(path: string, opts: RequestOptions & { onHeader
       return out(pb.approvals(v, st === "pending" ? "pending" : st === "decided" ? "decided" : "all"));
     }
     const a = pb.approvals(v).find((x) => x.id === p[1]) ?? notFound();
-    if (p[2] === "decision" && method === "POST") return out(decide(a, opts.body));
+    if (p[2] === "decision" && method === "POST") {
+      if (me?.role !== "reviewer") throw new ApiError(403, "Only reviewers can decide.");
+      return out(decide(a, opts.body));
+    }
     return out(a);
   }
 
   if (p[0] === "memories") {
     if (method === "DELETE") throw new ApiError(403, "Deleting memories is turned off in the recorded demo.");
-    if (p[1] === "search") {
-      const words = (q(opts, "q") ?? "").toLowerCase().split(/\W+/).filter((w) => w.length > 2);
-      return out(recording.memories.filter((m) => words.some((w) => m.text.toLowerCase().includes(w))));
-    }
-    if (p[1]) return out(recording.memories.find((m) => m.id === p[1]) ?? notFound());
-    return out(Number(q(opts, "offset") ?? 0) > 0 ? [] : recording.memories);
+    if (p[1] === "search") throw new ApiError(403, `Semantic search: ${LIVE_ONLY}`);
+    const shown = pb.memories(v);
+    if (p[1]) return out(shown.find((m) => m.id === p[1]) ?? notFound());
+    return out(Number(q(opts, "offset") ?? 0) > 0 ? [] : shown);
   }
 
   throw new ApiError(403, LIVE_ONLY);
@@ -93,5 +101,5 @@ function decide(a: Approval, body: unknown): Approval {
       `This is a recording of a real run, so only the decision made in that run can play back: ${ACTION_LABEL[want] ?? want}.`,
     );
   demo.decide(a.id);
-  return { ...a, status: recorded.status, decision: recorded.decision };
+  return pb.approval(demo.view(), recorded);
 }

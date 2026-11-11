@@ -304,7 +304,7 @@
    "node": null,
    "payload": {
     "job_id": 759,
-    "worker": "e4c7d0433775:1",
+    "worker": "worker-1",
     "attempt": 1,
     "job_kind": "run",
     "resumed_from_checkpoint": false,
@@ -1246,7 +1246,7 @@
    "node": null,
    "payload": {
     "job_id": 760,
-    "worker": "e4c7d0433775:1",
+    "worker": "worker-1",
     "attempt": 1,
     "job_kind": "resume",
     "resumed_from_checkpoint": true,
@@ -1385,7 +1385,7 @@
    "node": null,
    "payload": {
     "job_id": 761,
-    "worker": "e4c7d0433775:1",
+    "worker": "worker-1",
     "attempt": 1,
     "job_kind": "resume",
     "resumed_from_checkpoint": true,
@@ -1591,7 +1591,7 @@
    "kind": "event",
    "payload": {
     "job_id": 759,
-    "worker": "e4c7d0433775:1",
+    "worker": "worker-1",
     "attempt": 1,
     "job_kind": "run",
     "resumed_from_checkpoint": false,
@@ -2719,7 +2719,7 @@
    "kind": "event",
    "payload": {
     "job_id": 760,
-    "worker": "e4c7d0433775:1",
+    "worker": "worker-1",
     "attempt": 1,
     "job_kind": "resume",
     "resumed_from_checkpoint": true,
@@ -2865,7 +2865,7 @@
    "kind": "event",
    "payload": {
     "job_id": 761,
-    "worker": "e4c7d0433775:1",
+    "worker": "worker-1",
     "attempt": 1,
     "job_kind": "resume",
     "resumed_from_checkpoint": true,

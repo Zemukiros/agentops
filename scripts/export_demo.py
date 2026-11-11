@@ -75,9 +75,17 @@ def trace(c: httpx.Client, task_id: str, token: str) -> list[dict[str, Any]]:
 
 
 def scrub(value: Any, ids: dict[str, str]) -> Any:
-    """Replace internal ids and local links anywhere in the recording."""
+    """Replace internal ids, worker names and local links anywhere in the recording."""
     if isinstance(value, dict):
-        return {k: (None if k == "mailpit_url" else scrub(v, ids)) for k, v in value.items()}
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            if k == "mailpit_url":
+                out[k] = None
+            elif k == "worker" and isinstance(v, str):
+                out[k] = "worker-1"  # container id + process: internal
+            else:
+                out[k] = scrub(v, ids)
+        return out
     if isinstance(value, list):
         return [scrub(v, ids) for v in value]
     if isinstance(value, str):

@@ -20,16 +20,26 @@ describe("demo API", () => {
 
     // a different decision than the recorded one can't play back
     await expect(
-      demoApi(`/approvals/${first}/decision`, { method: "POST", body: { version: 1, decision: { action: "reject" } } }),
+      demoApi(`/approvals/${first}/decision`, { method: "POST", token: "demo-reviewer", body: { version: 1, decision: { action: "reject" } } }),
     ).rejects.toMatchObject({ status: 422 });
     expect(demo.get().waitingFor).toBe(first);
 
-    await demoApi(`/approvals/${first}/decision`, { method: "POST", body: { version: 1, decision: { action: "approve" } } });
+    // only reviewers can decide, as in the real API
+    await expect(
+      demoApi(`/approvals/${first}/decision`, { method: "POST", token: "demo-user", body: { version: 1, decision: { action: "approve" } } }),
+    ).rejects.toMatchObject({ status: 403 });
+    const decided = await demoApi<Approval>(`/approvals/${first}/decision`, {
+      method: "POST",
+      token: "demo-reviewer",
+      body: { version: 1, decision: { action: "approve" } },
+    });
+    expect(decided).toMatchObject({ status: "approved", decided_by: "demo-reviewer" });
+    expect(decided.decided_at).not.toBeNull();
     expect((await demoApi<Approval>(`/approvals/${first}`)).status).toBe("approved");
 
     const second = await untilWaiting();
     expect(second).not.toBe(first);
-    await demoApi(`/approvals/${second}/decision`, { method: "POST", body: { version: 1, decision: { action: "approve" } } });
+    await demoApi(`/approvals/${second}/decision`, { method: "POST", token: "demo-reviewer", body: { version: 1, decision: { action: "approve" } } });
     await vi.advanceTimersByTimeAsync(120_000);
 
     const d = await demoApi<TaskDetail>(`/tasks/${DEMO_TASK_ID}/detail`);
@@ -42,12 +52,31 @@ describe("demo API", () => {
     await expect(demoApi("/tasks", { method: "POST", body: { request: "x" } })).rejects.toMatchObject({ status: 403 });
     await expect(demoApi(`/memories/${recording.memories[0]!.id}`, { method: "DELETE" })).rejects.toMatchObject({ status: 403 });
     await expect(demoApi(`/tasks/${DEMO_TASK_ID}/checkpoints`)).rejects.toMatchObject({ status: 403 });
+    await expect(demoApi("/memories/search", { query: { q: "pgvector" } })).rejects.toMatchObject({ status: 403 });
     await expect(demoApi("/tasks/00000000-0000-0000-0000-000000000000/detail")).rejects.toMatchObject({ status: 404 });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("restarts cleanly while paused at a decision", async () => {
+    demo.restart();
+    const first = await untilWaiting();
+    demo.restart();
+    expect(demo.get()).toMatchObject({ revealed: 0, waitingFor: null });
+    expect((await demoApi<Approval[]>("/approvals", { query: { state: "pending" } })).length).toBe(0);
+    expect(await untilWaiting()).toBe(first);
+  });
+
+  it("filters the task list like the API", async () => {
+    demo.restart();
+    const page = (status: string) => demoApi<{ items: unknown[] }>("/tasks", { query: { status } });
+    expect((await page("failed")).items).toHaveLength(0);
+    expect((await demoApi<{ items: unknown[] }>("/tasks", { query: { q: "pgvector" } })).items).toHaveLength(1);
+    expect((await demoApi<{ items: unknown[] }>("/tasks", { query: { q: "kubernetes" } })).items).toHaveLength(0);
   });
 
   it("answers /me for both demo identities", async () => {
     expect(await demoApi("/me", { token: "demo-user" })).toMatchObject({ role: "user" });
     expect(await demoApi("/me", { token: "demo-reviewer" })).toMatchObject({ role: "reviewer" });
+    await expect(demoApi("/me", { token: null })).rejects.toMatchObject({ status: 401 });
   });
 });

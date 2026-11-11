@@ -3,8 +3,7 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 6 — complete on branch `phase-6`, in review as draft PR #6 (all 10 CI checks green
-  before the final docs commit). Not merged.
+- **Phase:** 6 — complete and merged (PR #6). Recorded public demo on branch `demo-site` (ADR-053).
 - **Last updated:** 2026-11-11 (recorded demo, branch `demo-site`)
 - **Test status:** see the final Phase 6 summary; `make test`, `make test-ui`, `make e2e` (also at
   `E2E_CPU_THROTTLE=4`) pass. Not in `make test`: 1 `model` test, 4 `e2e` tests and the
@@ -171,7 +170,10 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - `scripts/export_demo.py` → `ui/src/demo/recording.json` (redacted again; no credentials or local links, tested).
 - `VITE_DEMO=1` build of the real UI: playback with pauses for the visitor's decisions, banner,
   "Enter demo", notes where the backend is needed. `ui/vercel.json` for hosting from `ui/`.
-- Tests: 12 Vitest (playback + demo API; both mutation-checked), 1 Playwright run of the demo build
+- Independent review: no high findings; fixed memory timing, removed keyword "search" (not the API's
+  ranking), revision counts, in-progress cost rules, reviewer-only decisions, task-list filters,
+  worker names scrubbed, gitleaks exception scoped by rule/path/shape (`.gitleaks.toml`).
+- Tests: 16 Vitest (playback + demo API; mutation-checked), 1 Playwright run of the demo build
   (two approvals, completed, trace, axe on three pages, no request leaves the site). CI runs both.
 
 ## Next up
@@ -179,7 +181,6 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 - Optional, with approval: a full k=3 re-run (~$13) to replace the baseline headline and check
   previously passing scenarios for regressions; re-measure memory at k=3.
 - Investigate the truncated-proposal finding and give the final reviewer the action outcomes.
-- Merge PR #6 after review.
 
 ## Known limitations / stubs (be honest)
 - **Side-effect ambiguity window:** a crash between inserting the `side_effects` row and performing the action is treated as "outcome unknown" (surfaced for review, never retried), the same as a crash after performing. Conservative: it can under-execute, never double-execute.

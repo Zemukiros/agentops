@@ -90,4 +90,30 @@ describe("snapshots", () => {
     }
     expect(Object.keys(c.by_model).sort()).toEqual(Object.keys(rec.cost.by_model).sort());
   });
+
+  it("show this run's memories only once it has written them", () => {
+    const written = firstIndex("memory.consolidated");
+    expect(pb.memories(at(written))).toEqual([]);
+    const after = pb.memories(at(written + 1));
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((m) => m.source_task_id === rec.task.id)).toBe(true);
+  });
+
+  it("never show more than the run did, at any point", () => {
+    let prevCost = 0;
+    for (let i = 0; i <= N; i++) {
+      const v = at(i);
+      const d = pb.detail(v);
+      d.subtasks.forEach((s, j) => {
+        expect(s.revisions).toBeLessThanOrEqual(rec.detail.subtasks[j]!.revisions);
+        expect(s.reviews.length).toBeLessThanOrEqual(rec.detail.subtasks[j]!.reviews.length);
+      });
+      const c = pb.cost(v).total.cost_usd;
+      expect(c).toBeGreaterThanOrEqual(prevCost - 1e-9);
+      expect(c).toBeLessThanOrEqual(rec.cost.total.cost_usd + 1e-9);
+      prevCost = c;
+      const t = pb.cost(v).tools;
+      for (const [name, b] of Object.entries(t)) expect(b.errors).toBeLessThanOrEqual(rec.cost.tools[name]!.errors);
+    }
+  });
 });

@@ -6,8 +6,3 @@
 7fe0204816adec62b0e318c6436eb2625c8fd9cd:tests/unit/test_ui_views.py:aws-access-token:23
 # generic-api-key: detect-secrets baseline stores hashes, not secrets
 53a771252a5ea13ff80e133b6a5b8afc7dc6d8b3:.secrets.baseline:generic-api-key:136
-# generic-api-key: the demo recording's send_email idempotency key (sha256 of task + action;
-# also the email's Message-ID), not a credential (ADR-053)
-af9dfcaaa47bae06d4f54008be0fe2c5fce0d5de:ui/src/demo/recording.json:generic-api-key:225
-af9dfcaaa47bae06d4f54008be0fe2c5fce0d5de:ui/src/demo/recording.json:generic-api-key:1433
-af9dfcaaa47bae06d4f54008be0fe2c5fce0d5de:ui/src/demo/recording.json:generic-api-key:2922

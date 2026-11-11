@@ -139,7 +139,9 @@ export function detail(v: View): TaskDetail {
     if (fin)
       return { ...s, status: String(fin.payload.status), revisions: Number(fin.payload.revisions), reason: (fin.payload.reason as string | null) ?? null, human_override: false, reviews };
     const dispatched = has(v, "subtask.dispatched", (p) => p.subtask_id === s.id);
-    return { ...s, status: dispatched ? "running" : "pending", revisions: Math.max(0, reviews.length), output: null, reason: null, human_override: false, reviews };
+    // revisions made so far: one per "revise" verdict, never more than the run made
+    const revisions = Math.min(s.revisions, reviews.filter((r) => r.verdict === "revise").length);
+    return { ...s, status: dispatched ? "running" : "pending", revisions, output: null, reason: null, human_override: false, reviews };
   });
   const proposed = (hash: string) => has(v, "tool.call", (p) => p.proposal_hash === hash && p.status === "proposed");
   const actions = d.actions
@@ -221,7 +223,7 @@ export function cost(v: View): CostSummary {
   for (const e of v.shown.filter((e) => e.type === "tool.call")) {
     const t = (tools[String(e.payload.tool)] ??= { calls: 0, errors: 0, latency_ms: 0 });
     t.calls += 1;
-    t.errors += ["denied", "error", "failed"].includes(String(e.payload.status)) ? 1 : 0;
+    t.errors += ["error", "denied"].includes(String(e.payload.status)) ? 1 : 0; // as views.cost_summary
     t.latency_ms += Number(e.payload.latency_ms ?? 0);
   }
   const first = v.rec.events[0]!;
@@ -231,6 +233,7 @@ export function cost(v: View): CostSummary {
     .filter((a) => decided(v, a.id) && a.decided_at)
     .map((a) => ({ a, wait: (ms(a.decided_at!) - ms(a.created_at)) / 1000 }));
   const human = waits.reduce((n, w) => n + w.wait, 0);
+  const queue = Math.min(v.rec.cost.time.queue_s, wall); // the recorded queue time (claiming the job)
   return {
     task_id: v.rec.task.id,
     total,
@@ -238,7 +241,7 @@ export function cost(v: View): CostSummary {
     by_model,
     tools,
     budget: budget(v),
-    time: { wall_s: wall, compute_s: Math.max(0, wall - human), human_wait_s: human, queue_s: 0 },
+    time: { wall_s: wall, compute_s: Math.max(0, wall - human - queue), human_wait_s: human, queue_s: queue },
     approvals: approvals(v).map((a) => ({
       kind: a.kind,
       key: a.key,
@@ -247,4 +250,12 @@ export function cost(v: View): CostSummary {
       wait_s: waits.find((w) => w.a.id === a.id)?.wait ?? 0,
     })),
   };
+}
+
+/** The Memory page: only memories this run wrote, and only once it has written them. */
+export function memories(v: View): Memory[] {
+  if (!has(v, "memory.consolidated")) return [];
+  return v.rec.memories
+    .filter((m) => m.source_task_id === v.rec.task.id)
+    .map((m) => ({ ...m, created_at: v.shift(m.created_at)! }));
 }
