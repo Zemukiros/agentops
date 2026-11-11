@@ -11,8 +11,12 @@ log streamed to the UI over SSE, a budget ledger, and pgvector memory. React UI,
 sandbox for generated code, MCP tools, and an eval harness that measures the whole system
 with real models.
 
-**Status:** Completed locally (all six phases built; Phase 6 is in review as PR #6). See
+**Status:** Completed locally (all six phases built and merged). See
 [`docs/PROGRESS.md`](docs/PROGRESS.md).
+
+**[Try the recorded demo →](https://agentops-demo-xi.vercel.app)** The real UI replaying one
+real-model run in your browser: watch the plan and reviews unfold, then make the run's two
+human decisions yourself. No backend, nothing sent ([ADR-053](docs/DECISIONS.md)).
 
 ```mermaid
 flowchart LR

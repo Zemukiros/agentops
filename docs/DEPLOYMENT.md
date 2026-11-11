@@ -74,6 +74,9 @@ port, no Mailpit (ADR-050).
 
 ## Static recorded demo (Vercel)
 
+Live at https://agentops-demo-xi.vercel.app (Vercel Hobby, project `agentops-demo`, root `ui`;
+every push to `main` redeploys).
+
 The public demo is the real UI built with `VITE_DEMO=1`, replaying one recorded real-model run
 in the browser (ADR-053). No backend, no API key, $0 per visitor.
 
