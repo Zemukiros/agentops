@@ -1,0 +1,3528 @@
+{
+ "source": {
+  "task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+  "note": "Exported from a real-model run by scripts/export_demo.py (ADR-053)."
+ },
+ "identities": [
+  {
+   "id": "demo-user",
+   "name": "demo-user",
+   "role": "user"
+  },
+  {
+   "id": "demo-reviewer",
+   "name": "demo-reviewer",
+   "role": "reviewer"
+  }
+ ],
+ "task": {
+  "id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+  "request": "Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com.",
+  "status": "completed",
+  "kind": "task",
+  "root_task_id": null,
+  "scenario": null,
+  "cost_usd": 0.089155,
+  "llm_calls": 17,
+  "duration_s": 71.910844,
+  "pending_approvals": 0,
+  "branches": 0,
+  "created_at": "2026-11-11T02:03:50.193349Z",
+  "updated_at": "2026-11-11T02:05:02.104193Z"
+ },
+ "detail": {
+  "id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+  "request": "Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com.",
+  "graph": "main",
+  "status": "completed",
+  "kind": "task",
+  "parent_task_id": null,
+  "root_task_id": null,
+  "fork_checkpoint_id": null,
+  "scenario": null,
+  "error": null,
+  "created_at": "2026-11-11T02:03:50.193349+00:00",
+  "updated_at": "2026-11-11T02:05:02.104193+00:00",
+  "budget": {
+   "max_usd": 0.2,
+   "max_tokens": 200000.0,
+   "max_calls": 60.0,
+   "used_usd": 0.089155,
+   "used_tokens": 65839.0,
+   "used_calls": 17.0
+  },
+  "plan": {
+   "confidence": 0.9,
+   "rationale": "Research grounds the claims, then a writing subtask drafts the word-limited brief and proposes the email for human approval. Two subtasks are enough for a short deliverable."
+  },
+  "plan_confidence": {
+   "self_reported": 0.9,
+   "structural": 0.994,
+   "effective": 0.9,
+   "high": 0,
+   "medium": 0,
+   "depth": 2,
+   "memory_similarity": 0.9397,
+   "threshold": 0.6
+  },
+  "memories": [
+   {
+    "id": "8ca18e7c-b146-4e87-9c6c-7c587cf547d4",
+    "kind": "episode",
+    "text": "Past task \"Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com.\" ended completed",
+    "outcome": "completed",
+    "similarity": 0.9397,
+    "score": 0.8171
+   },
+   {
+    "id": "721fbb1e-e17f-432a-8546-fa2475ef514f",
+    "kind": "episode",
+    "text": "Past task \"Summarize pgvector for the team and email it.\" ended completed",
+    "outcome": "completed",
+    "similarity": 0.78,
+    "score": 0.6987
+   },
+   {
+    "id": "15cbbc73-45c8-40bc-8a21-26afd31f7e0c",
+    "kind": "fact",
+    "text": "pgvector is a PostgreSQL extension offering a vector type with L2, inner-product, and cosine operators; HNSW gives better speed and recall but builds slower with more memory, while IVFFlat builds faster with less memory.",
+    "outcome": "completed",
+    "similarity": 0.667,
+    "score": 0.6663
+   },
+   {
+    "id": "886f46c5-d6b7-442f-909e-2580be49ee13",
+    "kind": "episode",
+    "text": "Past task \"Research the top 3 project management tools for a small student team, write a short comparison, and email it to me.\" ended completed",
+    "outcome": "completed",
+    "similarity": 0.7031,
+    "score": 0.6501
+   },
+   {
+    "id": "d247a4cf-fc4a-44f4-8e31-7c586f409fba",
+    "kind": "episode",
+    "text": "Past task \"Summarize the release notes and email the team\" ended completed",
+    "outcome": "completed",
+    "similarity": 0.6184,
+    "score": 0.5863
+   }
+  ],
+  "subtasks": [
+   {
+    "id": "research",
+    "description": "Gather accurate, citable points on when pgvector (PostgreSQL extension) is preferable to a dedicated vector database: existing Postgres stack, moderate scale (millions of vectors rather than billions), transactional consistency and joins with relational data, simpler operations and lower cost, versus cases favoring dedicated systems (very large scale, high QPS, advanced filtering or sharding). Include index tradeoffs: HNSW gives better speed and recall but builds slower and uses more memory, while IVFFlat builds faster with less memory. Cite sources.",
+    "specialist": "research",
+    "depends_on": [],
+    "expected_output": "A short bulleted list of 5-8 key decision criteria with source links.",
+    "complexity": "low",
+    "status": "accepted",
+    "revisions": 0,
+    "output": "I could not send the email. I have no email tool, and the brief below is not sent to team@example.com. The sources below are also weaker than a primary pgvector source would be. My search returned only two pages, both on a `fixtures.agentops.test` domain, which I could not verify as the official pgvector documentation. My attempt to fetch the official pgvector GitHub README was refused because that URL had not come from a search result.\n\n**Key decision criteria (sourced)**\n\n- **Existing PostgreSQL stack:** Choose pgvector when the team already runs Postgres and wants one database. That gives one backup, one access-control model, and transactional consistency between rows and their embeddings. (https://fixtures.agentops.test/pgvector-vs-dedicated)\n- **Scale:** The source describes pgvector as suited to modest collections, \"up to tens of millions of vectors.\" Very large collections favor dedicated systems. (https://fixtures.agentops.test/pgvector-vs-dedicated)\n- **Relational queries:** Because vectors live in ordinary tables, similarity search can be combined with SQL filters, joins, and transactions in one query. (https://fixtures.agentops.test/pgvector-overview)\n- **High QPS and low latency:** Strict low-latency requirements at high query volume favor a dedicated vector database. (https://fixtures.agentops.test/pgvector-vs-dedicated)\n- **Independent scaling:** If the vector workload must scale separately from the transactional database, a dedicated system fits better. (https://fixtures.agentops.test/pgvector-vs-dedicated)\n- **HNSW index:** Better query speed and recall, at the cost of slower builds and more memory. (https://fixtures.agentops.test/pgvector-overview)\n- **IVFFlat index:** Faster builds and less memory, with lower query speed and recall than HNSW. The source states the build and memory trade-off but gives no recall figures. (https://fixtures.agentops.test/pgvector-overview)\n\n**Not verified:** Cost and operational-simplicity claims, advanced filtering and sharding limits, and specific scale numbers beyond the single source. These need the official pgvector README or benchmarks.\n\n**Draft brief (about 120 words), for whoever sends it:**\n\nChoose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.",
+    "reason": null,
+    "human_override": false,
+    "reviews": [
+     {
+      "revision": 0,
+      "verdict": "accept",
+      "score": 4,
+      "issues": [
+       "The draft offers 7 criteria, which fits the 5-8 range, but sources are only two fixture-domain pages, not primary documentation.",
+       "Tool results are truncated, so some details (e.g., 'one backup and one access-control model', IVFFlat 'lower query speed and recall') cannot be fully confirmed from the visible output.",
+       "The email was not sent; this is a later subtask, and the draft discloses it honestly."
+      ],
+      "feedback_for_specialist": null,
+      "unsupported_claims": [
+       "IVFFlat has lower query speed and recall than HNSW is implied by the source's comparison but not visibly confirmed in the truncated tool output.",
+       "One backup and one access-control model is not visibly confirmed in the truncated tool output."
+      ]
+     }
+    ]
+   },
+   {
+    "id": "write-email",
+    "description": "Using the research notes, write a brief of at most 150 words (strictly enforce the limit) on when a team should choose pgvector over a dedicated vector database. Keep it clear and practical for a technical team. Then propose an email containing the brief to team@example.com with a suitable subject line; the email is sent only after a human approves it.",
+    "specialist": "writing",
+    "depends_on": [
+     "research"
+    ],
+    "expected_output": "A brief of 150 words or fewer, plus a proposed email to team@example.com pending human approval.",
+    "complexity": "low",
+    "status": "accepted",
+    "revisions": 2,
+    "output": "**Proposed email: recorded as a proposal, not sent**\n\nThe send_email call was issued with these arguments, which match the displayed email:\n\n- **to:** team@example.com\n- **subject:** Brief: When to choose pgvector over a dedicated vector database\n- **body:** the brief text exactly as shown below\n\nThe tool result reports the call as \"proposed,\" not executed. It will be sent only after a human approves it.\n\n**Body (full text):**\n\n> Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.\n\nThe body is about 128 words, under the 150-word limit.\n\n**Caveats:**\n- The sources are on a `fixtures.agentops.test` domain that I could not confirm as official pgvector documentation. I could not reach the official pgvector README, so the scale figures and index trade-offs are unverified. The body flags this for the reader.\n- Cost, operational simplicity, and sharding claims were not checked and are left out of the brief.",
+    "reason": "human approve",
+    "human_override": true,
+    "reviews": [
+     {
+      "revision": 0,
+      "verdict": "revise",
+      "score": 3,
+      "issues": [
+       "The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.",
+       "The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.",
+       "The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent."
+      ],
+      "feedback_for_specialist": "The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources.",
+      "unsupported_claims": []
+     },
+     {
+      "revision": 1,
+      "verdict": "revise",
+      "score": 3,
+      "issues": [
+       "The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.",
+       "The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.",
+       "The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct."
+      ],
+      "feedback_for_specialist": "The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text exactly as shown, with no truncation, arrows, or stray tool-result text. Make sure the recorded proposal matches the displayed email. If the call cannot be made cleanly, say explicitly that the recorded proposal is defective and that the displayed email is the intended one.",
+      "unsupported_claims": []
+     },
+     {
+      "revision": 2,
+      "verdict": "revise",
+      "score": 2,
+      "issues": [
+       "The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.",
+       "Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.",
+       "This is the third round with the same defect. The draft asserts a fix that the tool call does not show."
+      ],
+      "feedback_for_specialist": "The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text with no arrows or tool-result text. Or, if you cannot make a clean call, state plainly that the recorded proposal is defective and that the displayed email is the intended one. Do not claim the recorded arguments match the displayed email unless they do.",
+      "unsupported_claims": [
+       "The send_email call was issued with arguments that match the displayed email (to, subject, full body). The recorded call shows a truncated body with no to or subject."
+      ]
+     }
+    ]
+   }
+  ],
+  "actions": [
+   {
+    "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "tool": "send_email",
+    "risk": "external",
+    "agent": "writing",
+    "subtask_id": "write-email",
+    "args": {
+     "to": "team@example.com",
+     "subject": "Brief: When to choose pgvector over a dedicated vector database",
+     "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them."
+    },
+    "rationale": null,
+    "approval": {
+     "id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89",
+     "status": "approved",
+     "version": 2,
+     "decision": {
+      "args": null,
+      "note": null,
+      "action": "approve"
+     }
+    },
+    "decision": "approve",
+    "outcome": {
+     "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+     "tool": "send_email",
+     "status": "done",
+     "idempotency_key": "88ff816a01681995a584fd015eed39e87d8cfe116a5c413749915a73be8041da",
+     "detail": "sent to team@example.com"
+    },
+    "side_effect_status": "done",
+    "mailpit_url": null
+   }
+  ],
+  "approvals": [
+   {
+    "id": "a6c9d9e0-b21f-47f3-8448-7733ad721d44",
+    "kind": "escalation",
+    "key": "escalation:e1",
+    "status": "approved",
+    "version": 2,
+    "source": "graph",
+    "blocking": true,
+    "created_at": "2026-11-11T02:04:43.658025+00:00",
+    "decided_at": "2026-11-11T02:04:45.639105+00:00",
+    "expires_at": "2026-11-12T02:04:43.658025+00:00"
+   },
+   {
+    "id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89",
+    "kind": "approve_action",
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "status": "approved",
+    "version": 2,
+    "source": "graph",
+    "blocking": true,
+    "created_at": "2026-11-11T02:04:45.762440+00:00",
+    "decided_at": "2026-11-11T02:04:50.500753+00:00",
+    "expires_at": "2026-11-12T02:04:45.762440+00:00"
+   }
+  ],
+  "final": "# Brief: When to choose pgvector over a dedicated vector database\n\nChoose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.\n\n**Delivery:** The brief (about 128 words) was emailed to team@example.com.\n\n**Caveat:** The sources are on a `fixtures.agentops.test` domain that could not be confirmed as official pgvector documentation, and the official README could not be reached. The scale figures and index trade-offs are therefore unverified. Cost, operational-simplicity, and sharding claims were not checked and are left out.",
+  "final_review": {
+   "verdict": "escalate",
+   "score": 3,
+   "issues": [
+    "Deliverable states the brief 'was emailed' to team@example.com, but the planned subtask only produced a proposed email pending human approval; sending is unverified and likely a false claim.",
+    "Word count claimed as about 128 words, but the brief body including sources and verification line appears closer to 140-150 words; the count is not demonstrated and may exceed the limit when the caveat is included.",
+    "Sources are on an unverifiable fixtures.agentops.test domain, and the scale figure ('tens of millions') and index trade-offs are unverified, as the deliverable admits.",
+    "The deliverable includes extra material (delivery note, caveat) beyond the brief, and it is unclear what the email actually contained."
+   ],
+   "feedback_for_specialist": "Do not claim the email was sent unless a send action was confirmed; report it as drafted and pending approval. Show the exact email text and verify the word count. Use verifiable sources.",
+   "unsupported_claims": [
+    "The brief (about 128 words) was emailed to team@example.com.",
+    "Up to roughly tens of millions of vectors is a suitable pgvector range."
+   ]
+  },
+  "partial": false,
+  "outcome": {
+   "status": "completed",
+   "reason": null
+  },
+  "failure_reason": null,
+  "explanation": null
+ },
+ "events": [
+  {
+   "id": 18778,
+   "type": "task.created",
+   "node": null,
+   "payload": {
+    "graph": "main"
+   },
+   "created_at": "2026-11-11T02:03:50.193349+00:00"
+  },
+  {
+   "id": 18779,
+   "type": "task.status",
+   "node": null,
+   "payload": {
+    "status": "running"
+   },
+   "created_at": "2026-11-11T02:03:50.391256+00:00"
+  },
+  {
+   "id": 18780,
+   "type": "run.segment_started",
+   "node": null,
+   "payload": {
+    "job_id": 759,
+    "worker": "worker-1",
+    "attempt": 1,
+    "job_kind": "run",
+    "resumed_from_checkpoint": false,
+    "orphaned_reservations_charged": 0
+   },
+   "created_at": "2026-11-11T02:03:50.396273+00:00"
+  },
+  {
+   "id": 18781,
+   "type": "node.completed",
+   "node": "intake",
+   "payload": {
+    "chars": 140
+   },
+   "created_at": "2026-11-11T02:03:50.426867+00:00"
+  },
+  {
+   "id": 18782,
+   "type": "memory.recalled",
+   "node": "recall",
+   "payload": {
+    "count": 5,
+    "memories": [
+     {
+      "id": "8ca18e7c-b146-4e87-9c6c-7c587cf547d4",
+      "kind": "episode",
+      "text": "Past task \"Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com.\" ended completed",
+      "score": 0.8171,
+      "outcome": "completed",
+      "similarity": 0.9397
+     },
+     {
+      "id": "721fbb1e-e17f-432a-8546-fa2475ef514f",
+      "kind": "episode",
+      "text": "Past task \"Summarize pgvector for the team and email it.\" ended completed",
+      "score": 0.6987,
+      "outcome": "completed",
+      "similarity": 0.78
+     },
+     {
+      "id": "15cbbc73-45c8-40bc-8a21-26afd31f7e0c",
+      "kind": "fact",
+      "text": "pgvector is a PostgreSQL extension offering a vector type with L2, inner-product, and cosine operators; HNSW gives better speed and recall but builds slower with more memory, while IVFFlat builds faster with less memory.",
+      "score": 0.6663,
+      "outcome": "completed",
+      "similarity": 0.667
+     },
+     {
+      "id": "886f46c5-d6b7-442f-909e-2580be49ee13",
+      "kind": "episode",
+      "text": "Past task \"Research the top 3 project management tools for a small student team, write a short comparison, and email it to me.\" ended completed",
+      "score": 0.6501,
+      "outcome": "completed",
+      "similarity": 0.7031
+     },
+     {
+      "id": "d247a4cf-fc4a-44f4-8e31-7c586f409fba",
+      "kind": "episode",
+      "text": "Past task \"Summarize the release notes and email the team\" ended completed",
+      "score": 0.5863,
+      "outcome": "completed",
+      "similarity": 0.6184
+     }
+    ]
+   },
+   "created_at": "2026-11-11T02:03:52.766506+00:00"
+  },
+  {
+   "id": 18783,
+   "type": "node.started",
+   "node": "plan",
+   "payload": {},
+   "created_at": "2026-11-11T02:03:52.781243+00:00"
+  },
+  {
+   "id": 18784,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "supervisor",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "plan/p1",
+    "cost_usd": 0.008996,
+    "latency_ms": 4619,
+    "llm_call_id": 4100,
+    "input_tokens": 1983,
+    "reserved_usd": 0.035292,
+    "output_tokens": 503,
+    "reservation_id": 4100
+   },
+   "created_at": "2026-11-11T02:03:57.820892+00:00"
+  },
+  {
+   "id": 18785,
+   "type": "plan.created",
+   "node": "plan",
+   "payload": {
+    "plan": {
+     "subtasks": [
+      {
+       "id": "research",
+       "complexity": "low",
+       "depends_on": [],
+       "specialist": "research",
+       "description": "Gather accurate, citable points on when pgvector (PostgreSQL extension) is preferable to a dedicated vector database: existing Postgres stack, moderate scale (millions of vectors rather than billions), transactional consistency and joins with relational data, simpler operations and lower cost, versus cases favoring dedicated systems (very large scale, high QPS, advanced filtering or sharding). Include index tradeoffs: HNSW gives better speed and recall but builds slower and uses more memory, while IVFFlat builds faster with less memory. Cite sources.",
+       "expected_output": "A short bulleted list of 5-8 key decision criteria with source links."
+      },
+      {
+       "id": "write-email",
+       "complexity": "low",
+       "depends_on": [
+        "research"
+       ],
+       "specialist": "writing",
+       "description": "Using the research notes, write a brief of at most 150 words (strictly enforce the limit) on when a team should choose pgvector over a dedicated vector database. Keep it clear and practical for a technical team. Then propose an email containing the brief to team@example.com with a suitable subject line; the email is sent only after a human approves it.",
+       "expected_output": "A brief of 150 words or fewer, plus a proposed email to team@example.com pending human approval."
+      }
+     ],
+     "rationale": "Research grounds the claims, then a writing subtask drafts the word-limited brief and proposes the email for human approval. Two subtasks are enough for a short deliverable.",
+     "confidence": 0.9
+    },
+    "attempt": 1
+   },
+   "created_at": "2026-11-11T02:03:57.838412+00:00"
+  },
+  {
+   "id": 18786,
+   "type": "plan.confidence",
+   "node": "plan",
+   "payload": {
+    "high": 0,
+    "depth": 2,
+    "medium": 0,
+    "effective": 0.9,
+    "threshold": 0.6,
+    "structural": 0.994,
+    "self_reported": 0.9,
+    "needs_approval": false,
+    "memory_similarity": 0.9397
+   },
+   "created_at": "2026-11-11T02:03:57.841510+00:00"
+  },
+  {
+   "id": 18787,
+   "type": "subtask.dispatched",
+   "node": "schedule",
+   "payload": {
+    "wave": 1,
+    "subtask_id": "research"
+   },
+   "created_at": "2026-11-11T02:03:57.854942+00:00"
+  },
+  {
+   "id": 18788,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "payload": {
+    "kind": "dispatch",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": [
+     "research"
+    ]
+   },
+   "created_at": "2026-11-11T02:03:57.857548+00:00"
+  },
+  {
+   "id": 18789,
+   "type": "node.started",
+   "node": "specialist",
+   "payload": {
+    "subtask_id": "research"
+   },
+   "created_at": "2026-11-11T02:03:57.877177+00:00"
+  },
+  {
+   "id": 18790,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "research",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r0/research",
+    "cost_usd": 0.0003188,
+    "latency_ms": 1412,
+    "llm_call_id": 4101,
+    "input_tokens": 1938,
+    "reserved_usd": 0.0012741,
+    "output_tokens": 250,
+    "reservation_id": 4101
+   },
+   "created_at": "2026-11-11T02:03:59.423539+00:00"
+  },
+  {
+   "id": 18791,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 1,
+    "tool": "fetch_url",
+    "agent": "research",
+    "status": "denied",
+    "revision": 0,
+    "latency_ms": 4,
+    "subtask_id": "research",
+    "tool_call_id": 1136,
+    "proposal_hash": null
+   },
+   "created_at": "2026-11-11T02:03:59.445870+00:00"
+  },
+  {
+   "id": 18792,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 2,
+    "tool": "web_search",
+    "agent": "research",
+    "status": "ok",
+    "revision": 0,
+    "latency_ms": 8,
+    "subtask_id": "research",
+    "tool_call_id": 1137,
+    "proposal_hash": null
+   },
+   "created_at": "2026-11-11T02:03:59.459965+00:00"
+  },
+  {
+   "id": 18793,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "research",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r0/research",
+    "cost_usd": 0.0003588,
+    "latency_ms": 1316,
+    "llm_call_id": 4102,
+    "input_tokens": 2528,
+    "reserved_usd": 0.001342,
+    "output_tokens": 212,
+    "reservation_id": 4102
+   },
+   "created_at": "2026-11-11T02:04:00.920259+00:00"
+  },
+  {
+   "id": 18794,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 3,
+    "tool": "fetch_url",
+    "agent": "research",
+    "status": "ok",
+    "revision": 0,
+    "latency_ms": 8,
+    "subtask_id": "research",
+    "tool_call_id": 1138,
+    "proposal_hash": null
+   },
+   "created_at": "2026-11-11T02:04:00.941504+00:00"
+  },
+  {
+   "id": 18795,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 4,
+    "tool": "fetch_url",
+    "agent": "research",
+    "status": "ok",
+    "revision": 0,
+    "latency_ms": 5,
+    "subtask_id": "research",
+    "tool_call_id": 1139,
+    "proposal_hash": null
+   },
+   "created_at": "2026-11-11T02:04:00.950443+00:00"
+  },
+  {
+   "id": 18796,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "research",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r0/research",
+    "cost_usd": 0.0008418,
+    "latency_ms": 4648,
+    "llm_call_id": 4103,
+    "input_tokens": 3303,
+    "reserved_usd": 0.0014311,
+    "output_tokens": 1023,
+    "reservation_id": 4103
+   },
+   "created_at": "2026-11-11T02:04:05.765127+00:00"
+  },
+  {
+   "id": 18797,
+   "type": "node.completed",
+   "node": "specialist",
+   "payload": {
+    "chars": 3050,
+    "subtask_id": "research",
+    "tool_calls": 4
+   },
+   "created_at": "2026-11-11T02:04:05.773198+00:00"
+  },
+  {
+   "id": 18798,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "reviewer",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "review/r0/research",
+    "cost_usd": 0.008086,
+    "latency_ms": 3153,
+    "llm_call_id": 4104,
+    "input_tokens": 2748,
+    "reserved_usd": 0.027402,
+    "output_tokens": 259,
+    "reservation_id": 4104
+   },
+   "created_at": "2026-11-11T02:04:09.138521+00:00"
+  },
+  {
+   "id": 18799,
+   "type": "review.verdict",
+   "node": "review",
+   "payload": {
+    "score": 4,
+    "issues": [
+     "The draft offers 7 criteria, which fits the 5-8 range, but sources are only two fixture-domain pages, not primary documentation.",
+     "Tool results are truncated, so some details (e.g., 'one backup and one access-control model', IVFFlat 'lower query speed and recall') cannot be fully confirmed from the visible output.",
+     "The email was not sent; this is a later subtask, and the draft discloses it honestly."
+    ],
+    "verdict": "accept",
+    "revision": 0,
+    "subtask_id": "research",
+    "unsupported_claims": [
+     "IVFFlat has lower query speed and recall than HNSW is implied by the source's comparison but not visibly confirmed in the truncated tool output.",
+     "One backup and one access-control model is not visibly confirmed in the truncated tool output."
+    ],
+    "feedback_for_specialist": null
+   },
+   "created_at": "2026-11-11T02:04:09.148377+00:00"
+  },
+  {
+   "id": 18800,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "accept",
+    "revision": 0,
+    "subtask_id": "research"
+   },
+   "created_at": "2026-11-11T02:04:09.154095+00:00"
+  },
+  {
+   "id": 18801,
+   "type": "subtask.finished",
+   "node": "subtask",
+   "payload": {
+    "reason": null,
+    "status": "accepted",
+    "revisions": 0,
+    "subtask_id": "research",
+    "human_override": false
+   },
+   "created_at": "2026-11-11T02:04:09.161517+00:00"
+  },
+  {
+   "id": 18802,
+   "type": "subtask.dispatched",
+   "node": "schedule",
+   "payload": {
+    "wave": 2,
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:09.179917+00:00"
+  },
+  {
+   "id": 18803,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "payload": {
+    "kind": "dispatch",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": [
+     "write-email"
+    ]
+   },
+   "created_at": "2026-11-11T02:04:09.182249+00:00"
+  },
+  {
+   "id": 18804,
+   "type": "node.started",
+   "node": "specialist",
+   "payload": {
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:09.198151+00:00"
+  },
+  {
+   "id": 18805,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "writing",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r0/write-email",
+    "cost_usd": 0.0008419000000000001,
+    "latency_ms": 3883,
+    "llm_call_id": 4105,
+    "input_tokens": 3519,
+    "reserved_usd": 0.0017059,
+    "output_tokens": 980,
+    "reservation_id": 4105
+   },
+   "created_at": "2026-11-11T02:04:13.187858+00:00"
+  },
+  {
+   "id": 18806,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 1,
+    "tool": "send_email",
+    "agent": "writing",
+    "status": "proposed",
+    "revision": 0,
+    "latency_ms": 0,
+    "subtask_id": "write-email",
+    "tool_call_id": 1140,
+    "proposal_hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624"
+   },
+   "created_at": "2026-11-11T02:04:13.200662+00:00"
+  },
+  {
+   "id": 18807,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "writing",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r0/write-email",
+    "cost_usd": 0.0007021,
+    "latency_ms": 2003,
+    "llm_call_id": 4106,
+    "input_tokens": 4586,
+    "reserved_usd": 0.0018286,
+    "output_tokens": 487,
+    "reservation_id": 4106
+   },
+   "created_at": "2026-11-11T02:04:15.351925+00:00"
+  },
+  {
+   "id": 18808,
+   "type": "node.completed",
+   "node": "specialist",
+   "payload": {
+    "chars": 1478,
+    "subtask_id": "write-email",
+    "tool_calls": 1
+   },
+   "created_at": "2026-11-11T02:04:15.361491+00:00"
+  },
+  {
+   "id": 18809,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "reviewer",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "review/r0/write-email",
+    "cost_usd": 0.018356,
+    "latency_ms": 8936,
+    "llm_call_id": 4107,
+    "input_tokens": 2693,
+    "reserved_usd": 0.027276,
+    "output_tokens": 1297,
+    "reservation_id": 4107
+   },
+   "created_at": "2026-11-11T02:04:24.446632+00:00"
+  },
+  {
+   "id": 18810,
+   "type": "review.verdict",
+   "node": "review",
+   "payload": {
+    "score": 3,
+    "issues": [
+     "The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.",
+     "The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.",
+     "The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent."
+    ],
+    "verdict": "revise",
+    "revision": 0,
+    "subtask_id": "write-email",
+    "unsupported_claims": [],
+    "feedback_for_specialist": "The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources."
+   },
+   "created_at": "2026-11-11T02:04:24.461343+00:00"
+  },
+  {
+   "id": 18811,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "revise",
+    "revision": 0,
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:24.467353+00:00"
+  },
+  {
+   "id": 18812,
+   "type": "node.started",
+   "node": "specialist",
+   "payload": {
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:24.473597+00:00"
+  },
+  {
+   "id": 18813,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "writing",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r1/write-email",
+    "cost_usd": 0.0007064,
+    "latency_ms": 3205,
+    "llm_call_id": 4108,
+    "input_tokens": 4154,
+    "reserved_usd": 0.001779,
+    "output_tokens": 582,
+    "reservation_id": 4108
+   },
+   "created_at": "2026-11-11T02:04:27.884803+00:00"
+  },
+  {
+   "id": 18814,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 1,
+    "tool": "send_email",
+    "agent": "writing",
+    "status": "proposed",
+    "revision": 1,
+    "latency_ms": 0,
+    "subtask_id": "write-email",
+    "tool_call_id": 1141,
+    "proposal_hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624"
+   },
+   "created_at": "2026-11-11T02:04:27.900349+00:00"
+  },
+  {
+   "id": 18815,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "writing",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r1/write-email",
+    "cost_usd": 0.0007478,
+    "latency_ms": 2296,
+    "llm_call_id": 4109,
+    "input_tokens": 4823,
+    "reserved_usd": 0.0018559,
+    "output_tokens": 531,
+    "reservation_id": 4109
+   },
+   "created_at": "2026-11-11T02:04:30.345379+00:00"
+  },
+  {
+   "id": 18816,
+   "type": "node.completed",
+   "node": "specialist",
+   "payload": {
+    "chars": 1631,
+    "subtask_id": "write-email",
+    "tool_calls": 1
+   },
+   "created_at": "2026-11-11T02:04:30.353659+00:00"
+  },
+  {
+   "id": 18817,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "reviewer",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "review/r1/write-email",
+    "cost_usd": 0.011484,
+    "latency_ms": 3740,
+    "llm_call_id": 4110,
+    "input_tokens": 3562,
+    "reserved_usd": 0.029276,
+    "output_tokens": 436,
+    "reservation_id": 4110
+   },
+   "created_at": "2026-11-11T02:04:34.341052+00:00"
+  },
+  {
+   "id": 18818,
+   "type": "review.verdict",
+   "node": "review",
+   "payload": {
+    "score": 3,
+    "issues": [
+     "The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.",
+     "The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.",
+     "The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct."
+    ],
+    "verdict": "revise",
+    "revision": 1,
+    "subtask_id": "write-email",
+    "unsupported_claims": [],
+    "feedback_for_specialist": "The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text exactly as shown, with no truncation, arrows, or stray tool-result text. Make sure the recorded proposal matches the displayed email. If the call cannot be made cleanly, say explicitly that the recorded proposal is defective and that the displayed email is the intended one."
+   },
+   "created_at": "2026-11-11T02:04:34.350257+00:00"
+  },
+  {
+   "id": 18819,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "revise",
+    "revision": 1,
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:34.355938+00:00"
+  },
+  {
+   "id": 18820,
+   "type": "node.started",
+   "node": "specialist",
+   "payload": {
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:34.361913+00:00"
+  },
+  {
+   "id": 18821,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "writing",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r2/write-email",
+    "cost_usd": 0.0007442000000000001,
+    "latency_ms": 2317,
+    "llm_call_id": 4111,
+    "input_tokens": 4902,
+    "reserved_usd": 0.001865,
+    "output_tokens": 508,
+    "reservation_id": 4111
+   },
+   "created_at": "2026-11-11T02:04:36.823587+00:00"
+  },
+  {
+   "id": 18822,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 1,
+    "tool": "send_email",
+    "agent": "writing",
+    "status": "proposed",
+    "revision": 2,
+    "latency_ms": 0,
+    "subtask_id": "write-email",
+    "tool_call_id": 1142,
+    "proposal_hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624"
+   },
+   "created_at": "2026-11-11T02:04:36.838075+00:00"
+  },
+  {
+   "id": 18823,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "writing",
+    "model": "claude-haiku-5-5",
+    "attempt": 1,
+    "purpose": "act/r2/write-email",
+    "cost_usd": 0.0008272,
+    "latency_ms": 2267,
+    "llm_call_id": 4112,
+    "input_tokens": 5497,
+    "reserved_usd": 0.0019334,
+    "output_tokens": 555,
+    "reservation_id": 4112
+   },
+   "created_at": "2026-11-11T02:04:39.381068+00:00"
+  },
+  {
+   "id": 18824,
+   "type": "node.completed",
+   "node": "specialist",
+   "payload": {
+    "chars": 1726,
+    "subtask_id": "write-email",
+    "tool_calls": 1
+   },
+   "created_at": "2026-11-11T02:04:39.389052+00:00"
+  },
+  {
+   "id": 18825,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "reviewer",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "review/r2/write-email",
+    "cost_usd": 0.013904,
+    "latency_ms": 4088,
+    "llm_call_id": 4113,
+    "input_tokens": 4577,
+    "reserved_usd": 0.03161,
+    "output_tokens": 475,
+    "reservation_id": 4113
+   },
+   "created_at": "2026-11-11T02:04:43.599421+00:00"
+  },
+  {
+   "id": 18826,
+   "type": "review.verdict",
+   "node": "review",
+   "payload": {
+    "score": 2,
+    "issues": [
+     "The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.",
+     "Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.",
+     "This is the third round with the same defect. The draft asserts a fix that the tool call does not show."
+    ],
+    "verdict": "revise",
+    "revision": 2,
+    "subtask_id": "write-email",
+    "unsupported_claims": [
+     "The send_email call was issued with arguments that match the displayed email (to, subject, full body). The recorded call shows a truncated body with no to or subject."
+    ],
+    "feedback_for_specialist": "The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text with no arrows or tool-result text. Or, if you cannot make a clean call, state plainly that the recorded proposal is defective and that the displayed email is the intended one. Do not claim the recorded arguments match the displayed email unless they do."
+   },
+   "created_at": "2026-11-11T02:04:43.608383+00:00"
+  },
+  {
+   "id": 18827,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "revise",
+    "revision": 2,
+    "subtask_id": "write-email"
+   },
+   "created_at": "2026-11-11T02:04:43.615804+00:00"
+  },
+  {
+   "id": 18828,
+   "type": "subtask.finished",
+   "node": "subtask",
+   "payload": {
+    "reason": "revisions exhausted (2)",
+    "status": "needs_human",
+    "revisions": 2,
+    "subtask_id": "write-email",
+    "human_override": false
+   },
+   "created_at": "2026-11-11T02:04:43.621469+00:00"
+  },
+  {
+   "id": 18829,
+   "type": "escalation.requested",
+   "node": "schedule",
+   "payload": {
+    "round": 1,
+    "subtask_ids": [
+     "write-email"
+    ]
+   },
+   "created_at": "2026-11-11T02:04:43.635167+00:00"
+  },
+  {
+   "id": 18830,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "payload": {
+    "kind": "escalate",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": [
+     "write-email"
+    ]
+   },
+   "created_at": "2026-11-11T02:04:43.638179+00:00"
+  },
+  {
+   "id": 18831,
+   "type": "approval.requested",
+   "node": null,
+   "payload": {
+    "key": "escalation:e1",
+    "kind": "escalation",
+    "blocking": true,
+    "approval_id": "a6c9d9e0-b21f-47f3-8448-7733ad721d44"
+   },
+   "created_at": "2026-11-11T02:04:43.658025+00:00"
+  },
+  {
+   "id": 18832,
+   "type": "task.status",
+   "node": null,
+   "payload": {
+    "status": "awaiting_approval",
+    "interrupts": [
+     {
+      "id": "a4276f9e14fcf3a2725bf68e999c441f",
+      "value": {
+       "key": "escalation:e1",
+       "kind": "escalation",
+       "round": 1,
+       "actions": [
+        "approve",
+        "edit",
+        "reject",
+        "take_over"
+       ],
+       "subtasks": [
+        {
+         "draft": "**Proposed email: recorded as a proposal, not sent**\n\nThe send_email call was issued with these arguments, which match the displayed email:\n\n- **to:** team@example.com\n- **subject:** Brief: When to choose pgvector over a dedicated vector database\n- **body:** the brief text exactly as shown below\n\nThe tool result reports the call as \"proposed,\" not executed. It will be sent only after a human approves it.\n\n**Body (full text):**\n\n> Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.\n\nThe body is about 128 words, under the 150-word limit.\n\n**Caveats:**\n- The sources are on a `fixtures.agentops.test` domain that I could not confirm as official pgvector documentation. I could not reach the official pgvector README, so the scale figures and index trade-offs are unverified. The body flags this for the reader.\n- Cost, operational simplicity, and sharding claims were not checked and are left out of the brief.",
+         "reason": "revisions exhausted (2)",
+         "reviews": [
+          {
+           "score": 3,
+           "issues": [
+            "The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.",
+            "The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.",
+            "The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent."
+           ],
+           "verdict": "revise",
+           "unsupported_claims": [],
+           "feedback_for_specialist": "The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources."
+          },
+          {
+           "score": 3,
+           "issues": [
+            "The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.",
+            "The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.",
+            "The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct."
+           ],
+           "verdict": "revise",
+           "unsupported_claims": [],
+           "feedback_for_specialist": "The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text exactly as shown, with no truncation, arrows, or stray tool-result text. Make sure the recorded proposal matches the displayed email. If the call cannot be made cleanly, say explicitly that the recorded proposal is defective and that the displayed email is the intended one."
+          },
+          {
+           "score": 2,
+           "issues": [
+            "The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.",
+            "Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.",
+            "This is the third round with the same defect. The draft asserts a fix that the tool call does not show."
+           ],
+           "verdict": "revise",
+           "unsupported_claims": [
+            "The send_email call was issued with arguments that match the displayed email (to, subject, full body). The recorded call shows a truncated body with no to or subject."
+           ],
+           "feedback_for_specialist": "The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text with no arrows or tool-result text. Or, if you cannot make a clean call, state plainly that the recorded proposal is defective and that the displayed email is the intended one. Do not claim the recorded arguments match the displayed email unless they do."
+          }
+         ],
+         "subtask_id": "write-email"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "created_at": "2026-11-11T02:04:43.666712+00:00"
+  },
+  {
+   "id": 18833,
+   "type": "approval.decided",
+   "node": null,
+   "payload": {
+    "key": "escalation:e1",
+    "kind": "escalation",
+    "action": "approve",
+    "status": "approved",
+    "approval_id": "a6c9d9e0-b21f-47f3-8448-7733ad721d44"
+   },
+   "created_at": "2026-11-11T02:04:45.639105+00:00"
+  },
+  {
+   "id": 18834,
+   "type": "task.status",
+   "node": null,
+   "payload": {
+    "status": "running"
+   },
+   "created_at": "2026-11-11T02:04:45.732505+00:00"
+  },
+  {
+   "id": 18835,
+   "type": "run.segment_started",
+   "node": null,
+   "payload": {
+    "job_id": 760,
+    "worker": "worker-1",
+    "attempt": 1,
+    "job_kind": "resume",
+    "resumed_from_checkpoint": true,
+    "orphaned_reservations_charged": 0
+   },
+   "created_at": "2026-11-11T02:04:45.735937+00:00"
+  },
+  {
+   "id": 18836,
+   "type": "escalation.resolved",
+   "node": "escalation_gate",
+   "payload": {
+    "round": 1,
+    "action": "approve",
+    "subtask_ids": [
+     "write-email"
+    ]
+   },
+   "created_at": "2026-11-11T02:04:45.742801+00:00"
+  },
+  {
+   "id": 18837,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "payload": {
+    "kind": "all_accepted",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": []
+   },
+   "created_at": "2026-11-11T02:04:45.749689+00:00"
+  },
+  {
+   "id": 18838,
+   "type": "approval.requested",
+   "node": null,
+   "payload": {
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "kind": "approve_action",
+    "blocking": true,
+    "approval_id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89"
+   },
+   "created_at": "2026-11-11T02:04:45.762440+00:00"
+  },
+  {
+   "id": 18839,
+   "type": "task.status",
+   "node": null,
+   "payload": {
+    "status": "awaiting_approval",
+    "interrupts": [
+     {
+      "id": "a5fa02f87490acee145ccd41cca505bc",
+      "value": {
+       "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+       "args": {
+        "to": "team@example.com",
+        "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.",
+        "subject": "Brief: When to choose pgvector over a dedicated vector database"
+       },
+       "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+       "kind": "approve_action",
+       "risk": "external",
+       "tool": "send_email",
+       "agent": "writing",
+       "actions": [
+        "approve",
+        "edit",
+        "reject",
+        "take_over"
+       ],
+       "rationale": null,
+       "subtask_id": "write-email",
+       "input_schema": {
+        "type": "object",
+        "title": "EmailIn",
+        "required": [
+         "to",
+         "subject",
+         "body"
+        ],
+        "properties": {
+         "to": {
+          "type": "string",
+          "title": "To",
+          "pattern": "^[^@\\s<>,;]{1,64}@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,63}$",
+          "maxLength": 254
+         },
+         "body": {
+          "type": "string",
+          "title": "Body",
+          "maxLength": 20000,
+          "minLength": 1
+         },
+         "subject": {
+          "type": "string",
+          "title": "Subject",
+          "pattern": "^[^\\r\\n]+$",
+          "maxLength": 200,
+          "minLength": 1
+         }
+        },
+        "additionalProperties": false
+       }
+      }
+     }
+    ]
+   },
+   "created_at": "2026-11-11T02:04:45.767647+00:00"
+  },
+  {
+   "id": 18840,
+   "type": "approval.decided",
+   "node": null,
+   "payload": {
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "kind": "approve_action",
+    "action": "approve",
+    "status": "approved",
+    "approval_id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89"
+   },
+   "created_at": "2026-11-11T02:04:50.500753+00:00"
+  },
+  {
+   "id": 18841,
+   "type": "task.status",
+   "node": null,
+   "payload": {
+    "status": "running"
+   },
+   "created_at": "2026-11-11T02:04:50.858363+00:00"
+  },
+  {
+   "id": 18842,
+   "type": "run.segment_started",
+   "node": null,
+   "payload": {
+    "job_id": 761,
+    "worker": "worker-1",
+    "attempt": 1,
+    "job_kind": "resume",
+    "resumed_from_checkpoint": true,
+    "orphaned_reservations_charged": 0
+   },
+   "created_at": "2026-11-11T02:04:50.861423+00:00"
+  },
+  {
+   "id": 18843,
+   "type": "action.decided",
+   "node": "action_gate",
+   "payload": {
+    "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "tool": "send_email",
+    "action": "approve"
+   },
+   "created_at": "2026-11-11T02:04:50.866723+00:00"
+  },
+  {
+   "id": 18844,
+   "type": "tool.call",
+   "node": "tools",
+   "payload": {
+    "step": 0,
+    "tool": "send_email",
+    "agent": "execute_actions",
+    "status": "executed",
+    "revision": 0,
+    "latency_ms": 40,
+    "subtask_id": "write-email",
+    "tool_call_id": 1143,
+    "proposal_hash": null
+   },
+   "created_at": "2026-11-11T02:04:50.919247+00:00"
+  },
+  {
+   "id": 18845,
+   "type": "action.outcome",
+   "node": "execute_actions",
+   "payload": {
+    "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "tool": "send_email",
+    "detail": "sent to team@example.com",
+    "status": "done",
+    "idempotency_key": "88ff816a01681995a584fd015eed39e87d8cfe116a5c413749915a73be8041da"
+   },
+   "created_at": "2026-11-11T02:04:50.925046+00:00"
+  },
+  {
+   "id": 18846,
+   "type": "node.started",
+   "node": "synthesize",
+   "payload": {
+    "partial": false
+   },
+   "created_at": "2026-11-11T02:04:50.932721+00:00"
+  },
+  {
+   "id": 18847,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "supervisor",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "synthesize",
+    "cost_usd": 0.008952,
+    "latency_ms": 2921,
+    "llm_call_id": 4114,
+    "input_tokens": 2331,
+    "reserved_usd": 0.036386,
+    "output_tokens": 429,
+    "reservation_id": 4114
+   },
+   "created_at": "2026-11-11T02:04:54.406423+00:00"
+  },
+  {
+   "id": 18848,
+   "type": "node.completed",
+   "node": "synthesize",
+   "payload": {
+    "chars": 1333,
+    "partial": false
+   },
+   "created_at": "2026-11-11T02:04:54.416411+00:00"
+  },
+  {
+   "id": 18849,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "reviewer",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "final_review",
+    "cost_usd": 0.006132,
+    "latency_ms": 4071,
+    "llm_call_id": 4115,
+    "input_tokens": 1196,
+    "reserved_usd": 0.023834,
+    "output_tokens": 374,
+    "reservation_id": 4115
+   },
+   "created_at": "2026-11-11T02:04:58.606691+00:00"
+  },
+  {
+   "id": 18850,
+   "type": "final_review.verdict",
+   "node": "final_review",
+   "payload": {
+    "score": 3,
+    "issues": [
+     "Deliverable states the brief 'was emailed' to team@example.com, but the planned subtask only produced a proposed email pending human approval; sending is unverified and likely a false claim.",
+     "Word count claimed as about 128 words, but the brief body including sources and verification line appears closer to 140-150 words; the count is not demonstrated and may exceed the limit when the caveat is included.",
+     "Sources are on an unverifiable fixtures.agentops.test domain, and the scale figure ('tens of millions') and index trade-offs are unverified, as the deliverable admits.",
+     "The deliverable includes extra material (delivery note, caveat) beyond the brief, and it is unclear what the email actually contained."
+    ],
+    "verdict": "escalate",
+    "threshold": 3,
+    "unsupported_claims": [
+     "The brief (about 128 words) was emailed to team@example.com.",
+     "Up to roughly tens of millions of vectors is a suitable pgvector range."
+    ],
+    "feedback_for_specialist": "Do not claim the email was sent unless a send action was confirmed; report it as drafted and pending approval. Show the exact email text and verify the word count. Use verifiable sources."
+   },
+   "created_at": "2026-11-11T02:04:58.616248+00:00"
+  },
+  {
+   "id": 18851,
+   "type": "llm.call",
+   "node": null,
+   "payload": {
+    "ok": true,
+    "role": "supervisor",
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "purpose": "consolidate",
+    "cost_usd": 0.007156,
+    "latency_ms": 3212,
+    "llm_call_id": 4116,
+    "input_tokens": 2353,
+    "reserved_usd": 0.03643,
+    "output_tokens": 245,
+    "reservation_id": 4116
+   },
+   "created_at": "2026-11-11T02:05:01.941715+00:00"
+  },
+  {
+   "id": 18852,
+   "type": "memory.consolidated",
+   "node": "consolidate",
+   "payload": {
+    "dropped": [
+     {
+      "why": "looks like an instruction",
+      "text": "The send_email tool only records a proposal that needs human approval, so tell the user an email is proposed rather than"
+     }
+    ],
+    "written": 2,
+    "llm_skipped": null
+   },
+   "created_at": "2026-11-11T02:05:02.080795+00:00"
+  },
+  {
+   "id": 18853,
+   "type": "task.finished",
+   "node": null,
+   "payload": {
+    "error": null,
+    "status": "completed"
+   },
+   "created_at": "2026-11-11T02:05:02.104193+00:00"
+  }
+ ],
+ "trace": [
+  {
+   "id": 18778,
+   "type": "task.created",
+   "node": null,
+   "at": "2026-11-11T02:03:50.193349+00:00",
+   "kind": "event",
+   "payload": {
+    "graph": "main"
+   }
+  },
+  {
+   "id": 18779,
+   "type": "task.status",
+   "node": null,
+   "at": "2026-11-11T02:03:50.391256+00:00",
+   "kind": "event",
+   "payload": {
+    "status": "running"
+   }
+  },
+  {
+   "id": 18780,
+   "type": "run.segment_started",
+   "node": null,
+   "at": "2026-11-11T02:03:50.396273+00:00",
+   "kind": "event",
+   "payload": {
+    "job_id": 759,
+    "worker": "worker-1",
+    "attempt": 1,
+    "job_kind": "run",
+    "resumed_from_checkpoint": false,
+    "orphaned_reservations_charged": 0
+   }
+  },
+  {
+   "id": 18781,
+   "type": "node.completed",
+   "node": "intake",
+   "at": "2026-11-11T02:03:50.426867+00:00",
+   "kind": "event",
+   "payload": {
+    "chars": 140
+   }
+  },
+  {
+   "id": 18782,
+   "type": "memory.recalled",
+   "node": "recall",
+   "at": "2026-11-11T02:03:52.766506+00:00",
+   "kind": "event",
+   "payload": {
+    "count": 5,
+    "memories": [
+     {
+      "id": "8ca18e7c-b146-4e87-9c6c-7c587cf547d4",
+      "kind": "episode",
+      "text": "Past task \"Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com.\" ended completed",
+      "score": 0.8171,
+      "outcome": "completed",
+      "similarity": 0.9397
+     },
+     {
+      "id": "721fbb1e-e17f-432a-8546-fa2475ef514f",
+      "kind": "episode",
+      "text": "Past task \"Summarize pgvector for the team and email it.\" ended completed",
+      "score": 0.6987,
+      "outcome": "completed",
+      "similarity": 0.78
+     },
+     {
+      "id": "15cbbc73-45c8-40bc-8a21-26afd31f7e0c",
+      "kind": "fact",
+      "text": "pgvector is a PostgreSQL extension offering a vector type with L2, inner-product, and cosine operators; HNSW gives better speed and recall but builds slower with more memory, while IVFFlat builds faster with less memory.",
+      "score": 0.6663,
+      "outcome": "completed",
+      "similarity": 0.667
+     },
+     {
+      "id": "886f46c5-d6b7-442f-909e-2580be49ee13",
+      "kind": "episode",
+      "text": "Past task \"Research the top 3 project management tools for a small student team, write a short comparison, and email it to me.\" ended completed",
+      "score": 0.6501,
+      "outcome": "completed",
+      "similarity": 0.7031
+     },
+     {
+      "id": "d247a4cf-fc4a-44f4-8e31-7c586f409fba",
+      "kind": "episode",
+      "text": "Past task \"Summarize the release notes and email the team\" ended completed",
+      "score": 0.5863,
+      "outcome": "completed",
+      "similarity": 0.6184
+     }
+    ]
+   }
+  },
+  {
+   "id": 18783,
+   "type": "node.started",
+   "node": "plan",
+   "at": "2026-11-11T02:03:52.781243+00:00",
+   "kind": "event",
+   "payload": {}
+  },
+  {
+   "id": 18784,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:03:57.820892+00:00",
+   "kind": "llm",
+   "llm_call_id": 4100,
+   "agent": "supervisor",
+   "purpose": "plan/p1",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 1983,
+   "output_tokens": 503,
+   "cost_usd": 0.008996,
+   "latency_ms": 4619,
+   "output": {
+    "content": "{\"subtasks\":[{\"id\":\"research\",\"description\":\"Gather accurate, citable points on when pgvector (PostgreSQL extension) is preferable to a dedicated vector database: existing Postgres stack, moderate scale (millions of vectors rather than billions), transactional consistency and joins with relational data, simpler operations and lower cost, versus cases favoring dedicated systems (very large scale, high QPS, advanced filtering or sharding). Include index tradeoffs: HNSW gives better speed and recall but builds slower and uses more memory, while IVFFlat builds faster with less memory. Cite sources.\",\"specialist\":\"research\",\"expected_output\":\"A short bulleted list of 5-8 key decision criteria with source links.\",\"complexity\":\"low\"},{\"id\":\"write-email\",\"description\":\"Using the research notes, write a brief of at most 150 words (strictly enforce the limit) on when a team should choose pgvector over a dedicated vector database. Keep it clear and practical for a technical team. Then propose an … [truncated 520 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18785,
+   "type": "plan.created",
+   "node": "plan",
+   "at": "2026-11-11T02:03:57.838412+00:00",
+   "kind": "event",
+   "payload": {
+    "plan": {
+     "subtasks": [
+      {
+       "id": "research",
+       "complexity": "low",
+       "depends_on": [],
+       "specialist": "research",
+       "description": "Gather accurate, citable points on when pgvector (PostgreSQL extension) is preferable to a dedicated vector database: existing Postgres stack, moderate scale (millions of vectors rather than billions), transactional consistency and joins with relational data, simpler operations and lower cost, versus cases favoring dedicated systems (very large scale, high QPS, advanced filtering or sharding). Include index tradeoffs: HNSW gives better speed and recall but builds slower and uses more memory, whi… [truncated 56 chars]",
+       "expected_output": "A short bulleted list of 5-8 key decision criteria with source links."
+      },
+      {
+       "id": "write-email",
+       "complexity": "low",
+       "depends_on": [
+        "research"
+       ],
+       "specialist": "writing",
+       "description": "Using the research notes, write a brief of at most 150 words (strictly enforce the limit) on when a team should choose pgvector over a dedicated vector database. Keep it clear and practical for a technical team. Then propose an email containing the brief to team@example.com with a suitable subject line; the email is sent only after a human approves it.",
+       "expected_output": "A brief of 150 words or fewer, plus a proposed email to team@example.com pending human approval."
+      }
+     ],
+     "rationale": "Research grounds the claims, then a writing subtask drafts the word-limited brief and proposes the email for human approval. Two subtasks are enough for a short deliverable.",
+     "confidence": 0.9
+    },
+    "attempt": 1
+   }
+  },
+  {
+   "id": 18786,
+   "type": "plan.confidence",
+   "node": "plan",
+   "at": "2026-11-11T02:03:57.841510+00:00",
+   "kind": "event",
+   "payload": {
+    "high": 0,
+    "depth": 2,
+    "medium": 0,
+    "effective": 0.9,
+    "threshold": 0.6,
+    "structural": 0.994,
+    "self_reported": 0.9,
+    "needs_approval": false,
+    "memory_similarity": 0.9397
+   }
+  },
+  {
+   "id": 18787,
+   "type": "subtask.dispatched",
+   "node": "schedule",
+   "at": "2026-11-11T02:03:57.854942+00:00",
+   "kind": "event",
+   "payload": {
+    "wave": 1,
+    "subtask_id": "research"
+   }
+  },
+  {
+   "id": 18788,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "at": "2026-11-11T02:03:57.857548+00:00",
+   "kind": "event",
+   "payload": {
+    "kind": "dispatch",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": [
+     "research"
+    ]
+   }
+  },
+  {
+   "id": 18789,
+   "type": "node.started",
+   "node": "specialist",
+   "at": "2026-11-11T02:03:57.877177+00:00",
+   "kind": "event",
+   "payload": {
+    "subtask_id": "research"
+   }
+  },
+  {
+   "id": 18790,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:03:59.423539+00:00",
+   "kind": "llm",
+   "llm_call_id": 4101,
+   "agent": "research",
+   "purpose": "act/r0/research",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 1938,
+   "output_tokens": 250,
+   "cost_usd": 0.0003188,
+   "latency_ms": 1412,
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01SxZGAtpGJLyYynhinw1kMC",
+      "args": {
+       "url": "https://github.com/pgvector/pgvector"
+      },
+      "name": "fetch_url",
+      "type": "tool_call"
+     },
+     {
+      "id": "toolu_01AWBHDvgt4dzWJiRGEGeVmV",
+      "args": {
+       "query": "pgvector HNSW vs IVFFlat build time memory recall tradeoff",
+       "max_results": 5
+      },
+      "name": "web_search",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "id": 18791,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:03:59.445870+00:00",
+   "kind": "tool",
+   "tool_call_id": 1136,
+   "agent": "research",
+   "tool": "fetch_url",
+   "risk": "read",
+   "status": "denied",
+   "ok": false,
+   "subtask_id": "research",
+   "revision": 0,
+   "step": 1,
+   "input": {
+    "url": "https://github.com/pgvector/pgvector"
+   },
+   "output": null,
+   "error": "<tool_result tool=\"fetch_url\" status=\"denied\" trust=\"untrusted\">\nfetch_url refused: that URL did not appear in the task request or in an earlier tool result. Fetch only URLs from search results or the request, unchanged.\n</tool_result>",
+   "latency_ms": 4
+  },
+  {
+   "id": 18792,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:03:59.459965+00:00",
+   "kind": "tool",
+   "tool_call_id": 1137,
+   "agent": "research",
+   "tool": "web_search",
+   "risk": "read",
+   "status": "ok",
+   "ok": true,
+   "subtask_id": "research",
+   "revision": 0,
+   "step": 2,
+   "input": {
+    "query": "pgvector HNSW vs IVFFlat build time memory recall tradeoff",
+    "max_results": 5
+   },
+   "output": "[1] pgvector: vector similarity search inside Postgres\nhttps://fixtures.agentops.test/pgvector-overview\npgvector adds a vector column type, distance operators and HNSW/IVFFlat indexes to PostgreSQL.\n\n[2] When to use pgvector vs a dedicated vector database\nhttps://fixtures.agentops.test/pgvector-vs-dedicated\nKeeping embeddings next to relational data simplifies filtering and transactions; very large indexes favour dedicated systems.",
+   "error": null,
+   "latency_ms": 8
+  },
+  {
+   "id": 18793,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:00.920259+00:00",
+   "kind": "llm",
+   "llm_call_id": 4102,
+   "agent": "research",
+   "purpose": "act/r0/research",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 2528,
+   "output_tokens": 212,
+   "cost_usd": 0.0003588,
+   "latency_ms": 1316,
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_016EZMryu9zBqTJ7yn2KVqiE",
+      "args": {
+       "url": "https://fixtures.agentops.test/pgvector-vs-dedicated"
+      },
+      "name": "fetch_url",
+      "type": "tool_call"
+     },
+     {
+      "id": "toolu_01DCbLtYkmVw6tM6d5btgSCT",
+      "args": {
+       "url": "https://fixtures.agentops.test/pgvector-overview"
+      },
+      "name": "fetch_url",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "id": 18794,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:04:00.941504+00:00",
+   "kind": "tool",
+   "tool_call_id": 1138,
+   "agent": "research",
+   "tool": "fetch_url",
+   "risk": "read",
+   "status": "ok",
+   "ok": true,
+   "subtask_id": "research",
+   "revision": 0,
+   "step": 3,
+   "input": {
+    "url": "https://fixtures.agentops.test/pgvector-vs-dedicated"
+   },
+   "output": "URL: https://fixtures.agentops.test/pgvector-vs-dedicated\nTitle: When to use pgvector vs a dedicated vector database\nHTTP 200\n\npgvector or a dedicated vector database?\nChoose pgvector when a team already runs PostgreSQL, the collection is modest (up to tens of millions of vectors), and queries mix similarity with relational filters. One database means one backup, one access-control model, and transactional consistency between rows and their embeddings.\nA dedicated vector database is a better fit for very large collections, strict low-latency requirements at high query volume, or when the vector workload must scale independently of the transactional database.",
+   "error": null,
+   "latency_ms": 8
+  },
+  {
+   "id": 18795,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:04:00.950443+00:00",
+   "kind": "tool",
+   "tool_call_id": 1139,
+   "agent": "research",
+   "tool": "fetch_url",
+   "risk": "read",
+   "status": "ok",
+   "ok": true,
+   "subtask_id": "research",
+   "revision": 0,
+   "step": 4,
+   "input": {
+    "url": "https://fixtures.agentops.test/pgvector-overview"
+   },
+   "output": "URL: https://fixtures.agentops.test/pgvector-overview\nTitle: pgvector: vector similarity search inside Postgres\nHTTP 200\n\npgvector overview\npgvector is an open-source PostgreSQL extension that adds a vector column type for storing embeddings, plus distance operators for L2 distance, inner product and cosine distance.\nIt supports exact nearest-neighbour search and two approximate index types: HNSW, which has better query speed and recall at the cost of slower builds and more memory, and IVFFlat, which builds faster and uses less memory.\nBecause vectors live in ordinary tables, similarity search can be combined with SQL filters, joins and transactions in one query.",
+   "error": null,
+   "latency_ms": 5
+  },
+  {
+   "id": 18796,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:05.765127+00:00",
+   "kind": "llm",
+   "llm_call_id": 4103,
+   "agent": "research",
+   "purpose": "act/r0/research",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 3303,
+   "output_tokens": 1023,
+   "cost_usd": 0.0008418,
+   "latency_ms": 4648,
+   "output": {
+    "content": "I could not send the email. I have no email tool, and the brief below is not sent to team@example.com. The sources below are also weaker than a primary pgvector source would be. My search returned only two pages, both on a `fixtures.agentops.test` domain, which I could not verify as the official pgvector documentation. My attempt to fetch the official pgvector GitHub README was refused because that URL had not come from a search result.\n\n**Key decision criteria (sourced)**\n\n- **Existing PostgreSQL stack:** Choose pgvector when the team already runs Postgres and wants one database. That gives one backup, one access-control model, and transactional consistency between rows and their embeddings. (https://fixtures.agentops.test/pgvector-vs-dedicated)\n- **Scale:** The source describes pgvector as suited to modest collections, \"up to tens of millions of vectors.\" Very large collections favor dedicated systems. (https://fixtures.agentops.test/pgvector-vs-dedicated)\n- **Relational queries:** B… [truncated 2050 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18797,
+   "type": "node.completed",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:05.773198+00:00",
+   "kind": "event",
+   "payload": {
+    "chars": 3050,
+    "subtask_id": "research",
+    "tool_calls": 4
+   }
+  },
+  {
+   "id": 18798,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:09.138521+00:00",
+   "kind": "llm",
+   "llm_call_id": 4104,
+   "agent": "reviewer",
+   "purpose": "review/r0/research",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 2748,
+   "output_tokens": 259,
+   "cost_usd": 0.008086,
+   "latency_ms": 3153,
+   "output": {
+    "content": "{\"verdict\":\"accept\",\"score\":4,\"issues\":[\"The draft offers 7 criteria, which fits the 5-8 range, but sources are only two fixture-domain pages, not primary documentation.\",\"Tool results are truncated, so some details (e.g., 'one backup and one access-control model', IVFFlat 'lower query speed and recall') cannot be fully confirmed from the visible output.\",\"The email was not sent; this is a later subtask, and the draft discloses it honestly.\"],\"feedback_for_specialist\":null,\"unsupported_claims\":[\"IVFFlat has lower query speed and recall than HNSW is implied by the source's comparison but not visibly confirmed in the truncated tool output.\",\"One backup and one access-control model is not visibly confirmed in the truncated tool output.\"]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18799,
+   "type": "review.verdict",
+   "node": "review",
+   "at": "2026-11-11T02:04:09.148377+00:00",
+   "kind": "event",
+   "payload": {
+    "score": 4,
+    "issues": [
+     "The draft offers 7 criteria, which fits the 5-8 range, but sources are only two fixture-domain pages, not primary documentation.",
+     "Tool results are truncated, so some details (e.g., 'one backup and one access-control model', IVFFlat 'lower query speed and recall') cannot be fully confirmed from the visible output.",
+     "The email was not sent; this is a later subtask, and the draft discloses it honestly."
+    ],
+    "verdict": "accept",
+    "revision": 0,
+    "subtask_id": "research",
+    "unsupported_claims": [
+     "IVFFlat has lower query speed and recall than HNSW is implied by the source's comparison but not visibly confirmed in the truncated tool output.",
+     "One backup and one access-control model is not visibly confirmed in the truncated tool output."
+    ],
+    "feedback_for_specialist": null
+   }
+  },
+  {
+   "id": 18800,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "at": "2026-11-11T02:04:09.154095+00:00",
+   "kind": "event",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "accept",
+    "revision": 0,
+    "subtask_id": "research"
+   }
+  },
+  {
+   "id": 18801,
+   "type": "subtask.finished",
+   "node": "subtask",
+   "at": "2026-11-11T02:04:09.161517+00:00",
+   "kind": "event",
+   "payload": {
+    "reason": null,
+    "status": "accepted",
+    "revisions": 0,
+    "subtask_id": "research",
+    "human_override": false
+   }
+  },
+  {
+   "id": 18802,
+   "type": "subtask.dispatched",
+   "node": "schedule",
+   "at": "2026-11-11T02:04:09.179917+00:00",
+   "kind": "event",
+   "payload": {
+    "wave": 2,
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18803,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "at": "2026-11-11T02:04:09.182249+00:00",
+   "kind": "event",
+   "payload": {
+    "kind": "dispatch",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": [
+     "write-email"
+    ]
+   }
+  },
+  {
+   "id": 18804,
+   "type": "node.started",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:09.198151+00:00",
+   "kind": "event",
+   "payload": {
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18805,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:13.187858+00:00",
+   "kind": "llm",
+   "llm_call_id": 4105,
+   "agent": "writing",
+   "purpose": "act/r0/write-email",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 3519,
+   "output_tokens": 980,
+   "cost_usd": 0.0008419000000000001,
+   "latency_ms": 3883,
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01VnjWxzoHw2G822H6QtK2Dd",
+      "args": {
+       "to": "team@example.com",
+       "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.",
+       "subject": "Brief: When to choose pgvector over a dedicated vector database"
+      },
+      "name": "send_email",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "id": 18806,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:04:13.200662+00:00",
+   "kind": "tool",
+   "tool_call_id": 1140,
+   "agent": "writing",
+   "tool": "send_email",
+   "risk": "external",
+   "status": "proposed",
+   "ok": true,
+   "subtask_id": "write-email",
+   "revision": 0,
+   "step": 1,
+   "input": {
+    "to": "team@example.com",
+    "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of y… [truncated 364 chars]",
+    "subject": "Brief: When to choose pgvector over a dedicated vector database"
+   },
+   "output": null,
+   "error": null,
+   "latency_ms": 0
+  },
+  {
+   "id": 18807,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:15.351925+00:00",
+   "kind": "llm",
+   "llm_call_id": 4106,
+   "agent": "writing",
+   "purpose": "act/r0/write-email",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 4586,
+   "output_tokens": 487,
+   "cost_usd": 0.0007021,
+   "latency_ms": 2003,
+   "output": {
+    "content": "**Brief: When to choose pgvector over a dedicated vector database**\n\nChoose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.\n\n(About 128 words.)\n\n**Proposed email (pending human approval, not… [truncated 478 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18808,
+   "type": "node.completed",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:15.361491+00:00",
+   "kind": "event",
+   "payload": {
+    "chars": 1478,
+    "subtask_id": "write-email",
+    "tool_calls": 1
+   }
+  },
+  {
+   "id": 18809,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:24.446632+00:00",
+   "kind": "llm",
+   "llm_call_id": 4107,
+   "agent": "reviewer",
+   "purpose": "review/r0/write-email",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 2693,
+   "output_tokens": 1297,
+   "cost_usd": 0.018356,
+   "latency_ms": 8936,
+   "output": {
+    "content": "{\"verdict\":\"revise\",\"score\":3,\"issues\":[\"The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.\",\"The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.\",\"The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent.\"],\"feedback_for_specialist\":\"The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources.\",\"unsupported_claims\":[]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18810,
+   "type": "review.verdict",
+   "node": "review",
+   "at": "2026-11-11T02:04:24.461343+00:00",
+   "kind": "event",
+   "payload": {
+    "score": 3,
+    "issues": [
+     "The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.",
+     "The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.",
+     "The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent."
+    ],
+    "verdict": "revise",
+    "revision": 0,
+    "subtask_id": "write-email",
+    "unsupported_claims": [],
+    "feedback_for_specialist": "The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources."
+   }
+  },
+  {
+   "id": 18811,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "at": "2026-11-11T02:04:24.467353+00:00",
+   "kind": "event",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "revise",
+    "revision": 0,
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18812,
+   "type": "node.started",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:24.473597+00:00",
+   "kind": "event",
+   "payload": {
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18813,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:27.884803+00:00",
+   "kind": "llm",
+   "llm_call_id": 4108,
+   "agent": "writing",
+   "purpose": "act/r1/write-email",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 4154,
+   "output_tokens": 582,
+   "cost_usd": 0.0007064,
+   "latency_ms": 3205,
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01Lgjx9tsoox8P5tUj1yMTz8",
+      "args": {
+       "to": "team@example.com",
+       "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.",
+       "subject": "Brief: When to choose pgvector over a dedicated vector database"
+      },
+      "name": "send_email",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "id": 18814,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:04:27.900349+00:00",
+   "kind": "tool",
+   "tool_call_id": 1141,
+   "agent": "writing",
+   "tool": "send_email",
+   "risk": "external",
+   "status": "proposed",
+   "ok": true,
+   "subtask_id": "write-email",
+   "revision": 1,
+   "step": 1,
+   "input": {
+    "to": "team@example.com",
+    "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of y… [truncated 364 chars]",
+    "subject": "Brief: When to choose pgvector over a dedicated vector database"
+   },
+   "output": null,
+   "error": null,
+   "latency_ms": 0
+  },
+  {
+   "id": 18815,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:30.345379+00:00",
+   "kind": "llm",
+   "llm_call_id": 4109,
+   "agent": "writing",
+   "purpose": "act/r1/write-email",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 4823,
+   "output_tokens": 531,
+   "cost_usd": 0.0007478,
+   "latency_ms": 2296,
+   "output": {
+    "content": "**Proposed email (pending human approval, not sent)**\n\n- **To:** team@example.com\n- **Subject:** Brief: When to choose pgvector over a dedicated vector database\n- **Body (full text, as proposed):**\n\n> Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures ag… [truncated 631 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18816,
+   "type": "node.completed",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:30.353659+00:00",
+   "kind": "event",
+   "payload": {
+    "chars": 1631,
+    "subtask_id": "write-email",
+    "tool_calls": 1
+   }
+  },
+  {
+   "id": 18817,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:34.341052+00:00",
+   "kind": "llm",
+   "llm_call_id": 4110,
+   "agent": "reviewer",
+   "purpose": "review/r1/write-email",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 3562,
+   "output_tokens": 436,
+   "cost_usd": 0.011484,
+   "latency_ms": 3740,
+   "output": {
+    "content": "{\"verdict\":\"revise\",\"score\":3,\"issues\":[\"The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.\",\"The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.\",\"The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct.\"],\"feedback_for_specialist\":\"The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\\\"team@example.com\\\", subject=\\\"Brief: When to choose pgvector over a dedicated vector data… [truncated 344 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18818,
+   "type": "review.verdict",
+   "node": "review",
+   "at": "2026-11-11T02:04:34.350257+00:00",
+   "kind": "event",
+   "payload": {
+    "score": 3,
+    "issues": [
+     "The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.",
+     "The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.",
+     "The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct."
+    ],
+    "verdict": "revise",
+    "revision": 1,
+    "subtask_id": "write-email",
+    "unsupported_claims": [],
+    "feedback_for_specialist": "The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text exactly as shown, with no truncation, arrows, or stray tool-result text. Make sure the recorded proposal matches the displayed email. If the call cannot be made cleanl… [truncated 107 chars]"
+   }
+  },
+  {
+   "id": 18819,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "at": "2026-11-11T02:04:34.355938+00:00",
+   "kind": "event",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "revise",
+    "revision": 1,
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18820,
+   "type": "node.started",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:34.361913+00:00",
+   "kind": "event",
+   "payload": {
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18821,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:36.823587+00:00",
+   "kind": "llm",
+   "llm_call_id": 4111,
+   "agent": "writing",
+   "purpose": "act/r2/write-email",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 4902,
+   "output_tokens": 508,
+   "cost_usd": 0.0007442000000000001,
+   "latency_ms": 2317,
+   "output": {
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "toolu_01HysgQHDJxq7MXWTdEuENKX",
+      "args": {
+       "to": "team@example.com",
+       "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.",
+       "subject": "Brief: When to choose pgvector over a dedicated vector database"
+      },
+      "name": "send_email",
+      "type": "tool_call"
+     }
+    ]
+   }
+  },
+  {
+   "id": 18822,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:04:36.838075+00:00",
+   "kind": "tool",
+   "tool_call_id": 1142,
+   "agent": "writing",
+   "tool": "send_email",
+   "risk": "external",
+   "status": "proposed",
+   "ok": true,
+   "subtask_id": "write-email",
+   "revision": 2,
+   "step": 1,
+   "input": {
+    "to": "team@example.com",
+    "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of y… [truncated 364 chars]",
+    "subject": "Brief: When to choose pgvector over a dedicated vector database"
+   },
+   "output": null,
+   "error": null,
+   "latency_ms": 0
+  },
+  {
+   "id": 18823,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:39.381068+00:00",
+   "kind": "llm",
+   "llm_call_id": 4112,
+   "agent": "writing",
+   "purpose": "act/r2/write-email",
+   "model": "anthropic/claude-haiku-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 5497,
+   "output_tokens": 555,
+   "cost_usd": 0.0008272,
+   "latency_ms": 2267,
+   "output": {
+    "content": "**Proposed email: recorded as a proposal, not sent**\n\nThe send_email call was issued with these arguments, which match the displayed email:\n\n- **to:** team@example.com\n- **subject:** Brief: When to choose pgvector over a dedicated vector database\n- **body:** the brief text exactly as shown below\n\nThe tool result reports the call as \"proposed,\" not executed. It will be sent only after a human approves it.\n\n**Body (full text):**\n\n> Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed an… [truncated 726 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18824,
+   "type": "node.completed",
+   "node": "specialist",
+   "at": "2026-11-11T02:04:39.389052+00:00",
+   "kind": "event",
+   "payload": {
+    "chars": 1726,
+    "subtask_id": "write-email",
+    "tool_calls": 1
+   }
+  },
+  {
+   "id": 18825,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:43.599421+00:00",
+   "kind": "llm",
+   "llm_call_id": 4113,
+   "agent": "reviewer",
+   "purpose": "review/r2/write-email",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 4577,
+   "output_tokens": 475,
+   "cost_usd": 0.013904,
+   "latency_ms": 4088,
+   "output": {
+    "content": "{\"verdict\":\"revise\",\"score\":2,\"issues\":[\"The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.\",\"Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.\",\"This is the third round with the same defect. The draft asserts a fix that the tool call does not show.\"],\"feedback_for_specialist\":\"The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\\\"team@example.com\\\", subject=\\\"Brief: When to choose pgvector over a dedicated ve… [truncated 501 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18826,
+   "type": "review.verdict",
+   "node": "review",
+   "at": "2026-11-11T02:04:43.608383+00:00",
+   "kind": "event",
+   "payload": {
+    "score": 2,
+    "issues": [
+     "The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.",
+     "Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.",
+     "This is the third round with the same defect. The draft asserts a fix that the tool call does not show."
+    ],
+    "verdict": "revise",
+    "revision": 2,
+    "subtask_id": "write-email",
+    "unsupported_claims": [
+     "The send_email call was issued with arguments that match the displayed email (to, subject, full body). The recorded call shows a truncated body with no to or subject."
+    ],
+    "feedback_for_specialist": "The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text with no arrows or tool-result text. … [truncated 218 chars]"
+   }
+  },
+  {
+   "id": 18827,
+   "type": "attempt.closed",
+   "node": "close_attempt",
+   "at": "2026-11-11T02:04:43.615804+00:00",
+   "kind": "event",
+   "payload": {
+    "outcome": "reviewed",
+    "verdict": "revise",
+    "revision": 2,
+    "subtask_id": "write-email"
+   }
+  },
+  {
+   "id": 18828,
+   "type": "subtask.finished",
+   "node": "subtask",
+   "at": "2026-11-11T02:04:43.621469+00:00",
+   "kind": "event",
+   "payload": {
+    "reason": "revisions exhausted (2)",
+    "status": "needs_human",
+    "revisions": 2,
+    "subtask_id": "write-email",
+    "human_override": false
+   }
+  },
+  {
+   "id": 18829,
+   "type": "escalation.requested",
+   "node": "schedule",
+   "at": "2026-11-11T02:04:43.635167+00:00",
+   "kind": "event",
+   "payload": {
+    "round": 1,
+    "subtask_ids": [
+     "write-email"
+    ]
+   }
+  },
+  {
+   "id": 18830,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "at": "2026-11-11T02:04:43.638179+00:00",
+   "kind": "event",
+   "payload": {
+    "kind": "escalate",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": [
+     "write-email"
+    ]
+   }
+  },
+  {
+   "id": 18831,
+   "type": "approval.requested",
+   "node": null,
+   "at": "2026-11-11T02:04:43.658025+00:00",
+   "kind": "event",
+   "payload": {
+    "key": "escalation:e1",
+    "kind": "escalation",
+    "blocking": true,
+    "approval_id": "a6c9d9e0-b21f-47f3-8448-7733ad721d44"
+   }
+  },
+  {
+   "id": 18832,
+   "type": "task.status",
+   "node": null,
+   "at": "2026-11-11T02:04:43.666712+00:00",
+   "kind": "event",
+   "payload": {
+    "status": "awaiting_approval",
+    "interrupts": [
+     {
+      "id": "a4276f9e14fcf3a2725bf68e999c441f",
+      "value": {
+       "key": "escalation:e1",
+       "kind": "escalation",
+       "round": 1,
+       "actions": [
+        "approve",
+        "edit",
+        "reject",
+        "take_over"
+       ],
+       "subtasks": [
+        {
+         "draft": "**Proposed email: recorded as a proposal, not sent**\n\nThe send_email call was issued with these arguments, which match the displayed email:\n\n- **to:** team@example.com\n- **subject:** Brief: When to choose pgvector over a dedicated vector database\n- **body:** the brief text exactly as shown below\n\nThe tool result reports the call as \"proposed,\" not executed. It will be sent only after a human approves it.\n\n**Body (full text):**\n\n> Choose pgvector when your team already runs PostgreSQL and your co… [truncated 1226 chars]",
+         "reason": "revisions exhausted (2)",
+         "reviews": [
+          {
+           "score": 3,
+           "issues": [
+            "The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.",
+            "The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.",
+            "The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent."
+           ],
+           "verdict": "revise",
+           "unsupported_claims": [],
+           "feedback_for_specialist": "The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources."
+          },
+          {
+           "score": 3,
+           "issues": [
+            "The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.",
+            "The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.",
+            "The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct."
+           ],
+           "verdict": "revise",
+           "unsupported_claims": [],
+           "feedback_for_specialist": "The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text exactly as shown, with no truncation, arrows, or stray tool-result text. Make sure the recorded proposal matches the displayed email. If the call cannot be made cleanl… [truncated 107 chars]"
+          },
+          {
+           "score": 2,
+           "issues": [
+            "The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.",
+            "Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.",
+            "This is the third round with the same defect. The draft asserts a fix that the tool call does not show."
+           ],
+           "verdict": "revise",
+           "unsupported_claims": [
+            "The send_email call was issued with arguments that match the displayed email (to, subject, full body). The recorded call shows a truncated body with no to or subject."
+           ],
+           "feedback_for_specialist": "The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text with no arrows or tool-result text. … [truncated 218 chars]"
+          }
+         ],
+         "subtask_id": "write-email"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": 18833,
+   "type": "approval.decided",
+   "node": null,
+   "at": "2026-11-11T02:04:45.639105+00:00",
+   "kind": "event",
+   "payload": {
+    "key": "escalation:e1",
+    "kind": "escalation",
+    "action": "approve",
+    "status": "approved",
+    "approval_id": "a6c9d9e0-b21f-47f3-8448-7733ad721d44"
+   }
+  },
+  {
+   "id": 18834,
+   "type": "task.status",
+   "node": null,
+   "at": "2026-11-11T02:04:45.732505+00:00",
+   "kind": "event",
+   "payload": {
+    "status": "running"
+   }
+  },
+  {
+   "id": 18835,
+   "type": "run.segment_started",
+   "node": null,
+   "at": "2026-11-11T02:04:45.735937+00:00",
+   "kind": "event",
+   "payload": {
+    "job_id": 760,
+    "worker": "worker-1",
+    "attempt": 1,
+    "job_kind": "resume",
+    "resumed_from_checkpoint": true,
+    "orphaned_reservations_charged": 0
+   }
+  },
+  {
+   "id": 18836,
+   "type": "escalation.resolved",
+   "node": "escalation_gate",
+   "at": "2026-11-11T02:04:45.742801+00:00",
+   "kind": "event",
+   "payload": {
+    "round": 1,
+    "action": "approve",
+    "subtask_ids": [
+     "write-email"
+    ]
+   }
+  },
+  {
+   "id": 18837,
+   "type": "schedule.decided",
+   "node": "schedule",
+   "at": "2026-11-11T02:04:45.749689+00:00",
+   "kind": "event",
+   "payload": {
+    "kind": "all_accepted",
+    "reason": null,
+    "blocked": {},
+    "subtask_ids": []
+   }
+  },
+  {
+   "id": 18838,
+   "type": "approval.requested",
+   "node": null,
+   "at": "2026-11-11T02:04:45.762440+00:00",
+   "kind": "event",
+   "payload": {
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "kind": "approve_action",
+    "blocking": true,
+    "approval_id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89"
+   }
+  },
+  {
+   "id": 18839,
+   "type": "task.status",
+   "node": null,
+   "at": "2026-11-11T02:04:45.767647+00:00",
+   "kind": "event",
+   "payload": {
+    "status": "awaiting_approval",
+    "interrupts": [
+     {
+      "id": "a5fa02f87490acee145ccd41cca505bc",
+      "value": {
+       "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+       "args": {
+        "to": "team@example.com",
+        "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of y… [truncated 364 chars]",
+        "subject": "Brief: When to choose pgvector over a dedicated vector database"
+       },
+       "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+       "kind": "approve_action",
+       "risk": "external",
+       "tool": "send_email",
+       "agent": "writing",
+       "actions": [
+        "approve",
+        "edit",
+        "reject",
+        "take_over"
+       ],
+       "rationale": null,
+       "subtask_id": "write-email",
+       "input_schema": {
+        "type": "object",
+        "title": "EmailIn",
+        "required": [
+         "to",
+         "subject",
+         "body"
+        ],
+        "properties": {
+         "to": {
+          "type": "string",
+          "title": "To",
+          "pattern": "^[^@\\s<>,;]{1,64}@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,63}$",
+          "maxLength": 254
+         },
+         "body": {
+          "type": "string",
+          "title": "Body",
+          "maxLength": 20000,
+          "minLength": 1
+         },
+         "subject": {
+          "type": "string",
+          "title": "Subject",
+          "pattern": "^[^\\r\\n]+$",
+          "maxLength": 200,
+          "minLength": 1
+         }
+        },
+        "additionalProperties": false
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": 18840,
+   "type": "approval.decided",
+   "node": null,
+   "at": "2026-11-11T02:04:50.500753+00:00",
+   "kind": "event",
+   "payload": {
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "kind": "approve_action",
+    "action": "approve",
+    "status": "approved",
+    "approval_id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89"
+   }
+  },
+  {
+   "id": 18841,
+   "type": "task.status",
+   "node": null,
+   "at": "2026-11-11T02:04:50.858363+00:00",
+   "kind": "event",
+   "payload": {
+    "status": "running"
+   }
+  },
+  {
+   "id": 18842,
+   "type": "run.segment_started",
+   "node": null,
+   "at": "2026-11-11T02:04:50.861423+00:00",
+   "kind": "event",
+   "payload": {
+    "job_id": 761,
+    "worker": "worker-1",
+    "attempt": 1,
+    "job_kind": "resume",
+    "resumed_from_checkpoint": true,
+    "orphaned_reservations_charged": 0
+   }
+  },
+  {
+   "id": 18843,
+   "type": "action.decided",
+   "node": "action_gate",
+   "at": "2026-11-11T02:04:50.866723+00:00",
+   "kind": "event",
+   "payload": {
+    "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "tool": "send_email",
+    "action": "approve"
+   }
+  },
+  {
+   "id": 18844,
+   "type": "tool.call",
+   "node": "tools",
+   "at": "2026-11-11T02:04:50.919247+00:00",
+   "kind": "tool",
+   "tool_call_id": 1143,
+   "agent": "execute_actions",
+   "tool": "send_email",
+   "risk": "external",
+   "status": "executed",
+   "ok": true,
+   "subtask_id": "write-email",
+   "revision": 0,
+   "step": 0,
+   "input": {
+    "to": "team@example.com",
+    "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of y… [truncated 364 chars]",
+    "subject": "Brief: When to choose pgvector over a dedicated vector database"
+   },
+   "output": "sent to team@example.com",
+   "error": null,
+   "latency_ms": 40
+  },
+  {
+   "id": 18845,
+   "type": "action.outcome",
+   "node": "execute_actions",
+   "at": "2026-11-11T02:04:50.925046+00:00",
+   "kind": "event",
+   "payload": {
+    "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "tool": "send_email",
+    "detail": "sent to team@example.com",
+    "status": "done",
+    "idempotency_key": "88ff816a01681995a584fd015eed39e87d8cfe116a5c413749915a73be8041da"
+   }
+  },
+  {
+   "id": 18846,
+   "type": "node.started",
+   "node": "synthesize",
+   "at": "2026-11-11T02:04:50.932721+00:00",
+   "kind": "event",
+   "payload": {
+    "partial": false
+   }
+  },
+  {
+   "id": 18847,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:54.406423+00:00",
+   "kind": "llm",
+   "llm_call_id": 4114,
+   "agent": "supervisor",
+   "purpose": "synthesize",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 2331,
+   "output_tokens": 429,
+   "cost_usd": 0.008952,
+   "latency_ms": 2921,
+   "output": {
+    "content": "# Brief: When to choose pgvector over a dedicated vector database\n\nChoose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.\n\n**Delivery:** The brief (about 128 words) was emailed to team@examp… [truncated 333 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18848,
+   "type": "node.completed",
+   "node": "synthesize",
+   "at": "2026-11-11T02:04:54.416411+00:00",
+   "kind": "event",
+   "payload": {
+    "chars": 1333,
+    "partial": false
+   }
+  },
+  {
+   "id": 18849,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:04:58.606691+00:00",
+   "kind": "llm",
+   "llm_call_id": 4115,
+   "agent": "reviewer",
+   "purpose": "final_review",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 1196,
+   "output_tokens": 374,
+   "cost_usd": 0.006132,
+   "latency_ms": 4071,
+   "output": {
+    "content": "{\"verdict\":\"escalate\",\"score\":3,\"issues\":[\"Deliverable states the brief 'was emailed' to team@example.com, but the planned subtask only produced a proposed email pending human approval; sending is unverified and likely a false claim.\",\"Word count claimed as about 128 words, but the brief body including sources and verification line appears closer to 140-150 words; the count is not demonstrated and may exceed the limit when the caveat is included.\",\"Sources are on an unverifiable fixtures.agentops.test domain, and the scale figure ('tens of millions') and index trade-offs are unverified, as the deliverable admits.\",\"The deliverable includes extra material (delivery note, caveat) beyond the brief, and it is unclear what the email actually contained.\"],\"feedback_for_specialist\":\"Do not claim the email was sent unless a send action was confirmed; report it as drafted and pending approval. Show the exact email text and verify the word count. Use verifiable sources.\",\"unsupported_claims\":[\"T… [truncated 136 chars]",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18850,
+   "type": "final_review.verdict",
+   "node": "final_review",
+   "at": "2026-11-11T02:04:58.616248+00:00",
+   "kind": "event",
+   "payload": {
+    "score": 3,
+    "issues": [
+     "Deliverable states the brief 'was emailed' to team@example.com, but the planned subtask only produced a proposed email pending human approval; sending is unverified and likely a false claim.",
+     "Word count claimed as about 128 words, but the brief body including sources and verification line appears closer to 140-150 words; the count is not demonstrated and may exceed the limit when the caveat is included.",
+     "Sources are on an unverifiable fixtures.agentops.test domain, and the scale figure ('tens of millions') and index trade-offs are unverified, as the deliverable admits.",
+     "The deliverable includes extra material (delivery note, caveat) beyond the brief, and it is unclear what the email actually contained."
+    ],
+    "verdict": "escalate",
+    "threshold": 3,
+    "unsupported_claims": [
+     "The brief (about 128 words) was emailed to team@example.com.",
+     "Up to roughly tens of millions of vectors is a suitable pgvector range."
+    ],
+    "feedback_for_specialist": "Do not claim the email was sent unless a send action was confirmed; report it as drafted and pending approval. Show the exact email text and verify the word count. Use verifiable sources."
+   }
+  },
+  {
+   "id": 18851,
+   "type": "llm.call",
+   "node": null,
+   "at": "2026-11-11T02:05:01.941715+00:00",
+   "kind": "llm",
+   "llm_call_id": 4116,
+   "agent": "supervisor",
+   "purpose": "consolidate",
+   "model": "anthropic/claude-sonnet-5-5",
+   "attempt": 1,
+   "ok": true,
+   "retry": false,
+   "error": null,
+   "input_tokens": 2353,
+   "output_tokens": 245,
+   "cost_usd": 0.007156,
+   "latency_ms": 3212,
+   "output": {
+    "content": "{\"memories\":[{\"kind\":\"lesson\",\"text\":\"Fetching a URL that did not come from a search result gets refused, so official docs such as a GitHub README may be unreachable and only search-returned sources can be cited.\",\"importance\":0.6},{\"kind\":\"lesson\",\"text\":\"The send_email tool only records a proposal that needs human approval, so tell the user an email is proposed rather than sent and put the full draft in the message.\",\"importance\":0.7},{\"kind\":\"fact\",\"text\":\"Per the accepted brief, pgvector suits teams already on PostgreSQL with modest collections (up to tens of millions of vectors); dedicated vector databases suit very large scale, strict low latency at high QPS, or independent scaling.\",\"importance\":0.5}]}",
+    "tool_calls": []
+   }
+  },
+  {
+   "id": 18852,
+   "type": "memory.consolidated",
+   "node": "consolidate",
+   "at": "2026-11-11T02:05:02.080795+00:00",
+   "kind": "event",
+   "payload": {
+    "dropped": [
+     {
+      "why": "looks like an instruction",
+      "text": "The send_email tool only records a proposal that needs human approval, so tell the user an email is proposed rather than"
+     }
+    ],
+    "written": 2,
+    "llm_skipped": null
+   }
+  },
+  {
+   "id": 18853,
+   "type": "task.finished",
+   "node": null,
+   "at": "2026-11-11T02:05:02.104193+00:00",
+   "kind": "event",
+   "payload": {
+    "error": null,
+    "status": "completed"
+   }
+  }
+ ],
+ "cost": {
+  "task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+  "total": {
+   "calls": 17,
+   "errors": 0,
+   "retries": 0,
+   "input_tokens": 56693,
+   "output_tokens": 9146,
+   "cost_usd": 0.089155,
+   "latency_ms": 58087
+  },
+  "by_agent": {
+   "research": {
+    "calls": 3,
+    "errors": 0,
+    "retries": 0,
+    "input_tokens": 7769,
+    "output_tokens": 1485,
+    "cost_usd": 0.001519,
+    "latency_ms": 7376
+   },
+   "reviewer": {
+    "calls": 5,
+    "errors": 0,
+    "retries": 0,
+    "input_tokens": 14776,
+    "output_tokens": 2841,
+    "cost_usd": 0.057962,
+    "latency_ms": 23988
+   },
+   "supervisor": {
+    "calls": 3,
+    "errors": 0,
+    "retries": 0,
+    "input_tokens": 6667,
+    "output_tokens": 1177,
+    "cost_usd": 0.025104,
+    "latency_ms": 10752
+   },
+   "writing": {
+    "calls": 6,
+    "errors": 0,
+    "retries": 0,
+    "input_tokens": 27481,
+    "output_tokens": 3643,
+    "cost_usd": 0.00457,
+    "latency_ms": 15971
+   }
+  },
+  "by_model": {
+   "anthropic/claude-haiku-5-5": {
+    "calls": 9,
+    "errors": 0,
+    "retries": 0,
+    "input_tokens": 35250,
+    "output_tokens": 5128,
+    "cost_usd": 0.006089,
+    "latency_ms": 23347
+   },
+   "anthropic/claude-sonnet-5-5": {
+    "calls": 8,
+    "errors": 0,
+    "retries": 0,
+    "input_tokens": 21443,
+    "output_tokens": 4018,
+    "cost_usd": 0.083066,
+    "latency_ms": 34740
+   }
+  },
+  "tools": {
+   "fetch_url": {
+    "calls": 3,
+    "errors": 1,
+    "latency_ms": 17
+   },
+   "send_email": {
+    "calls": 4,
+    "errors": 0,
+    "latency_ms": 40
+   },
+   "web_search": {
+    "calls": 1,
+    "errors": 0,
+    "latency_ms": 8
+   }
+  },
+  "budget": {
+   "max_usd": 0.2,
+   "max_tokens": 200000.0,
+   "max_calls": 60.0,
+   "used_usd": 0.089155,
+   "used_tokens": 65839.0,
+   "used_calls": 17.0,
+   "unpriced_calls": 0.0
+  },
+  "time": {
+   "wall_s": 71.911,
+   "compute_s": 64.545,
+   "human_wait_s": 7.157,
+   "queue_s": 0.209
+  },
+  "approvals": [
+   {
+    "kind": "escalation",
+    "key": "escalation:e1",
+    "status": "approved",
+    "blocking": true,
+    "wait_s": 1.981
+   },
+   {
+    "kind": "approve_action",
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "status": "approved",
+    "blocking": true,
+    "wait_s": 4.738
+   }
+  ]
+ },
+ "approvals": [
+  {
+   "id": "a6c9d9e0-b21f-47f3-8448-7733ad721d44",
+   "task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+   "kind": "escalation",
+   "key": "escalation:e1",
+   "status": "approved",
+   "version": 2,
+   "payload": {
+    "key": "escalation:e1",
+    "kind": "escalation",
+    "round": 1,
+    "actions": [
+     "approve",
+     "edit",
+     "reject",
+     "take_over"
+    ],
+    "subtasks": [
+     {
+      "draft": "**Proposed email: recorded as a proposal, not sent**\n\nThe send_email call was issued with these arguments, which match the displayed email:\n\n- **to:** team@example.com\n- **subject:** Brief: When to choose pgvector over a dedicated vector database\n- **body:** the brief text exactly as shown below\n\nThe tool result reports the call as \"proposed,\" not executed. It will be sent only after a human approves it.\n\n**Body (full text):**\n\n> Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.\n\nThe body is about 128 words, under the 150-word limit.\n\n**Caveats:**\n- The sources are on a `fixtures.agentops.test` domain that I could not confirm as official pgvector documentation. I could not reach the official pgvector README, so the scale figures and index trade-offs are unverified. The body flags this for the reader.\n- Cost, operational simplicity, and sharding claims were not checked and are left out of the brief.",
+      "reason": "revisions exhausted (2)",
+      "reviews": [
+       {
+        "score": 3,
+        "issues": [
+         "The recorded send_email proposal has a truncated and malformed body. It stops after 'ordinary tables' and then contains tool-result text, so approving it would send an incomplete brief.",
+         "The recorded proposal args show no 'to' or 'subject' fields, so the proposed action does not match the email described in the draft text.",
+         "The draft's email section says the body is 'the brief above' rather than giving the full text. The approver cannot see exactly what would be sent."
+        ],
+        "verdict": "revise",
+        "unsupported_claims": [],
+        "feedback_for_specialist": "The brief is about 130 words with the title, under the 150 limit, and it follows the research context. Re-propose the send_email call with clean arguments: to=team@example.com, the subject line, and the full brief text as the body, with no truncation or stray tool-result text. In the draft, show the full email body inline so the approver can review exactly what will be sent. Keep the caveats about the unverified sources."
+       },
+       {
+        "score": 3,
+        "issues": [
+         "The recorded send_email proposal is still malformed. Its body is truncated after 'ordinary tables' and is followed by tool-result text, so approving the recorded action would send an incomplete brief and not the full text shown in the draft.",
+         "The recorded proposal args contain no 'to' or 'subject' fields, so the action the human would approve does not match the To and Subject lines in the draft text.",
+         "The draft says the send_email call was recorded as a proposal, but it does not acknowledge that the recorded arguments differ from the displayed email. This could mislead the approver into thinking the recorded action is correct."
+        ],
+        "verdict": "revise",
+        "unsupported_claims": [],
+        "feedback_for_specialist": "The brief text and word count are fine (about 128 words, under 150), and the caveats are appropriate. The remaining problem is the tool call. Re-issue send_email with clean, complete JSON arguments: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text exactly as shown, with no truncation, arrows, or stray tool-result text. Make sure the recorded proposal matches the displayed email. If the call cannot be made cleanly, say explicitly that the recorded proposal is defective and that the displayed email is the intended one."
+       },
+       {
+        "score": 2,
+        "issues": [
+         "The draft claims the send_email call was issued with arguments that match the displayed email. The recorded call contradicts this: its body is truncated after 'ordinary tables' and is followed by tool-result text, and it has no 'to' or 'subject' fields.",
+         "Approving the recorded action would send an incomplete, malformed email. The approver would be misled by the draft's statement that the arguments match.",
+         "This is the third round with the same defect. The draft asserts a fix that the tool call does not show."
+        ],
+        "verdict": "revise",
+        "unsupported_claims": [
+         "The send_email call was issued with arguments that match the displayed email (to, subject, full body). The recorded call shows a truncated body with no to or subject."
+        ],
+        "feedback_for_specialist": "The brief text and word count are fine (about 128 words) and the caveats are appropriate. The problem is the false statement about the tool call. The recorded send_email body is cut off after 'ordinary tables' and contains stray tool-result text, and it lacks to and subject. Either re-issue send_email with clean, complete JSON: to=\"team@example.com\", subject=\"Brief: When to choose pgvector over a dedicated vector database\", and body set to the full brief text with no arrows or tool-result text. Or, if you cannot make a clean call, state plainly that the recorded proposal is defective and that the displayed email is the intended one. Do not claim the recorded arguments match the displayed email unless they do."
+       }
+      ],
+      "subtask_id": "write-email"
+     }
+    ],
+    "response_schema": {
+     "type": "object",
+     "title": "EscalationDecision",
+     "required": [
+      "action"
+     ],
+     "properties": {
+      "note": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 2000
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Note",
+       "default": null
+      },
+      "edits": {
+       "type": "object",
+       "title": "Edits",
+       "additionalProperties": {
+        "type": "string"
+       }
+      },
+      "action": {
+       "enum": [
+        "approve",
+        "edit",
+        "reject",
+        "take_over"
+       ],
+       "type": "string",
+       "title": "Action"
+      },
+      "deliverable": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 50000
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Deliverable",
+       "default": null
+      }
+     },
+     "description": "escalation_gate for needs_human subtasks.",
+     "additionalProperties": false
+    }
+   },
+   "decision": {
+    "note": null,
+    "edits": {},
+    "action": "approve",
+    "deliverable": null
+   },
+   "source": "graph",
+   "blocking": true,
+   "expires_at": "2026-11-12T02:04:43.658025Z",
+   "created_at": "2026-11-11T02:04:43.658025Z",
+   "decided_at": "2026-11-11T02:04:45.639105Z",
+   "decided_by": "demo-reviewer",
+   "task_kind": "task",
+   "task_request": "Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com."
+  },
+  {
+   "id": "cdd64c16-3b31-4140-bacf-1f5d9f0c0e89",
+   "task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+   "kind": "approve_action",
+   "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+   "status": "approved",
+   "version": 2,
+   "payload": {
+    "key": "action:9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "args": {
+     "to": "team@example.com",
+     "body": "Choose pgvector when your team already runs PostgreSQL and your collection is modest, up to roughly tens of millions of vectors. Its main advantage is that embeddings live in ordinary tables, so similarity search can be combined with SQL filters, joins, and transactions in one query. You also get one backup and one access-control model. Choose a dedicated vector database for very large collections, strict low-latency needs at high query volume, or when vector search must scale independently of your transactional database. On indexes, HNSW gives better speed and recall but builds more slowly and uses more memory; IVFFlat builds faster with less memory. Sources: https://fixtures.agentops.test/pgvector-vs-dedicated and https://fixtures.agentops.test/pgvector-overview. Verify scale figures against the official pgvector documentation before relying on them.",
+     "subject": "Brief: When to choose pgvector over a dedicated vector database"
+    },
+    "hash": "9fe6ff4f9715af8fa80d13f6f0831b88aea2425a9a5e9a0fa567f6756306e624",
+    "kind": "approve_action",
+    "risk": "external",
+    "tool": "send_email",
+    "agent": "writing",
+    "actions": [
+     "approve",
+     "edit",
+     "reject",
+     "take_over"
+    ],
+    "rationale": null,
+    "subtask_id": "write-email",
+    "input_schema": {
+     "type": "object",
+     "title": "EmailIn",
+     "required": [
+      "to",
+      "subject",
+      "body"
+     ],
+     "properties": {
+      "to": {
+       "type": "string",
+       "title": "To",
+       "pattern": "^[^@\\s<>,;]{1,64}@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,63}$",
+       "maxLength": 254
+      },
+      "body": {
+       "type": "string",
+       "title": "Body",
+       "maxLength": 20000,
+       "minLength": 1
+      },
+      "subject": {
+       "type": "string",
+       "title": "Subject",
+       "pattern": "^[^\\r\\n]+$",
+       "maxLength": 200,
+       "minLength": 1
+      }
+     },
+     "additionalProperties": false
+    },
+    "response_schema": {
+     "type": "object",
+     "title": "ActionDecision",
+     "required": [
+      "action"
+     ],
+     "properties": {
+      "args": {
+       "anyOf": [
+        {
+         "type": "object",
+         "additionalProperties": true
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Args",
+       "default": null
+      },
+      "note": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 2000
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Note",
+       "default": null
+      },
+      "action": {
+       "enum": [
+        "approve",
+        "edit",
+        "reject",
+        "take_over"
+       ],
+       "type": "string",
+       "title": "Action"
+      }
+     },
+     "description": "action_gate (approve_action). take_over = a human did it themselves (not executed).",
+     "additionalProperties": false
+    }
+   },
+   "decision": {
+    "args": null,
+    "note": null,
+    "action": "approve"
+   },
+   "source": "graph",
+   "blocking": true,
+   "expires_at": "2026-11-12T02:04:45.762440Z",
+   "created_at": "2026-11-11T02:04:45.762440Z",
+   "decided_at": "2026-11-11T02:04:50.500753Z",
+   "decided_by": "demo-reviewer",
+   "task_kind": "task",
+   "task_request": "Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com."
+  }
+ ],
+ "memories": [
+  {
+   "id": "8ca18e7c-b146-4e87-9c6c-7c587cf547d4",
+   "kind": "episode",
+   "text": "Past task \"Write a brief of at most 150 words on when a team should choose pgvector over a dedicated vector database, and email it to team@example.com.\" ended completed",
+   "importance": 0.3,
+   "outcome": "completed",
+   "source_task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+   "created_at": "2026-11-11T02:05:02.045535+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "1fbe60e2-23e9-42cf-915f-637a61207824",
+   "kind": "fact",
+   "text": "Per the accepted brief, pgvector suits teams already on PostgreSQL with modest collections (up to tens of millions of vectors); dedicated vector databases suit very large scale, strict low latency at high QPS, or independent scaling.",
+   "importance": 0.5,
+   "outcome": "completed",
+   "source_task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+   "created_at": "2026-11-11T02:05:02.045535+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "46d78eae-6ed8-40b1-aeb3-c224e1a129a0",
+   "kind": "lesson",
+   "text": "Fetching a URL that did not come from a search result gets refused, so official docs such as a GitHub README may be unreachable and only search-returned sources can be cited.",
+   "importance": 0.6,
+   "outcome": "completed",
+   "source_task_id": "253a5593-b7db-4d85-b8a8-ac95e973f392",
+   "created_at": "2026-11-11T02:05:02.045535+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "3c21512e-7bf2-42fe-bcf8-4c2896b249c2",
+   "kind": "lesson",
+   "text": "When research tools return only fixture or test pages, flag claims as unverified and drop unsupported specifics like scale thresholds and cost comparisons instead of including them in the draft.",
+   "importance": 0.7,
+   "outcome": "completed",
+   "source_task_id": "351c8839-8f4a-4f57-9c69-3a75dafc0fd2",
+   "created_at": "2026-11-10T19:33:36.015619+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "15cbbc73-45c8-40bc-8a21-26afd31f7e0c",
+   "kind": "fact",
+   "text": "pgvector is a PostgreSQL extension offering a vector type with L2, inner-product, and cosine operators; HNSW gives better speed and recall but builds slower with more memory, while IVFFlat builds faster with less memory.",
+   "importance": 0.5,
+   "outcome": "completed",
+   "source_task_id": "351c8839-8f4a-4f57-9c69-3a75dafc0fd2",
+   "created_at": "2026-11-10T19:33:36.015619+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "f1abafc0-fed7-406d-92c9-46ccfe1f7a62",
+   "kind": "episode",
+   "text": "Past task \"Plan the Q1 data platform migration across four teams\" ended completed",
+   "importance": 0.3,
+   "outcome": "completed",
+   "source_task_id": "0008d21a-ff56-4ebf-a49a-40e95713a225",
+   "created_at": "2026-11-10T04:08:27.392062+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "886f46c5-d6b7-442f-909e-2580be49ee13",
+   "kind": "episode",
+   "text": "Past task \"Research the top 3 project management tools for a small student team, write a short comparison, and email it to me.\" ended completed",
+   "importance": 0.3,
+   "outcome": "completed",
+   "source_task_id": "271f9316-6ce7-4f27-a10b-8bc639d5810d",
+   "created_at": "2026-11-10T04:08:23.731476+00:00",
+   "similarity": null,
+   "score": null
+  },
+  {
+   "id": "a59cf36e-74d3-4e59-8bc1-93d35e29c122",
+   "kind": "episode",
+   "text": "Past task \"Research the top 3 project management tools for a small student team, write a short comparison, and email it to me.\" ended completed",
+   "importance": 0.3,
+   "outcome": "completed",
+   "source_task_id": "1bafc031-0e24-47fe-a7a8-f212ed26d490",
+   "created_at": "2026-11-10T03:59:16.313404+00:00",
+   "similarity": null,
+   "score": null
+  }
+ ]
+}

@@ -15,7 +15,7 @@ const MAX_USD = "0.20";
 const REQUEST =
   "Write a brief of at most 150 words on when a team should choose pgvector over a dedicated " +
   "vector database, and email it to team@example.com.";
-const SHOTS = "../docs/screenshots";
+const SHOTS = process.env.REAL_UI_SHOTS ?? "../docs/screenshots";
 
 test.skip(!process.env.REAL_UI_WALKTHROUGH, "real models: set REAL_UI_WALKTHROUGH=1 (costs up to $0.20)");
 test.setTimeout(15 * 60_000);

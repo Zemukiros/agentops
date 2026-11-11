@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../api/client";
 import type { Task } from "../api/types";
 import { PageHeader } from "../components/Layout";
 import { Button, Card, Field, inputClass } from "../components/ui";
+import { DemoUnavailable } from "../demo/lazy";
 
 const MAX = 20_000;
 
@@ -32,7 +33,7 @@ export function parseBudget(f: BudgetForm): { value: Record<string, number> | nu
   return { value: Object.keys(out).length ? out : null, errors };
 }
 
-export function NewTask() {
+function NewTaskForm() {
   const [request, setRequest] = useState("");
   // null = not chosen yet: the server's default (ui_demo in fake mode) applies
   const [picked, setScenario] = useState<string | null>(null);
@@ -164,4 +165,14 @@ export function NewTask() {
       </form>
     </div>
   );
+}
+
+export function NewTask() {
+  if (DemoUnavailable)
+    return (
+      <Suspense fallback={null}>
+        <DemoUnavailable what="Starting a new task" />
+      </Suspense>
+    );
+  return <NewTaskForm />;
 }

@@ -61,6 +61,11 @@ export async function apiWithHeaders<T>(path: string, opts: RequestOptions = {})
 }
 
 export async function api<T>(path: string, opts: RequestOptions & { onHeaders?: (h: Headers) => void } = {}): Promise<T> {
+  if (import.meta.env.VITE_DEMO === "1") {
+    // recorded demo: answered in the browser; the branch and its chunk vanish from normal builds
+    const { demoApi } = await import("../demo/server");
+    return demoApi<T>(path, opts);
+  }
   const token = opts.token === undefined ? session.token() : opts.token;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;

@@ -1,0 +1,16 @@
+# gitleaks config: the default rules plus one narrow exception (ADR-053). Reviewed false
+# positives tied to a commit stay in .gitleaksignore.
+[extend]
+useDefault = true
+
+# The demo recording carries the send_email idempotency key (sha256 of task + action, also the
+# email's Message-ID): a 64-hex hash, not a credential. Only that shape, only in that file, only
+# for this rule. (A global [[allowlists]] with condition = "AND" also hid other findings in the
+# file on gitleaks 8.30.1, so the exception is scoped to the rule.)
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+condition = "AND"
+paths = ['''(^|/)ui/src/demo/recording\.json$''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-f]{64}$''']

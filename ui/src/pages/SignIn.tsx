@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { ApiError, api } from "../api/client";
 import { session, useSession } from "../api/session";
@@ -7,6 +7,7 @@ import { Icon } from "../components/Icon";
 import { Logo, ThemeToggle } from "../components/Layout";
 import { Badge } from "../components/StatusBadge";
 import { Button, Field, inputClass } from "../components/ui";
+import { DemoEntry } from "../demo/lazy";
 
 export function SignIn() {
   const { identities, active } = useSession();
@@ -51,6 +52,11 @@ export function SignIn() {
       </div>
       <main id="main" className="grid flex-1 place-items-center px-4 pb-16">
         <div className="w-full max-w-md space-y-4">
+          {DemoEntry ? (
+            <Suspense fallback={null}>
+              <DemoEntry />
+            </Suspense>
+          ) : (
           <div className="rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-7">
             <h1 className="text-lg font-semibold tracking-tight">Sign in</h1>
             <p className="mt-1 text-sm text-fg-muted">
@@ -97,8 +103,9 @@ export function SignIn() {
               </Button>
             </form>
           </div>
+          )}
 
-          {identities.length > 0 && (
+          {!DemoEntry && identities.length > 0 && (
             <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
               <h2 className="px-1 pb-2 text-sm font-semibold">Signed in this tab</h2>
               <ul className="space-y-1">

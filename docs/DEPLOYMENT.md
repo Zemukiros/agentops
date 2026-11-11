@@ -72,6 +72,29 @@ port, no Mailpit (ADR-050).
 - Log shipping and alerting. Optional traces: `OTEL_ENABLED=true` with the `observability` profile (Jaeger).
 - A spend limit on the Anthropic workspace in addition to the per-task budgets.
 
+## Static recorded demo (Vercel)
+
+The public demo is the real UI built with `VITE_DEMO=1`, replaying one recorded real-model run
+in the browser (ADR-053). No backend, no API key, $0 per visitor.
+
+```bash
+cd ui && npm run build:demo && npx vite preview   # local check on :5173
+npx playwright test -c playwright.demo.config.ts  # click-through test of the demo build
+```
+
+Vercel (Hobby, $0): Add New → Project → import the repo, then set
+- **Root Directory:** `ui`
+- **Framework Preset:** Vite (the rest comes from `ui/vercel.json`: `npm ci`, `npm run build:demo`, output `dist`)
+- **Environment variables:** none
+
+`ui/vercel.json` adds the SPA rewrite and the same security headers as `ui/nginx.conf.template`,
+with `connect-src 'self'` (the demo never calls an API).
+
+To record a new run: start the stack in real mode, run `ui/e2e/real-walkthrough.spec.ts`
+(`REAL_UI_WALKTHROUGH=1`, about $0.09 under a $0.20 cap; `REAL_UI_SHOTS` redirects its
+screenshots), then `uv run python scripts/export_demo.py <task_id>` and review the diff of
+`ui/src/demo/recording.json` before committing.
+
 ## Scaling
 
 Workers are stateless: run more (`docker compose up -d --scale worker=3`). Jobs are claimed

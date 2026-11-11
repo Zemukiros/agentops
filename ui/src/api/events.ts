@@ -26,7 +26,7 @@ export function retryDelay(attempt: number): number {
   return Math.min(MAX_RETRY_DELAY_MS, 500 * 2 ** Math.min(attempt, 5));
 }
 
-export function useTaskEvents(taskId: string | undefined): {
+function useLiveTaskEvents(taskId: string | undefined): {
   events: TaskEvent[];
   state: StreamState;
 } {
@@ -89,3 +89,32 @@ export function useTaskEvents(taskId: string | undefined): {
 
   return { events, state };
 }
+
+/** Recorded demo (ADR-053): the same events, revealed by the demo clock instead of SSE. The
+ * dynamic import keeps the recording out of normal builds. */
+function useDemoTaskEvents(taskId: string | undefined): { events: TaskEvent[]; state: StreamState } {
+  const [snap, setSnap] = useState<{ events: TaskEvent[]; state: StreamState }>({ events: [], state: "connecting" });
+  useEffect(() => {
+    if (!taskId) return;
+    let off: (() => void) | undefined;
+    let alive = true;
+    void Promise.all([import("../demo/store"), import("../demo/playback")]).then(([{ demo }, pb]) => {
+      if (!alive) return;
+      const update = () => {
+        const v = demo.view();
+        const events = pb.events(v);
+        setSnap({ events, state: events.at(-1)?.type === "task.finished" ? "closed" : "live" });
+      };
+      off = demo.subscribe(update);
+      demo.start();
+      update();
+    });
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, [taskId]);
+  return snap;
+}
+
+export const useTaskEvents = import.meta.env.VITE_DEMO === "1" ? useDemoTaskEvents : useLiveTaskEvents;
