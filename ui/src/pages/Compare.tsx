@@ -9,6 +9,8 @@ import { Badge, StatusBadge } from "../components/StatusBadge";
 import { Card, EmptyState, ErrorState, Skeleton } from "../components/ui";
 import { diffStats, parseUnifiedDiff } from "../lib/diff";
 import { duration, shortId, usd } from "../lib/format";
+import { Suspense } from "react";
+import { DemoUnavailable } from "../demo/lazy";
 
 function SideHeader({ s }: { s: CompareSide }) {
   return (
@@ -43,7 +45,7 @@ function SideHeader({ s }: { s: CompareSide }) {
   );
 }
 
-export function ComparePage() {
+function LiveComparePage() {
   const { a, b } = useParams();
   const q = useQuery({ queryKey: ["compare", a, b], queryFn: () => api<Comparison>(`/tasks/${a}/compare/${b}`) });
   if (q.isPending)
@@ -156,4 +158,14 @@ export function ComparePage() {
       </div>
     </div>
   );
+}
+
+export function ComparePage() {
+  if (DemoUnavailable)
+    return (
+      <Suspense fallback={null}>
+        <DemoUnavailable what="Comparing runs" />
+      </Suspense>
+    );
+  return <LiveComparePage />;
 }

@@ -117,7 +117,8 @@ make eval        # free: replay recorded model cassettes + dry run of all 60 sce
 ## Limitations
 
 - The re-measure after the fixes covers only the scenarios they target (previously passing
-  scenarios weren't re-run), and the memory evidence is k=1. ADR-052 is tested in fake mode only.
+  scenarios weren't re-run), and the memory evidence is k=1. ADR-052 is confirmed on one real-model
+  run, not across the eval suite.
 - Fixture web pages and a synthetic demo database, not the live web.
 - Auth is seeded bearer tokens with two roles (no OAuth/SSO, no token expiry).
 - The compose files have no TLS or backups; production needs a reverse proxy and `pg_dump`.
@@ -127,5 +128,5 @@ make eval        # free: replay recorded model cassettes + dry run of all 60 sce
 
 [Architecture](docs/ARCHITECTURE.md) · [Evaluation](docs/EVALUATION.md) ·
 [Security](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md) · [Demo](docs/DEMO.md) ·
-[Decisions (ADR-001…050)](docs/DECISIONS.md) · [Progress](docs/PROGRESS.md) ·
+[Decisions (ADR-001…053)](docs/DECISIONS.md) · [Progress](docs/PROGRESS.md) ·
 [Requirements](docs/BRIEF.md)

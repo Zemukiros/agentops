@@ -38,6 +38,9 @@ make eval-tables                 # regenerate README/EVALUATION.md tables from e
 uv run python -m evals run --mode real --yes --k 3 --cap 16   # PAID eval (~$13); needs approval; compose worker stopped
 make prod-config / make prod-up  # prod profile (docker-compose.prod.yml + untracked .env.prod; ADR-050)
 make test-ui                     # UI (ui/): ESLint + tsc + Vitest
+cd ui && npm run build:demo       # static recorded demo (ADR-053): VITE_DEMO=1, no backend; deployed on Vercel from ui/
+cd ui && npx playwright test -c playwright.demo.config.ts   # demo build click-through (no stack needed)
+uv run python scripts/export_demo.py <task_id>   # re-export the demo recording from a finished task (free; stack up)
 make e2e                         # Playwright walkthrough + axe against the running stack (make up && make migrate); E2E_CPU_THROTTLE=4 to mimic a slow CI runner
 FAKE_LATENCY_MS=600 make up      # fake mode: pace runs so the live UI is watchable (0 by default)
 cd ui && npx vite                # UI dev server on :5173 (API on :8000); `npm ci` first (ignore-scripts)

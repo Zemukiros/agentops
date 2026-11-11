@@ -5,12 +5,13 @@ _Update at the end of every work session and every phase. Keep it short. This is
 ## Current status
 - **Phase:** 6 — complete on branch `phase-6`, in review as draft PR #6 (all 10 CI checks green
   before the final docs commit). Not merged.
-- **Last updated:** 2026-11-10
+- **Last updated:** 2026-11-11 (recorded demo, branch `demo-site`)
 - **Test status:** see the final Phase 6 summary; `make test`, `make test-ui`, `make e2e` (also at
   `E2E_CPU_THROTTLE=4`) pass. Not in `make test`: 1 `model` test, 4 `e2e` tests and the
   real-model UI walkthrough (`REAL_UI_WALKTHROUGH=1`), all real/costly.
 - **Real-model spend:** Phase 6 **$16.8462** (eval $16.7698 of the $18 cap + UI walkthrough
-  $0.0764 of $0.20; ledger in `docs/EVALUATION.md`). Cumulative AgentOps: **$17.124375**.
+  $0.0764 of $0.20; ledger in `docs/EVALUATION.md`). Recorded demo run (2026-11-11): **$0.089155**
+  of $0.20. Cumulative AgentOps: **$17.21353**.
 
 ## Phase plan
 | Phase | Goal | Status |
@@ -163,10 +164,21 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 
 **Phase 6** (per-run ledger in `docs/EVALUATION.md`): smoke $0.1804, baseline + fill $13.3857, re-measure A/B/C $3.2037 → eval **$16.7698** (cap $18); UI walkthrough **$0.0764** (cap $0.20). Phase 6 total **$16.8462**. Cumulative AgentOps: **$17.124375**.
 
+## Recorded demo (2026-11-11, branch `demo-site`, ADR-053)
+- One fresh real-model walkthrough (task `253a5593`, $0.089155): completed, 2 human decisions,
+  email sent exactly once; ADR-052 confirmed with real models; two new open findings (see
+  `docs/EVALUATION.md`, second walkthrough).
+- `scripts/export_demo.py` → `ui/src/demo/recording.json` (redacted again; no credentials or local links, tested).
+- `VITE_DEMO=1` build of the real UI: playback with pauses for the visitor's decisions, banner,
+  "Enter demo", notes where the backend is needed. `ui/vercel.json` for hosting from `ui/`.
+- Tests: 12 Vitest (playback + demo API; both mutation-checked), 1 Playwright run of the demo build
+  (two approvals, completed, trace, axe on three pages, no request leaves the site). CI runs both.
+
 ## Next up
 - Human review of the judge spot-check sample (`evals/results/2026-11-10-163339-real/spotcheck.md`).
 - Optional, with approval: a full k=3 re-run (~$13) to replace the baseline headline and check
-  previously passing scenarios for regressions; re-measure memory at k=3; ADR-052 with real models.
+  previously passing scenarios for regressions; re-measure memory at k=3.
+- Investigate the truncated-proposal finding and give the final reviewer the action outcomes.
 - Merge PR #6 after review.
 
 ## Known limitations / stubs (be honest)

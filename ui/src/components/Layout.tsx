@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { session, useSession, type Identity } from "../api/session";
 import { useTheme, type ThemeChoice } from "../lib/theme";
 import { Icon, type IconName } from "./Icon";
 import { Badge } from "./StatusBadge";
+import { DemoBanner } from "../demo/lazy";
 
 export interface NavItem {
   to: string;
@@ -236,6 +237,11 @@ export function Layout({ items }: { items: NavItem[] }) {
       >
         Skip to content
       </a>
+      {DemoBanner && (
+        <Suspense fallback={null}>
+          <DemoBanner />
+        </Suspense>
+      )}
 
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
         <Logo />

@@ -106,6 +106,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run build:demo  # static recorded demo (ADR-053)
 
   e2e:
     # The whole stack in fake mode (no model calls, Mailpit only), driven through the UI.
@@ -128,6 +129,9 @@ jobs:
       - run: npx playwright test
         working-directory: ui
         env: {CI: "1"}
+      - run: npx playwright test -c playwright.demo.config.ts  # recorded demo build, no backend (ADR-053)
+        working-directory: ui
+        env: {CI: "1"}
       - if: failure()
         run: docker compose logs --no-color > compose.log
       - if: failure()
@@ -136,6 +140,7 @@ jobs:
           name: e2e-report
           path: |
             ui/playwright-report
+            ui/playwright-report-demo
             ui/test-results
             compose.log
           retention-days: 7

@@ -1,6 +1,6 @@
 // Replay (ADR-040): pick a checkpoint, edit what may be edited there, fork, run, compare.
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "../../api/client";
 import type { CheckpointFields, CheckpointList, Lineage, Task } from "../../api/types";
@@ -11,6 +11,7 @@ import { nodeLabel } from "../../lib/diff";
 import { compact, relativeTime, shortId, usd } from "../../lib/format";
 import { hasErrors, validatePlan, type EditablePlan } from "../../lib/planEdit";
 import { PlanEditor, planFromPayload, planToPayload } from "../approvals/PlanEditor";
+import { DemoUnavailable } from "../../demo/lazy";
 
 interface ForkForm {
   request: string;
@@ -185,7 +186,7 @@ function ForkPanel({ taskId, checkpointId, defaults }: { taskId: string; checkpo
   );
 }
 
-export function ReplayPanel({ taskId }: { taskId: string }) {
+function LiveReplayPanel({ taskId }: { taskId: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [compareWith, setCompareWith] = useState<string>("");
@@ -344,4 +345,14 @@ export function ReplayPanel({ taskId }: { taskId: string }) {
       </Card>
     </div>
   );
+}
+
+export function ReplayPanel({ taskId }: { taskId: string }) {
+  if (DemoUnavailable)
+    return (
+      <Suspense fallback={null}>
+        <DemoUnavailable what="Replay (fork a run from a checkpoint)" />
+      </Suspense>
+    );
+  return <LiveReplayPanel taskId={taskId} />;
 }

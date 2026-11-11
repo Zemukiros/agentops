@@ -205,10 +205,29 @@ team@example.com."
   gets an `<actions>` block of what actually happened, and is told to report it as listed),
   with a unit test. **Not re-measured with real models:** the eval budget was spent.
 
+### Second walkthrough (2026-11-11, for the recorded demo)
+
+Same request and $0.20 cap on the merged code, recorded for the public demo (ADR-053):
+task `253a5593`, status `completed`, 17 model calls, 0 errors, **$0.0892**. The research
+subtask was accepted first time (4/5). The writing reviewer sent the email draft back twice and
+escalated after two revisions (scores 3, 3, 2); the reviewer accepted the drafts in the inbox,
+the email was approved and delivered **exactly once** (Mailpit, idempotency key). Wall 72 s,
+compute 65 s.
+
+- **ADR-052 confirmed with real models:** the deliverable reports "The brief (about 128 words)
+  was emailed to team@example.com", matching the action outcome.
+- **Open finding, not fixed:** every writing review said the proposed email's body was
+  "truncated after 'ordinary tables'" and followed by tool-result text, yet the email that was
+  approved and sent has the full body. The reviewer's view of a proposal looks truncated or
+  mixed with tool output; this cost two revisions and the escalation. Not yet investigated.
+- **Open finding, not fixed:** the final review (escalate, 3/5) called "was emailed" an
+  unverified claim. ADR-052 gave the synthesizer the action outcomes, but not the final reviewer.
+
 ## Not measured / limitations
 
 - Human review of the judge spot-check sample is pending.
-- ADR-052 (deliverables report real action outcomes) is tested in fake mode only.
+- ADR-052 (deliverables report real action outcomes) is unit-tested and confirmed on one real-model
+  run (the second walkthrough), not re-measured across the eval suite.
 - k = 3 gives wide per-scenario intervals; the eval budget (about $13 for a full run) is the limit.
 - Fixture web pages, not the live web; a synthetic demo database.
 - The memory screen (ADR-045) deliberately drops some legitimate preferences ("drafts should
@@ -231,6 +250,7 @@ team@example.com."
 | | **Eval total** (approved cap $18) | **$16.7698** |
 | task `351c8839` | real-model UI walkthrough (separate $0.20 cap) | $0.0764 |
 | | **Phase 6 total** | **$16.8462** |
+| task `253a5593` | second real-model UI walkthrough, recorded for the demo (ADR-053; $0.20 cap) | $0.0892 |
 
 ## Reproduce
 
