@@ -3,7 +3,7 @@
 _Update at the end of every work session and every phase. Keep it short. This is how work resumes without lost context._
 
 ## Current status
-- **Phase:** 6 — complete and merged (PR #6). Recorded public demo on branch `demo-site` (ADR-053).
+- **Phase:** 6 — complete and merged (PR #6). Recorded public demo live at https://agentops-demo-xi.vercel.app (ADR-053).
 - **Last updated:** 2026-11-11 (recorded demo, branch `demo-site`)
 - **Test status:** see the final Phase 6 summary; `make test`, `make test-ui`, `make e2e` (also at
   `E2E_CPU_THROTTLE=4`) pass. Not in `make test`: 1 `model` test, 4 `e2e` tests and the
@@ -163,7 +163,10 @@ Per call (input, output, actual cost; reserved = worst case held by the ledger, 
 
 **Phase 6** (per-run ledger in `docs/EVALUATION.md`): smoke $0.1804, baseline + fill $13.3857, re-measure A/B/C $3.2037 → eval **$16.7698** (cap $18); UI walkthrough **$0.0764** (cap $0.20). Phase 6 total **$16.8462**. Cumulative AgentOps: **$17.124375**.
 
-## Recorded demo (2026-11-11, branch `demo-site`, ADR-053)
+## Recorded demo (2026-11-11, PR #7 merged, ADR-053)
+- **Live:** https://agentops-demo-xi.vercel.app (Vercel Hobby, root `ui`). Verified live: security
+  headers, SPA deep links, immutable asset caching, full click-through to completed with no
+  outside requests and no console or CSP errors.
 - One fresh real-model walkthrough (task `253a5593`, $0.089155): completed, 2 human decisions,
   email sent exactly once; ADR-052 confirmed with real models; two new open findings (see
   `docs/EVALUATION.md`, second walkthrough).
